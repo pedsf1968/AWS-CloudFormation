@@ -1,0 +1,7 @@
+[
+    {
+      "ParameterKey": "BucketUrl",
+      "ParameterValue": "https://hawkfund-cloudformation.s3.eu-west-3.amazonaws.com/10_initialization"
+    }
+  ]
+  

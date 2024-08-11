@@ -1,0 +1,212 @@
+---
+# aws cloudformation validate-template --template-body file:/50-VPCPeeringAcrossRegionsA.yaml
+# aws cloudformation create-stack --stack-name ANS-50A --template-body file://50-VPCPeeringAcrossRegionsA.yaml --region eu-west-3 --capabilities CAPABILITY_IAM
+# aws cloudformation create-stack --stack-name ANS-50A --template-body file://50-VPCPeeringAcrossRegionsA.yaml --region eu-central-1 --capabilities CAPABILITY_IAM
+# aws cloudformation delete-stack --stack-name ANS-50A --region eu-west-3
+# aws cloudformation delete-stack --stack-name ANS-50A --region eu-central-1
+
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template deploys a VPC, Public and Private Subnets, Internet Gateway, Route Table, Custom DNS and Instances
+
+
+Mappings:
+  RegionMap:
+    eu-west-3:
+      VPCName: "A-VPC"
+      VPCCidr: 10.10.0.0/16
+      VPCPeeringConnectionName: "A-VPCPeering"
+      SubnetName: "A-PublicSubnet"
+      SubnetCidr: 10.10.0.0/24
+      SubnetPublic: True
+      SubnetRouteTableName: A-SubnetRouteTable
+      InstanceName: "A-Instance"
+      InstanceImageId: ami-015875403620174eb
+      KeyName: "dso-paris" 
+    eu-central-1:
+      VPCName: "B-VPC"
+      VPCCidr: 10.20.0.0/16
+      VPCPeeringConnectionName: "B-VPCPeering"
+      SubnetName: "B-PrivateSubnet"
+      SubnetCidr: 10.20.0.0/24
+      SubnetPublic: False
+      SubnetRouteTableName: B-SubnetRouteTable
+      InstanceName: "B-Instance"
+      InstanceImageId: ami-00060fac2f8c42d30 
+      KeyName: "dso-francfort"
+Parameters:    
+  InternetGatewayName:
+    Description: Internet Gateway name
+    Type: String
+    Default: "VPC-IGW"
+  DefaultRouteTableName:
+    Description: Default Route Table name
+    Type: String
+    Default: "VPC-RT"
+  
+
+Resources:
+  # VPC, DHCPOptions, Association and App and DB Subnets
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !FindInMap [RegionMap, !Ref "AWS::Region", VPCCidr]
+      EnableDnsSupport: "true"
+      EnableDnsHostnames: "true"
+      Tags:
+        - Key: Name
+          Value: !FindInMap [RegionMap, !Ref "AWS::Region", VPCName]
+
+  peerRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Principal:
+              AWS: !Ref AWS::AccountId
+            Action:
+              - 'sts:AssumeRole'
+            Effect: Allow
+      Path: /
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 'ec2:AcceptVpcPeeringConnection'
+                Resource: '*'
+
+  Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [ 0, !GetAZs ]
+      CidrBlock: !FindInMap [RegionMap, !Ref "AWS::Region", SubnetCidr]
+      MapPublicIpOnLaunch: !FindInMap [RegionMap, !Ref "AWS::Region", SubnetPublic]
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: !FindInMap [RegionMap, !Ref "AWS::Region", SubnetName]
+  
+  # Internet Gateway and Attachment
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Ref InternetGatewayName
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  # Route, Route Table and Associations
+  DefaultRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Ref DefaultRouteTableName
+  SubnetRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !FindInMap [RegionMap, !Ref "AWS::Region", SubnetRouteTableName] 
+
+  DefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref SubnetRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  SubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref SubnetRouteTable
+      SubnetId: !Ref Subnet
+
+  # Instances and Security Groups
+  Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone:  !Select [ 0, !GetAZs ]
+      ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", InstanceImageId]
+      InstanceType: t2.micro
+      KeyName: !FindInMap [RegionMap, !Ref "AWS::Region", KeyName]
+      SecurityGroupIds:
+        - !Ref SSHSecurityGroup
+        - !Ref ICMPSecurityGroup
+      SubnetId: !Ref Subnet
+      Tags:
+        - Key: Name
+          Value: !FindInMap [RegionMap, !Ref "AWS::Region", InstanceName]
+  
+  SSHSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable SSH access via port 22
+      SecurityGroupIngress:
+      - CidrIp: 0.0.0.0/0
+        FromPort: 22
+        IpProtocol: tcp
+        ToPort: 22
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: SSH-SG
+
+  ICMPSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable Ping
+      SecurityGroupIngress:
+      - CidrIp: !FindInMap [RegionMap, !Ref "AWS::Region", VPCCidr]
+        FromPort: -1
+        IpProtocol: icmp
+        ToPort: -1
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: ICMP-SG
+
+Outputs:
+  VpcId:
+    Description: Id of the VPC
+    Value: !Ref VPC
+  RoleARN:
+    Description: ARN of th Peering Role
+    Value: !GetAtt peerRole.Arn    
+  SubnetId:
+    Description: Id of the Subnet
+    Value: !Ref Subnet
+  InternetGatewayId:
+    Description: Id of the Internet Gateway
+    Value: !Ref InternetGateway
+  InternetGatewayAttachmentId:
+    Description: Id of the Internet Gateway Attachment
+    Value: !Ref InternetGatewayAttachment
+  DefaultRouteId:
+    Description: Id of the default Route Table
+    Value: !Ref DefaultRoute
+
+  SubnetRouteTableId:
+    Description: Id of the Subnet Route Table
+    Value: !Ref SubnetRouteTable
+  SubnetRouteTableAssociationId:
+    Description: Id of the Subnet Route Table Association
+    Value: !Ref SubnetRouteTableAssociation
+  SSHSecurityGroupId:
+    Description: Id of the SSH Security Group
+    Value: !Ref SSHSecurityGroup
+
+  InstanceId:
+    Description: Id of the Instance 
+    Value: !Ref Instance
+  InstancePrivateIP:
+    Description: Private IP v4 of the Instance 
+    Value: !GetAtt Instance.PrivateIp

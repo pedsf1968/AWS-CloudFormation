@@ -1,0 +1,18 @@
+# aws cloudformation update-stack --stack-name cfn-demo-s3 --template-body file://2-adding-access-control.yaml
+# aws cloudformation delete-stack --stack-name cfn-demo-s3
+---
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description:
+  Simple public S3 bucket
+
+Resources:
+  MyS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: ObjectWriter
+      

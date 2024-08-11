@@ -1,0 +1,76 @@
+# générer une erreur si les ressources n'incluent pas de centre de coûts
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Macro that ensures every EBS volume is encrypted
+Resources:
+  LambdaIamRole:
+    Type: "AWS::IAM::Role"
+    Properties: 
+      AssumeRolePolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - Effect: "Allow"
+            Principal: 
+              Service: 
+                - lambda.amazonaws.com
+            Action: 
+              - "sts:AssumeRole"
+      Policies: 
+        - 
+          PolicyName: "LambdaPolicy"
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement: 
+              - 
+                Effect: "Allow"
+                Action: 
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: "*"
+
+
+  LambdaFunction:
+    Type: "AWS::Lambda::Function"
+    Properties: 
+      FunctionName: ErrorIfNotCostCenter
+      Handler: index.handler
+      Role: !GetAtt LambdaIamRole.Arn
+      Runtime: python3.6
+      Code: 
+        ZipFile: |
+          def fail_if_no_cost_center(name,resource):
+            print('resource', resource)
+            if 'Properties' not in resource:
+              raise Exception(name+' does not have any Properties')  
+            if 'Tags' not in resource['Properties']:
+              raise Exception(name+' missing CostCenter tag')  
+            if not list(filter(lambda x: x['Key']=='CostCenter', resource['Properties']['Tags'])):
+              raise Exception(name+' missing CostCenter tag')  
+
+          def transform_fragment(event):
+            for name,resource in event['fragment']['Resources'].items():
+              fail_if_no_cost_center(name,resource)            
+            return {
+              "requestId": event['requestId'],
+              "status": "success",
+              "fragment": event['fragment']
+            }
+
+          def handler(event, context):
+            try:
+              return transform_fragment(event)
+            except BaseException as ex:
+              print("Error - "+str(ex))
+              return {
+                "requestId": event['requestId'],
+                "status": "ERROR - "+str(ex),
+                "fragment": {}
+              }
+
+  Macro:
+    Type: AWS::CloudFormation::Macro
+    Properties:
+      Name: ErrorIfNotCostCenter
+      Description: Global macro. Ensure every resource is tagged with a cost center.
+      FunctionName: !Ref LambdaFunction
+

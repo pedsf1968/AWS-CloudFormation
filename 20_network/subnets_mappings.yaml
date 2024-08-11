@@ -1,0 +1,21 @@
+Mappings:
+  eu-west-1:
+    a: 
+      public: 10.100.0.0/24
+      private: 10.100.16.0/20
+    b: 
+      public: 10.100.1.0/24
+      private: 10.100.32.0/20
+    c: 
+      public: 10.100.2.0/24
+      private: 10.100.48.0/20
+  eu-west-3:
+    a: 
+      public: 10.100.0.0/24
+      private: 10.100.16.0/20
+    b: 
+      public: 10.100.1.0/24
+      private: 10.100.32.0/20
+    c: 
+      public: 10.100.2.0/24
+      private: 10.100.48.0/20

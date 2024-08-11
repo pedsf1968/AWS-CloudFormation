@@ -1,0 +1,93 @@
+{
+    "Resources": {
+        "PrivateSubnetA": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": "vpc-0358a820bb1eded35",
+                "CidrBlock": "10.100.16.0/20",
+                "AvailabilityZone": "eu-west-3a",
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "HKF-dev Private SubnetA"
+                    },
+                    {
+                        "Key": "Project",
+                        "Value": "HKF"
+                    },
+                    {
+                        "Key": "Env",
+                        "Value": "dev"
+                    }
+                ]
+            }
+        },
+        "PrivateSubnetB": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": "vpc-0358a820bb1eded35",
+                "CidrBlock": "10.100.32.0/20",
+                "AvailabilityZone": "eu-west-3b",
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "HKF-dev Private SubnetB"
+                    },
+                    {
+                        "Key": "Project",
+                        "Value": "HKF"
+                    },
+                    {
+                        "Key": "Env",
+                        "Value": "dev"
+                    }
+                ]
+            }
+        },
+        "PrivateSubnetC": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": "vpc-0358a820bb1eded35",
+                "CidrBlock": "10.100.48.0/20",
+                "AvailabilityZone": "eu-west-3c",
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "HKF-dev Private SubnetC"
+                    },
+                    {
+                        "Key": "Project",
+                        "Value": "HKF"
+                    },
+                    {
+                        "Key": "Env",
+                        "Value": "dev"
+                    }
+                ]
+            }
+        }
+    },
+    "Outputs": {
+        "PrivateSubnetIdA": {
+            "Description": "ID of the Private SubnetA",
+            "Value": "!Ref PrivateSubnetA",
+            "Export": {
+                "Name": "!Sub ${ProjectName}-${EnvironmentName}-PrivateSubnetIdA"
+            }
+        },
+        "PrivateSubnetIdB": {
+            "Description": "ID of the Private SubnetB",
+            "Value": "!Ref PrivateSubnetB",
+            "Export": {
+                "Name": "!Sub ${ProjectName}-${EnvironmentName}-PrivateSubnetIdB"
+            }
+        },
+        "PrivateSubnetIdC": {
+            "Description": "ID of the Private SubnetC",
+            "Value": "!Ref PrivateSubnetC",
+            "Export": {
+                "Name": "!Sub ${ProjectName}-${EnvironmentName}-PrivateSubnetIdC"
+            }
+        }
+    }
+}

@@ -1,0 +1,3 @@
+https://eu-central-1.console.aws.amazon.com/cloudformation/home?region=eu-central-1#/stacks/create/review?templateURL=https://s3.eu-central-1.amazonaws.com/cloudformation-templates-eu-central-1/WordPress_Single_Instance.template&stackName=MyWPBlog&param_DBName=mywpblog&param_InstanceType=t2.medium&param_KeyName=DemoKeyPair
+
+https://eu-west-3.console.aws.amazon.com/cloudformation/home?region=eu-west-3#/stacks/quickcreate?templateURL=https%3A%2F%2Fs3.eu-west-3.amazonaws.com%2Fcf-templates-fcusuc682bnl-eu-west-3%2F2023-11-06T180132.886Z7ms-2-cfn-init.yaml&stackName=DemoQuickCreate&param_KeyName=cloudformation-ec2-key&param_SSHLocation=0.0.0.0%2F0&param_MyS3BucketName=pedsf-demo-s3&param_ImageId=%2Faws%2Fservice%2Fami-amazon-linux-latest%2Famzn2-ami-hvm-x86_64-gp2

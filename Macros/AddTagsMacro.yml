@@ -1,0 +1,76 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Macro that adds given tags
+Resources:
+  LambdaIamRole:
+    Type: "AWS::IAM::Role"
+    Properties: 
+      AssumeRolePolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - Effect: "Allow"
+            Principal: 
+              Service: 
+                - lambda.amazonaws.com
+            Action: 
+              - "sts:AssumeRole"
+      Policies: 
+        - 
+          PolicyName: "LambdaPolicy"
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement: 
+              - 
+                Effect: "Allow"
+                Action: 
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: "*"
+
+
+  AddTagsLambdaFunction:
+    Type: "AWS::Lambda::Function"
+    Properties: 
+      FunctionName: AddTags
+      Handler: index.handler
+      Role: !GetAtt LambdaIamRole.Arn
+      Runtime: python3.6
+      Code: 
+        ZipFile: |
+          def add_tags_to_resource(resource, tags):
+            if('Properties' not in resource):
+              resource['Properties']={}
+            if('Tags' not in resource['Properties']):
+                  resource['Properties']['Tags']=[]
+            resource['Properties']['Tags'].extend( tags )
+            return resource
+
+          def transform_fragment(event):
+            tag_list=event['params']['Tags']
+            tag_tuples=map( lambda kv: kv.split("="), tag_list)
+            tags=map( lambda t: {'Key':t[0],'Value':t[1]}, tag_tuples)
+            new_fragment={k: add_tags_to_resource(v,tags) for k, v in event['fragment'].items()}
+            return {
+              "requestId": event['requestId'],
+              "status": "success",
+              "fragment": new_fragment
+            }
+
+          def handler(event, context):
+            try:
+              return transform_fragment(event)
+            except BaseException as ex:
+              print("Error - "+str(ex))
+              return {
+                "requestId": event['requestId'],
+                "status": "ERROR - "+str(ex),
+                "fragment": {}
+              }
+
+  AddTagsStringMacro:
+    Type: AWS::CloudFormation::Macro
+    Properties:
+      Name: AddTags
+      Description: Adds tags to every resource
+      FunctionName: !Ref AddTagsLambdaFunction
+

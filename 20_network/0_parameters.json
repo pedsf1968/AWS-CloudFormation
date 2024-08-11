@@ -1,0 +1,23 @@
+[
+    {
+      "ParameterKey": "EnvironmentName",
+      "ParameterValue": "dev"
+    },
+    {
+      "ParameterKey": "ProjectName",
+      "ParameterValue": "Hawkfund"
+    },
+    {
+      "ParameterKey": "VpcCidrBlock",
+      "ParameterValue": "10.100.0.0/16"
+    },
+    {
+      "ParameterKey": "VpcPrivateSubnets",
+      "ParameterValue": "10.100.16.0/20,10.100.32.0/20,10.100.48.0/20"
+    },
+    {
+      "ParameterKey": "VpcPublicSubnets",
+      "ParameterValue": "10.100.1.0/24,10.100.2.0/24,10.100.3.0/24"
+    }
+  ]
+  

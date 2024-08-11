@@ -1,0 +1,188 @@
+---
+# aws cloudformation validate-template --template-body file://_network.yaml
+# aws cloudformation create-stack --stack-name ROOT-10-network --template-body file://_network.yaml 
+#                                 --parameters ParameterKey=ProjectName,ParameterValue='hk' 
+#                                              ParameterKey=EnvironmentName,ParameterValue='dev'
+#                                              ParameterKey=VpcCIDR,ParameterValue='10.192.0.0/16'
+
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template deploys a VPC, with a pair of public and private subnets spread
+  across three Availability Zones. It deploys an internet gateway, with a default
+  route on the public subnets. It deploys a pair of NAT gateways (one in each AZ),
+  and default routes for them in the private subnets.
+
+
+Parameters:
+  BucketUrl:
+    Description: CloudFormation buket URL
+    Type: String
+    Default: "https://hawkfund-cloudformation.s3.eu-west-3.amazonaws.com"
+
+  ProjectName:
+    Description: A Project name that is prefixed to resource names
+    Type: String
+    Default: "hk"
+
+  EnvironmentName:
+    Description: An environment name that is prefixed to resource names
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+
+  VpcCidrBlock:
+    Description: Please enter the IP range (CIDR notation) for this VPC
+    Type: String
+    Default: 10.192.0.0/16
+
+  SubnetMask:
+    Description: Mask of subnets 24 by default
+    Type: Number
+    MinValue: 17
+    MaxValue: 30
+    Default: 24
+
+  PrivateSubnetByAZ:
+    Description: Number of Private Subnet in AZ
+    Type: Number
+    MinValue: 1
+    MaxValue: 2
+    Default: 1
+     
+  PublicSubnetByAZ:
+    Description: Number of Public Subnet in AZ
+    Type: Number
+    MinValue: 1
+    MaxValue: 2
+    Default: 1
+
+Resources:
+  CustomResourceStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "${BucketUrl}/10_network/5_custom_resources.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        SubnetMask: !Ref SubnetMask
+        PrivateSubnetByAZ: !Ref PrivateSubnetByAZ
+        PublicSubnetByAZ: !Ref PublicSubnetByAZ
+
+  VpcStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "${BucketUrl}/10_network/10_vpc.yaml"
+      TimeoutInMinutes: 2
+      Parameters:
+        ProjectName: !Ref ProjectName
+        EnvironmentName: !Ref EnvironmentName
+        VpcCidrBlock: !Ref VpcCidrBlock
+
+  InternetGatewayStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "${BucketUrl}/10_network/20_internet_gateway.yaml"
+      TimeoutInMinutes: 2
+      Parameters:
+        ProjectName: !Ref ProjectName
+        EnvironmentName: !Ref EnvironmentName
+        VpcId: !GetAtt VpcStack.Outputs.VpcId
+      
+  PrivateSubnetsStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "${BucketUrl}/10_network/30_private_subnets.yaml"
+      TimeoutInMinutes: 2
+      Parameters:
+        ProjectName: !Ref ProjectName
+        EnvironmentName: !Ref EnvironmentName
+        VpcId: !GetAtt VpcStack.Outputs.VpcId
+        VpcCidrBlock: !Ref VpcCidrBlock
+        VpcCidrBlockCount: !GetAtt CustomResourceStack.Outputs.VpcCidrBlockCount
+        VpcCidrBlockCidrBits: !GetAtt CustomResourceStack.Outputs.VpcCidrBlockCidrBits
+
+  PublicSubnetsStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "${BucketUrl}/10_network/40_public_subnets.yaml"
+      TimeoutInMinutes: 2
+      Parameters:
+        ProjectName: !Ref ProjectName
+        EnvironmentName: !Ref EnvironmentName
+        VpcId: !GetAtt VpcStack.Outputs.VpcId
+        VpcCidrBlock: !Ref VpcCidrBlock
+        VpcCidrBlockCount: !GetAtt CustomResourceStack.Outputs.VpcCidrBlockCount
+        VpcCidrBlockCidrBits: !GetAtt CustomResourceStack.Outputs.VpcCidrBlockCidrBits
+
+
+  NatGatewaysStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "${BucketUrl}/10_network/50_nat_gateway.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        ProjectName: !Ref ProjectName
+        EnvironmentName: !Ref EnvironmentName
+        PublicSubnetId1: !GetAtt PublicSubnetsStack.Outputs.PublicSubnetId1
+        PublicSubnetId2: !GetAtt PublicSubnetsStack.Outputs.PublicSubnetId2
+        PublicSubnetId3: !GetAtt PublicSubnetsStack.Outputs.PublicSubnetId3
+        
+  PublicRouteTableStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "${BucketUrl}/10_network/60_public_route_table.yaml"
+      TimeoutInMinutes: 2
+      Parameters:
+        ProjectName: !Ref ProjectName
+        EnvironmentName: !Ref EnvironmentName
+        VpcId: !GetAtt VpcStack.Outputs.VpcId
+        InternetGatewayId: !GetAtt InternetGatewayStack.Outputs.InternetGatewayId      
+        PublicSubnetId1: !GetAtt PublicSubnetsStack.Outputs.PublicSubnetId1
+        PublicSubnetId2: !GetAtt PublicSubnetsStack.Outputs.PublicSubnetId2
+        PublicSubnetId3: !GetAtt PublicSubnetsStack.Outputs.PublicSubnetId3
+
+  PrivateRouteTableStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "${BucketUrl}/10_network/70_private_route_table.yaml"
+      TimeoutInMinutes: 2
+      Parameters:
+        ProjectName: !Ref ProjectName
+        EnvironmentName: !Ref EnvironmentName
+        VpcId: !GetAtt VpcStack.Outputs.VpcId
+        PrivateSubnetId1: !GetAtt PrivateSubnetsStack.Outputs.PrivateSubnetId1
+        PrivateSubnetId2: !GetAtt PrivateSubnetsStack.Outputs.PrivateSubnetId2
+        PrivateSubnetId3: !GetAtt PrivateSubnetsStack.Outputs.PrivateSubnetId3
+        NatGatewayId1: !GetAtt NatGatewaysStack.Outputs.NatGatewayId1
+        NatGatewayId2: !GetAtt NatGatewaysStack.Outputs.NatGatewayId2
+        NatGatewayId3: !GetAtt NatGatewaysStack.Outputs.NatGatewayId3
+
+  SecurityGroupStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "${BucketUrl}/10_network/80_security_groups.yaml"
+      TimeoutInMinutes: 2
+      Parameters:
+        ProjectName: !Ref ProjectName
+        EnvironmentName: !Ref EnvironmentName
+        VpcId: !GetAtt VpcStack.Outputs.VpcId
+  

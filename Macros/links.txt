@@ -1,0 +1,2 @@
+https://docs.aws.amazon.com/fr_fr/AWSCloudFormation/latest/UserGuide/template-macros.html
+https://github.com/awslabs/aws-cloudformation-templates/tree/master/aws/services/CloudFormation/MacrosExamples/

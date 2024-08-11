@@ -1,0 +1,53 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Transform:
+  - MacroSubnets
+  - AWS::LanguageExtensions
+Description: "This template deploys private subnets spread across three Availability Zones."
+
+Parameters:
+  EnvironmentName:
+    Description: "An environment name that is prefixed to resource names"
+    Type: String
+  ProjectName:
+    Description: "A Project name that is prefixed to resource names"
+    Type: String
+  # For Subnets Macro to loop on AZ
+  MACROAZ:
+    Description: "List of AZ to spread VPC"
+    Type: CommaDelimitedList
+  # For Subnets Macro one subnet for each AZ
+  MACROSubnets:
+    Description: "List of Public Subnets for all AZs"
+    Type: CommaDelimitedList
+  VpcId:
+    Description: ID of the VPC
+    Type: String 
+  
+Resources:
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      # Set prefix for MACRO parameters
+      MacroSubnets: MACRO
+      # For preventing erros on Transform use first AZ, will be repaced by Subnets Macro
+      AvailabilityZone: !Select [0, !Ref MACROAZ]
+      # For preventing errors on Transform, use the first subnet, will be repaced by Subnets Macro
+      CidrBlock: !Select [0, !Ref MACROSubnets]
+      MapPublicIpOnLaunch: true
+      VpcId: !Ref VpcId
+      Tags:
+      - Key: Name
+        Value: !Sub ${ProjectName}-${EnvironmentName} Public Subnet
+      - Key: Project
+        Value: !Ref ProjectName
+      - Key: Env
+        Value: !Ref EnvironmentName
+
+Outputs:
+  PublicSubnet:
+    MacroSubnets: MACRO
+    Description: ID of the Public Subnet
+    Value: !Ref PublicSubnet
+    Export:
+      Name: !Sub "${ProjectName}-${EnvironmentName}-PublicSubnet"

@@ -1,0 +1,205 @@
+---
+# aws cloudformation validate-template --template-body file://10_lambda.yaml
+
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template for creating lambda used by CloudFormation other's stacks
+
+Resources:
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action: 
+          - sts:AssumeRole
+          Effect: Allow
+          Principal: 
+            Service: 
+            - lambda.amazonaws.com
+        Version: '2012-10-17'          
+      Path: "/"
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  # GetAzByInitials:
+  #   Type: AWS::Lambda::Function
+  #   Properties:
+  #     Code:
+  #       ZipFile: |
+  #         var response = require('cfn-response');
+  #         exports.handler = function(event, context) {
+  #           var azInitials = [];
+  #           for (var az of event.ResourceProperties.azList) {
+  #             azInitials.push(az.substring(az.length -1));
+  #           }            
+  #           response.send(event, context, response.SUCCESS, {azInitials: azInitials});
+  #         };
+  #     Description: Return a list of AZ last character
+  #     FunctionName: GetAzByInitials
+  #     Handler: index.handler
+  #     MemorySize: 128
+  #     Role: !GetAtt GetAzByInitials.Arn
+  #     Runtime: nodejs18.x
+
+  GetResourceProperties:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          var response = require('cfn-response');
+          exports.handler = function(event, context) {
+            var result = event.ResourceProperties;
+            response.send(event, context, response.SUCCESS, {Value: result});
+          };
+      Description: Function to test parameters and output ResourceProperties in CloudWatch
+      FunctionName: GetResourceProperties
+      Handler: index.handler
+      MemorySize: 128
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: nodejs18.x
+
+
+  GetCidrBlockCidrBits:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          var response = require('cfn-response');
+          exports.handler = function(event, context) {
+            var result = 32 - parseInt(event.ResourceProperties.mask);
+            response.send(event, context, response.SUCCESS, {Value: result});
+          };
+      Description: Calculate the number of 0 bits in mask for IPv4
+      FunctionName: GetCidrBlockCidrBits
+      Handler: index.handler
+      MemorySize: 128
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: nodejs18.x
+
+  GetSubnetCount:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          var response = require('cfn-response');
+          exports.handler = function(event, context) {
+            var result = event.ResourceProperties.azList.length * 2;
+            response.send(event, context, response.SUCCESS, {Value: result});
+          };
+      Description: Calculate the number of subnet needed
+      FunctionName: GetSubnetCount
+      Handler: index.handler
+      MemorySize: 128
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: nodejs18.x
+
+  GetOneCidrBlock:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          var response = require('cfn-response');
+          exports.handler = function(event, context) {
+            response.send(event, context, response.SUCCESS, {cidrBlocka: "10.200.16.0/20",cidrBlockb: "10.200.32.0/20",cidrBlockc: "10.200.48.0/20"});
+          };
+      Description: Return az long and short Name and associated CidrBlock
+      FunctionName: GetOneCidrBlock
+      Handler: index.handler
+      MemorySize: 128
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: nodejs18.x                 
+
+# GetOneCidrBlock:
+#     Type: AWS::Lambda::Function
+#     Properties:
+#       Code:
+#         ZipFile: |
+#           var response = require('cfn-response');
+#           const region = process.env.AWS_REGION;
+#           var subnetsArray = [];
+#           var azArray = [];
+#           exports.handler = function(event, context) {
+#             console.log("region: ",region);
+#             console.log("subnetsArray: ",subnetsArray);
+#             console.log("azArray: ",azArray);
+#             if (subnetsArray.length == 0) {
+#               var subnets = event.ResourceProperties.subnets;
+#               subnetsArray = subnets.split(",");
+#               azArray = event.ResourceProperties.azList;
+#             }
+#             var azName = azArray.shift();
+#             var shortAz = azName.replace(region, '');
+#             var cidrBlock = subnetsArray.shift();
+
+#             console.log("subnetsArray: ",subnetsArray)
+#             console.log("azArray: ",azArray);
+#             console.log("azName: ",azName);
+#             console.log("shortAz: ",shortAz);
+#             console.log("cidrBlock: ",cidrBlock);
+
+#             response.send(event, context, response.SUCCESS, {azName: azName, shortAz: shortAz, cidrBlock: cidrBlock});
+#           };
+#       Description: Return az long and short Name and associated CidrBlock
+#       FunctionName: GetOneCidrBlock
+#       Handler: index.handler
+#       MemorySize: 128
+#       Role: !GetAtt LambdaExecutionRole.Arn
+#       Runtime: nodejs18.x                 
+
+  GetSubnetsLists:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          var response = require('cfn-response');
+          const region = process.env.AWS_REGION;
+
+          exports.handler = function(event, context) { 
+            var subnetsArray = event.ResourceProperties.subnets;
+            var shortAz = [];
+            var privateSubnets = [];
+            var publicSubnets = [];
+            for (var az of event.ResourceProperties.azList) { 
+              shortAz.push(az.replace(region, ''));             
+              privateSubnets.push(subnetsArray.shift());
+              publicSubnets.push(subnetsArray.shift());
+            }
+            response.send(event, context, response.SUCCESS, {shortAz: shortAz, privateSubnets: privateSubnets, publicSubnets: publicSubnets});
+          };
+      Description: Return maps of private and public subnets by AZ
+      FunctionName: GetSubnetsLists
+      Handler: index.handler
+      MemorySize: 128
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: nodejs18.x                 
+
+Outputs:
+  GetCidrBlockCidrBitsArn:
+    Description: The ARN of GetCidrBlockCidrBits Lambda
+    Value: !GetAtt GetCidrBlockCidrBits.Arn
+    Export:
+      Name: GetCidrBlockCidrBits
+
+  GetOneCidrBlockArn:
+    Description: The ARN of GetOneCidrBlock Lambda
+    Value: !GetAtt GetOneCidrBlock.Arn
+    Export:
+      Name: GetOneCidrBlock
+
+  GetSubnetCountArn:
+    Description: The ARN of GetSubnetCount Lambda
+    Value: !GetAtt GetSubnetCount.Arn
+    Export:
+      Name: GetSubnetCount
+
+  GetSubnetsListsArn:
+    Description: The ARN of GetSubnetsLists Lambda
+    Value: !GetAtt GetSubnetsLists.Arn
+    Export:
+      Name: GetSubnetsLists
+
+  GetResourcePropertiesArn:
+    Description: the ARN of GetResourceProperties Lambda
+    Value: !GetAtt GetResourceProperties.Arn
+    Export:
+      Name: GetResourceProperties

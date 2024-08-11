@@ -1,0 +1,48 @@
+---
+# aws cloudformation validate-template --template-body file://20_internet_gateway.yaml
+
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template deploys the Internet Gateway and link to VPC
+Transform: AWS::LanguageExtensions
+
+Parameters:
+  ProjectName:
+    Description: A Project name that is prefixed to resource names
+    Type: String
+    Default: "hk"
+  EnvironmentName:
+    Description: An environment name that is prefixed to resource names
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+  VpcId:
+    Description: ID of the VPC
+    Type: String
+
+Resources:
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${EnvironmentName}-IGW
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Env
+          Value: !Ref EnvironmentName
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VpcId
+
+Outputs:
+  InternetGatewayId:
+    Description: ID of the Internet Gateway
+    Value: !Ref InternetGateway
+    Export:
+      Name: !Sub "${ProjectName}-${EnvironmentName}-IGW"

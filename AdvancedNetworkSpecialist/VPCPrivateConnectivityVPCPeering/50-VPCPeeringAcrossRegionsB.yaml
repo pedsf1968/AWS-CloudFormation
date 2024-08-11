@@ -1,0 +1,35 @@
+---
+# aws cloudformation validate-template --template-body file:/50-VPCPeeringAcrossRegionsB.yaml
+# aws cloudformation create-stack --stack-name ANS-50B --template-body file://50-VPCPeeringAcrossRegionsB.yaml --region eu-west-3
+#                                 --parameters ParameterKey=VPCLocalID,ParameterValue=[A VPC ID] ParameterKey=VPCRemoteID,ParameterValue=[B VPC ID]
+# aws cloudformation create-stack --stack-name ANS-50B --template-body file://50-VPCPeeringAcrossRegionsB.yaml --region eu-central-1
+#                                 --parameters ParameterKey=VPCLocalID,ParameterValue=[B VPC ID] ParameterKey=VPCRemoteID,ParameterValue=[A VPC ID]
+# aws cloudformation delete-stack --stack-name ANS-50B --region eu-west-3
+# aws cloudformation delete-stack --stack-name ANS-50B --region eu-central-1
+
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template deploys a VPC, Public and Private Subnets, Internet Gateway, Route Table, Custom DNS and Instances
+
+
+Parameters:    
+  VPCLocalID:
+    Description: ID of the VPC in A Region
+    Type: String
+    Default : vpc-079950b150f8657dd
+  VPCRemoteID:
+    Description: ID of the VPC in B Region
+    Type: String
+    Default: vpc-00fe0537c982df979
+
+Resources:
+  # VPC Peering
+  VPCPeeringConnection:
+    Type: AWS::EC2::VPCPeeringConnection
+    Properties:
+      VpcId: !Ref VPCRemoteID
+      PeerVpcId: !Ref VPCLocalID
+      Tags:
+      - Key: Name
+        Value: VPCPeeringConnection
+
+  

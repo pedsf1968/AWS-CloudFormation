@@ -1,0 +1,77 @@
+# vérifier que les volumes EBS sont chiffrés
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Macro that ensures every EBS volume is encrypted
+Resources:
+  LambdaIamRole:
+    Type: "AWS::IAM::Role"
+    Properties: 
+      AssumeRolePolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - Effect: "Allow"
+            Principal: 
+              Service: 
+                - lambda.amazonaws.com
+            Action: 
+              - "sts:AssumeRole"
+      Policies: 
+        - 
+          PolicyName: "LambdaPolicy"
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement: 
+              - 
+                Effect: "Allow"
+                Action: 
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: "*"
+
+
+  LambdaFunction:
+    Type: "AWS::Lambda::Function"
+    Properties: 
+      FunctionName: EncryptEBSVolumes
+      Handler: index.handler
+      Role: !GetAtt LambdaIamRole.Arn
+      Runtime: python3.6
+      Code: 
+        ZipFile: |
+          def encrypt_if_EBS_volume(resource):
+            if(resource['Type']!='AWS::EC2::Volume'):
+              return resource
+            if('Properties' not in resource):
+              resource['Properties']={}
+            resource['Properties']['Encrypted']=True
+            return resource
+
+          def transform_fragment(event):
+            event['fragment']['Resources'] = {
+              name: encrypt_if_EBS_volume(resource) for name, resource in event['fragment']['Resources'].items()
+            }
+            
+            return {
+              "requestId": event['requestId'],
+              "status": "success",
+              "fragment": event['fragment']
+            }
+
+          def handler(event, context):
+            try:
+              return transform_fragment(event)
+            except BaseException as ex:
+              print("Error - "+str(ex))
+              return {
+                "requestId": event['requestId'],
+                "status": "ERROR - "+str(ex),
+                "fragment": {}
+              }
+
+  Macro:
+    Type: AWS::CloudFormation::Macro
+    Properties:
+      Name: EncryptEBSVolumes
+      Description: Makes sure the Encrypted property is true for any EBS Volume
+      FunctionName: !Ref LambdaFunction
+

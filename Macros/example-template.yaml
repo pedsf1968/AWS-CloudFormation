@@ -1,0 +1,18 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+GroupDescription:
+  String
+Metadata:
+  tempalte metadata
+Parameters:
+  set og parameters
+Mappings:
+  set of mappings
+Conditions:
+  set of conditions
+Transform:
+  set of transforms
+Resources:
+  set of resources
+Outputs:
+  set of outputs

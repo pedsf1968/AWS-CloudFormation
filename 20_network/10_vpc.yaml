@@ -1,0 +1,36 @@
+---
+# aws cloudformation validate-template --template-body file://10_vpc.yaml
+
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template deploys a VPC
+Transform: AWS::LanguageExtensions
+
+Parameters:
+  EnvironmentName:
+    Description: An environment name that is prefixed to resource names
+    Type: String
+  ProjectName:
+    Description: A Project name that is prefixed to resource names
+    Type: String
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Sub "{{resolve:ssm:/${ProjectName}/${EnvironmentName}/VpcCidrBlock}}"
+      EnableDnsSupport: "true"
+      EnableDnsHostnames: "true"
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-Vpc"
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Env
+          Value: !Ref EnvironmentName
+
+Outputs:
+  VpcId:
+    Description: Id of the VPC
+    Value: !Ref VPC
+    Export:
+      Name: !Sub "${ProjectName}-${EnvironmentName}-VpcId"

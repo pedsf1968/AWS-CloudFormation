@@ -1,0 +1,71 @@
+# Analyse des variables dans une chaîne
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Macro that ensures every EBS volume is encrypted
+Resources:
+  LambdaIamRole:
+    Type: "AWS::IAM::Role"
+    Properties: 
+      AssumeRolePolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - Effect: "Allow"
+            Principal: 
+              Service: 
+                - lambda.amazonaws.com
+            Action: 
+              - "sts:AssumeRole"
+      Policies: 
+        - 
+          PolicyName: "LambdaPolicy"
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement: 
+              - 
+                Effect: "Allow"
+                Action: 
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: "*"
+
+
+  LambdaFunction:
+    Type: "AWS::Lambda::Function"
+    Properties: 
+      FunctionName: ExtractVarsMacro
+      Handler: index.handler
+      Role: !GetAtt LambdaIamRole.Arn
+      Runtime: python3.6
+      Code: 
+        ZipFile: |
+          def transform_fragment(event):
+              expr=event['params']['Expression']
+              var_name=event['params']['Variable']
+
+              var=list(filter( lambda v: v[0]== var_name,
+                  map( lambda kv: kv.split("="), expr.split(',') )
+              ))
+              print('var',var)
+              return {
+                  "requestId": event['requestId'],
+                  "status": "success",
+                  "fragment": var[0][1]
+              }
+
+          def handler(event, context):
+              try:
+                  return transform_fragment(event)
+              except BaseException as ex:
+                  print("Error - "+str(ex))
+                  return {
+                      "requestId": event['requestId'],
+                      "status": "ERROR - "+str(ex),
+                      "fragment": {}
+                  }
+  Macro:
+    Type: AWS::CloudFormation::Macro
+    Properties:
+      Name: ExtractVarsMacro
+      Description: Makes sure the Encrypted property is true for any EBS Volume
+      FunctionName: !Ref LambdaFunction
+

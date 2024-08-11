@@ -1,0 +1,113 @@
+---
+# aws cloudformation validate-template --template-body file://70_private_route_table.yaml
+
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template deploys Privates Route Tables spread across three Availability Zones.
+
+Parameters:
+  ProjectName:
+    Description: A Project name that is prefixed to resource names
+    Type: String
+    Default: "hk"
+
+  EnvironmentName:
+    Description: An environment name that is prefixed to resource names
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+
+  VpcId:
+    Description: ID of the VPC
+    Type: String
+
+  PrivateSubnetId1:
+    Description:  A reference to the private subnet in the 1st Availability Zone
+    Type: String
+
+  PrivateSubnetId2:
+    Description:  A reference to the private subnet in the 2nd Availability Zone
+    Type: String
+
+  PrivateSubnetId3:
+    Description:  A reference to the private subnet in the 3rd Availability Zone
+    Type: String
+
+  NatGatewayId1:
+    Description: A reference to the Nat Gateway in the 1st Availability Zone
+    Type: String
+
+  NatGatewayId2:
+    Description: A reference to the Nat Gateway in the 2nd Availability Zone
+    Type: String
+
+  NatGatewayId3:
+    Description: A reference to the Nat Gateway in the 3rd Availability Zone
+    Type: String
+
+
+Resources:
+  PrivateRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${EnvironmentName} Private Routes (!Ref AvailabilityZone)
+
+  DefaultPrivateRoute1:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGatewayId1
+
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      SubnetId: !Ref PrivateSubnetId1
+
+  PrivateRouteTable2:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${EnvironmentName} Private Routes (!Ref AvailabilityZone)
+
+  DefaultPrivateRoute2:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGatewayId2
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      SubnetId: !Ref PrivateSubnetId2
+
+  PrivateRouteTable3:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${EnvironmentName} Private Routes (!Ref AvailabilityZone)
+
+  DefaultPrivateRoute3:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable3
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGatewayId3
+
+  PrivateSubnet3RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable3
+      SubnetId: !Ref PrivateSubnetId3

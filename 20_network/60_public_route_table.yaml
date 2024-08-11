@@ -1,0 +1,76 @@
+---
+# aws cloudformation validate-template --template-body file://60_public_route_table.yaml
+
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template deploys Public Route Tables spread across three Availability Zones.
+
+Parameters:
+  ProjectName:
+    Description: A Project name that is prefixed to resource names
+    Type: String
+    Default: "hk"
+
+  EnvironmentName:
+    Description: An environment name that is prefixed to resource names
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+
+  VpcId:
+    Description: ID of the VPC
+    Type: String
+
+  InternetGatewayId:
+    Description: ID of the Internet Gateway
+    Type: String
+
+  PublicSubnetId1:
+    Description:  A reference to the public subnet in the 1st Availability Zone
+    Type: String
+
+  PublicSubnetId2:
+    Description:  A reference to the public subnet in the 2nd Availability Zone
+    Type: String
+
+  PublicSubnetId3:
+    Description:  A reference to the public subnet in the 3rd Availability Zone
+    Type: String
+
+Resources:
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${EnvironmentName} Public Routes
+
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGatewayId
+
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnetId1
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnetId2
+
+  PublicSubnet3RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnetId3
+
+

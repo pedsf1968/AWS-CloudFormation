@@ -1,0 +1,26 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template deploys initial configuration for all other stacks
+
+Parameters:
+  BucketUrl:
+    Description: CloudFormation buket URL
+    Type: String
+    Default: "https://hawkfund-cloudformation.s3.eu-west-3.amazonaws.com/10_initialization"
+
+Resources:
+  LambdaStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete          
+    Properties:
+      TemplateURL: !Sub "${BucketUrl}/10_lambda.yaml"
+      TimeoutInMinutes: 5
+
+  MacroStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy:  Delete
+    UpdateReplacePolicy: Delete          
+    Properties:
+      TemplateURL: !Sub "${BucketUrl}/20_macro.yaml"
+      TimeoutInMinutes: 5

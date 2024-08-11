@@ -1,0 +1,19 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Examples of using macros
+Transform: 
+  - IdentityMacro
+Resources:
+  Fn::Transform:
+    Name: 'AddTags'
+    Parameters:
+      Tags: [Author=me, Team=Accounting, Tag3=Val3]
+  FirstQueue:
+    Type: "AWS::SQS::Queue"
+    Properties:
+      DelaySeconds: 0               # How long to delay messages
+      MaximumMessageSize: 1024      # in bytes
+      MessageRetentionPeriod: 3600  # in seconds; let's use an hour, just for fun 
+      QueueName: FirstQueue
+      ReceiveMessageWaitTimeSeconds: 0 # don't wait to see if more messages appear
+      VisibilityTimeout: 30
+

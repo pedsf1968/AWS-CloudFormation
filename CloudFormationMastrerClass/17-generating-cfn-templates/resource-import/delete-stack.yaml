@@ -1,0 +1,23 @@
+Resources:
+  ImportedTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Delete
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+
+  ImportedBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+  
+  ImportedInstance:
+    Type: AWS::EC2::Instance
+    DeletionPolicy: Delete
+    Properties:
+      ImageId: ami-0302f42a44bf53a45
+      InstanceType: t2.micro

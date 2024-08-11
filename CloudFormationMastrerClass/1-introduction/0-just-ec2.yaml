@@ -1,0 +1,15 @@
+# aws cloudformation create-stack --stack-name cfn-demo-ec2 --template-body file://0-just-ec2.yaml
+# aws cloudformation delete-stack --stack-name cfn-demo-ec2  
+---
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description:
+  Simple EC2 creation
+
+Resources:
+  MyInstance:
+    Type: "AWS::EC2::Instance"
+    Properties:
+      AvailabilityZone: eu-west-3a
+      ImageId: ami-0a4b7ff081ca1ded9
+      InstanceType: t2.micro

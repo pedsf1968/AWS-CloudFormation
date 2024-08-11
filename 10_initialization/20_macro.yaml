@@ -1,0 +1,135 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  Subnets Macro
+  A simple iterator for creating multiple subnets
+
+Resources:
+  Macro:
+    Type: AWS::CloudFormation::Macro
+    Properties:
+      Name: MacroSubnets
+      FunctionName: !GetAtt MacroSubnetsFunction.Arn
+  
+  AWSLambdaExecutionRole:
+     Type: AWS::IAM::Role
+     Properties:
+       AssumeRolePolicyDocument:
+         Statement:
+         - Action:
+           - sts:AssumeRole
+           Effect: Allow
+           Principal:
+             Service:
+             - lambda.amazonaws.com
+         Version: '2012-10-17'
+       Path: "/"
+       Policies:
+       - PolicyDocument:
+           Statement:
+           - Action:
+             - logs:CreateLogGroup
+             - logs:CreateLogStream
+             - logs:PutLogEvents
+             Effect: Allow
+             Resource: arn:aws:logs:*:*:*
+           Version: '2012-10-17'
+         PolicyName: Hawkfund-SubnetsMacroFunction
+       RoleName: Hawkfund-AWSMacroLambdaExecutionRole
+
+  MacroSubnetsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Macro to create severals subnets
+      FunctionName: MacroSubnetsFunction
+      Handler: index.handler
+      Runtime: python3.8
+      Timeout: 360
+      Role: !GetAtt AWSLambdaExecutionRole.Arn
+      Code:
+        ZipFile: |
+          import copy
+          import json
+
+          def process_template(template, parameters):
+            new_template = copy.deepcopy(template)
+            print("Start new_template:", new_template)
+            status = 'success'
+
+            for name, resource in template['Resources'].items():
+              if resource['Properties']['MacroSubnets']:
+                try:
+                  tag = new_template['Resources'][name]['Properties'].pop('MacroSubnets')
+                  resourceToMultiply = new_template['Resources'].pop(name)
+                except AttributeError:
+                  print("No MacroSubnets TAG")
+
+                print("parameters: ", parameters)
+
+                if parameters[tag + 'AZ']:
+                  availabilityZones = parameters.pop(tag + 'AZ')
+                if parameters[tag + 'Subnets']:
+                  subnets = parameters.pop(tag + 'Subnets')
+
+                print("parameters: ", parameters)
+
+                if new_template['Outputs'][name]['MacroSubnets']:
+                  try:
+                    new_template['Outputs'][name].pop('MacroSubnets')
+                    outputToMultiply = new_template['Outputs'].pop(name) 
+                  except AttributeError:
+                    print("No Output")
+
+                fragmentAfterMultiplication = multiply(name, resourceToMultiply, outputToMultiply,availabilityZones, subnets)
+                print(fragmentAfterMultiplication)
+
+                if not set(fragmentAfterMultiplication.keys()) & set(new_template['Resources'].keys()):
+                  new_template['Resources'].update(fragmentAfterMultiplication['Resources'])
+                  if fragmentAfterMultiplication['Outputs']:
+                    new_template['Outputs'].update(fragmentAfterMultiplication['Outputs'])
+                else:
+                  status = 'failed'
+                  return {'fragment': template, 'status': status}
+              else:
+                print("Did not find 'MacroSubnets' property in '{}' resource...Nothing to do!".format(name))
+
+            print("END new_template:", new_template)  
+            return {'fragment': new_template, 'status': status}
+                  
+          def multiply(resource_name, resource_structure, output_structure, availabilityZones, subnets):
+            resources = {}
+            outputs = {}
+            
+            # Loop according to the number of times we want to multiply, creating a new resource each time
+            for az, subnet in zip(availabilityZones, subnets):
+              suffix = az[-1].upper()
+              multipliedResourceStructure = copy.deepcopy(resource_structure)
+              multipliedResourceStructure['Properties']['AvailabilityZone'] = az
+              multipliedResourceStructure['Properties']['CidrBlock'] = subnet
+              for tag in multipliedResourceStructure['Properties']['Tags']:
+                if tag['Key'] == "Name":
+                  tag['Value']['Fn::Sub'] += suffix
+              resources[resource_name + suffix] = multipliedResourceStructure
+              if output_structure:
+                multipliedOutputStructure = copy.deepcopy(output_structure)
+                print("multipliedOutputStructure", multipliedOutputStructure)
+                multipliedOutputStructure['Description'] +=  suffix
+                multipliedOutputStructure['Value']['Ref'] += suffix
+                multipliedOutputStructure['Export']['Name']['Fn::Sub'] += suffix
+            
+                outputs[resource_name + suffix] = multipliedOutputStructure
+                      
+              print("resources", resources)
+              print("outputs", outputs)
+            return {'Resources':resources, 'Outputs':outputs}
+
+          def handler(event, context):
+            print("Before: ", event)
+            result = process_template(event['fragment'], event['templateParameterValues'])
+            print("After: ", event)
+            print(result['fragment'])
+
+            return {
+              'requestId': event['requestId'],
+              'status': result['status'],
+              'fragment': result['fragment']
+            }

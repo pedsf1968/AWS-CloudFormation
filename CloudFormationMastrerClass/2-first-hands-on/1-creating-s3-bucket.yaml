@@ -1,0 +1,12 @@
+# aws cloudformation create-stack --stack-name cfn-demo-s3 --template-body file://1-creating-s3-bucket.yaml
+# aws cloudformation delete-stack --stack-name cfn-demo-s3
+---
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description:
+  Simple S3 bucket
+
+Resources:
+  MyS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties: {}
