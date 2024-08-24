@@ -1,0 +1,70 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create a role for remote account to create VPC Peering
+
+Parameters:
+  VPCId:
+    Type: String
+  SubnetId:
+    Type: String
+  InstanceName:
+    Type: String
+  InstanceImageId:
+    Type: AWS::EC2::Image::Id
+  KeyName:
+    Type: String
+  InstanceSGCidr:
+    Type: String
+
+Resources:     
+  # Instances and Security Groups
+  Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone:  !Select [ 0, !GetAZs ]
+      ImageId: !Ref InstanceImageId
+      InstanceType: t2.micro
+      KeyName: !Ref KeyName
+      SecurityGroupIds:
+        - !Ref SSHSecurityGroup
+        - !Ref ICMPSecurityGroup
+      SubnetId: !Ref SubnetId
+      Tags:
+        - Key: Name
+          Value: !Ref InstanceName
+  
+  SSHSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable SSH access via port 22
+      SecurityGroupIngress:
+      - CidrIp: !Ref InstanceSGCidr
+        FromPort: 22
+        IpProtocol: tcp
+        ToPort: 22
+      VpcId: !Ref VPCId
+      Tags:
+        - Key: Name
+          Value: SSH-SG
+
+  ICMPSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable Ping
+      SecurityGroupIngress:
+      - CidrIp: !Ref InstanceSGCidr
+        FromPort: -1
+        IpProtocol: icmp
+        ToPort: -1
+      VpcId: !Ref VPCId
+      Tags:
+        - Key: Name
+          Value: ICMP-SG
+
+Outputs:
+  InstanceId:
+    Description: Id of the Instance 
+    Value: !Ref Instance
+  InstancePrivateIP:
+    Description: Private IP v4 of the Instance 
+    Value: !GetAtt Instance.PrivateIp     

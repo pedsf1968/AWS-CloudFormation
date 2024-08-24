@@ -1,0 +1,38 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create a role for remote account to create VPC Peering
+
+Parameters:
+  VPCId:
+    Type: String
+  SubnetId:
+    Type: String
+  SubnetRouteTableName:
+    Type: String
+  VpcPeeringConnectionId:
+    Type: String
+  DestinationCidrBlock:
+    Type: String
+
+Resources:  
+  # Route, Route Table and Associations
+  SubnetRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPCId
+      Tags:
+        - Key: Name
+          Value: !Ref SubnetRouteTableName
+
+  PeeringRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref SubnetRouteTable
+      DestinationCidrBlock: !Ref DestinationCidrBlock
+      VpcPeeringConnectionId: !Ref VpcPeeringConnectionId
+
+  SubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref SubnetRouteTable
+      SubnetId: !Ref SubnetId

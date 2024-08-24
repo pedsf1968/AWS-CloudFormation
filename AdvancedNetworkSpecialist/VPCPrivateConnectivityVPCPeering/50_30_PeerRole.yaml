@@ -1,0 +1,46 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create a role for remote account to create VPC Peering
+
+Parameters:
+  FirstAccountId:
+    Type: String
+  PeerRequesterAccountId:
+    Type: String
+  VPCId:
+    Type: String
+
+Resources:
+  PeerRole:
+    Type: 'AWS::IAM::Role'
+    Properties: 
+      AssumeRolePolicyDocument:
+        Statement:
+          - Principal:
+              AWS: !Ref PeerRequesterAccountId
+            Action:
+              - 'sts:AssumeRole'
+            Effect: Allow
+      Path: /
+      Policies:
+        - PolicyName: PeerRole
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 'ec2:AcceptVpcPeeringConnection'
+                Resource: '*'
+      Tags:
+           - Key: Name
+             Value: PeerRole
+
+Outputs:
+  PeerRoleArn:
+    Description: ARN of th Peering Role
+    Value: !GetAtt PeerRole.Arn
+  PeerRequesterAccountId:
+    Description: PeerRequesterAccountId
+    Value: !Ref PeerRequesterAccountId
+  FirstAccountId:
+    Description: FirstAccountId
+    Value: !Ref FirstAccountId

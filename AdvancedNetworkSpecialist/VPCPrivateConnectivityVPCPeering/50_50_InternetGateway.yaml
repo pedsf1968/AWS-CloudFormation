@@ -1,0 +1,61 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create a role for remote account to create VPC Peering
+
+Parameters:
+  VPCId:
+    Type: String
+  SubnetId:
+    Type: String
+  InternetGatewayName:
+    Type: String
+  DefaultRouteTableName:
+    Type: String
+
+Resources:  
+  # Internet Gateway and Attachment
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Ref InternetGatewayName
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPCId
+
+  # Route, Route Table and Associations
+  DefaultRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPCId
+      Tags:
+        - Key: Name
+          Value: !Ref DefaultRouteTableName
+
+  DefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref DefaultRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  SubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref DefaultRouteTable
+      SubnetId: !Ref SubnetId
+
+
+# Outputs:
+#   InternetGatewayId:
+#     Value: !Ref InternetGateway
+#   InternetGatewayAttachmentId:
+#     Value: !Ref InternetGatewayAttachment
+#   DefaultRouteTableId:
+#     Value: !Ref DefaultRouteTable
+#   DefaultRouteId:
+#     Value: !Ref DefaultRoute

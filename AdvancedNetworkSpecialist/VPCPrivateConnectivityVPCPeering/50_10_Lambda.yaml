@@ -1,0 +1,115 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template for creating lambda used by CloudFormation other's stacks
+
+Resources:
+  GetParametersFromS3Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      Policies:
+      - PolicyName: AppendToLogsPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: "*"
+      - PolicyName: ReadToS3Policy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - s3:GetObject
+            - s3:ListBucket
+            - s3:GetDataAccess
+            - s3:GetObjectAttributes
+            Resource: "arn:aws:s3:::hawkfund-cloudformation/VPCPeeringCrossAccount/*"
+
+  PutParametersFromS3Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      Policies:
+      - PolicyName: AppendToLogsPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: "*"
+      - PolicyName: ReadToS3Policy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - s3:GetObject
+            - s3:PutObject
+            - s3:ListBucket
+            - s3:GetDataAccess
+            - s3:GetObjectAttributes
+            Resource: "arn:aws:s3:::hawkfund-cloudformation/VPCPeeringCrossAccount/*"
+
+
+  GetParametersFromS3:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+
+          s3 = boto3.resource('s3')
+
+          def lambda_handler(event, context):
+            try:
+              bucket =  event["Bucket"]
+              buketKey = event["BucketKey"]
+              parameter = event["Key"]
+              
+              obj = s3.Object(bucket, buketKey)
+              data = obj.get()['Body'].read().decode('utf-8')
+              json_data = json.loads(data)
+
+              for key, value in json_data.items():
+                if key == parameter:
+                 print(key, value)
+            except Exception as err:
+              print(err)
+
+            return {
+                'statusCode': 200,
+                'body': json.dumps(json_data)
+            }
+      Description: Function to read parameters from JSON file in a S3 bucket
+      FunctionName: GetParametersFromS3
+      Handler: index.lambda_handler
+      MemorySize: 128
+      Role: !GetAtt GetParametersFromS3Role.Arn
+      Runtime: python3.12
