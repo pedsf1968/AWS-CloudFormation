@@ -1,12 +1,4 @@
 {
-    "VpcPeeringConnectionId": "toto",
-    "eu-west-3": {
-        "PeerRegion": "eu-central-1",
-        "VPCName": "A-VPC"
-    },    
-    "eu-central-1": {
-        "PeerRegion": "eu-west-3",
-        "VPCName": "B-VPC"
-    }    
-    
+    "PeerRoleArn": "",
+    "VpcPeeringConnectionId": ""
 }

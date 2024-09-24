@@ -1,0 +1,30 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create a role for remote account to create VPC Peering
+
+Parameters:
+  VPCId:
+    Type: String
+  InternetGatewayName:
+    Type: String
+
+Resources:  
+  # Internet Gateway and Attachment
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Ref InternetGatewayName
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPCId
+
+Outputs:
+  InternetGatewayId:
+    Value: !Ref InternetGateway
+  InternetGatewayAttachmentId:
+    Value: !Ref InternetGatewayAttachment

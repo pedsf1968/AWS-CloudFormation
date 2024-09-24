@@ -1,0 +1,123 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create a role for remote account to create VPC Peering
+
+Parameters:
+  VPCId:
+    Type: String
+  PrivateSubnetId:
+    Type: String
+  PublicSubnetId:
+    Type: String
+
+  InstanceImageId:
+    Description: Instance AMI
+    Type: AWS::EC2::Image::Id
+  InstanceKeyName: 
+    Description: Instance Key name
+    Type: String
+  PrivateInstanceName: 
+    Description: Private instance name
+    Type: String
+  PublicInstanceName: 
+    Description: Public instance name
+    Type: String
+  PrivateInstanceProfile:
+    Description: Profile of the Private Instance
+    Type: String
+  PrivateSourceCidr:
+    Type: String
+  PublicSourceCidr:
+    Type: String
+
+Resources:     
+  # Public and Private Instances
+  PublicInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone:  !Select [ 0, !GetAZs ]
+      ImageId: !Ref InstanceImageId
+      InstanceType: t2.micro
+      KeyName: !Ref InstanceKeyName
+      SecurityGroupIds:
+        - !Ref PublicSecurityGroup
+      SubnetId: !Ref PublicSubnetId
+      Tags:
+        - Key: Name
+          Value: !Ref PublicInstanceName
+
+  PublicInstanceEIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      InstanceId: !Ref PublicInstance
+
+  PrivateInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone:  !Select [ 0, !GetAZs ]
+      ImageId: !Ref InstanceImageId
+      InstanceType: t2.micro
+      KeyName: !Ref InstanceKeyName
+      SecurityGroupIds:
+        - !Ref PrivateSecurityGroup
+      SubnetId: !Ref PrivateSubnetId
+      IamInstanceProfile: !Ref PrivateInstanceProfile
+      Tags:
+        - Key: Name
+          Value: !Ref PrivateInstanceName
+
+
+  # Public and Private Security Groups
+  PublicSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable SSH access via port 22
+      SecurityGroupIngress:
+      - CidrIp: !Ref PublicSourceCidr
+        FromPort: 22
+        IpProtocol: tcp
+        ToPort: 22
+      - CidrIp: !Ref PublicSourceCidr
+        FromPort: -1
+        IpProtocol: icmp
+        ToPort: -1
+      VpcId: !Ref VPCId
+      Tags:
+        - Key: Name
+          Value: "Public-SG"
+
+  PrivateSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable SSH access via port 22
+      SecurityGroupIngress:
+      - CidrIp: !Ref PrivateSourceCidr
+        FromPort: 22
+        IpProtocol: tcp
+        ToPort: 22
+      - CidrIp: !Ref PrivateSourceCidr
+        FromPort: -1
+        IpProtocol: icmp
+        ToPort: -1
+      VpcId: !Ref VPCId
+      Tags:
+        - Key: Name
+          Value: "Private-SG"
+
+Outputs:
+  PrivateInstanceId:
+    Description: "Id of the Private Instance"
+    Value: !Ref PrivateInstance
+  PrivateInstancePrivateIP:
+    Description: "Private IP of the Private Instance"
+    Value: !GetAtt PrivateInstance.PrivateIp     
+  PrivateInstancePublicIP:
+    Description: "Public IP of the Private Instance"
+    Value: !GetAtt PublicInstanceEIP.PublicIp
+  PublicInstanceId:
+    Description: "Id of the Public Instance"
+    Value: !Ref PublicInstance
+  PublicInstancePrivateIP:
+    Description: "Private IP of the Public Instance"
+    Value: !GetAtt PublicInstance.PrivateIp     
+  

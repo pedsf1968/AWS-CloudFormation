@@ -1,0 +1,179 @@
+# aws cloudformation validate-template --template-body file:/54_VPCEndPointForS3.yaml
+# aws cloudformation create-stack --stack-name ANS-54 --template-body file://54_VPCEndPointForS3.yaml --region eu-west-3 --capabilities CAPABILITY_IAM
+# aws cloudformation delete-stack --stack-name ANS-54 --region eu-west-3
+AWSTemplateFormatVersion: "2010-09-09"
+Description: This template deploys a VPC, Public and Private Subnets, Internet Gateway, Route Table, Custom DNS and Instances
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "VPC configuration"
+        Parameters:
+          - VPCName
+          - VPCCidr
+      - Label:
+          default: "Subnets configuration"
+        Parameters:
+          - SubnetName
+          - PrivateSubnetCidr
+          - PublicSubnetCidr
+      - Label:
+          default: "IGW, Route Tables and Routes"
+        Parameters:
+          - InternetGatewayName
+          - RouteTableName
+      - Label:
+          default: "Instances"
+        Parameters:
+          - InstanceImageId
+          - InstanceKeyName
+          - PrivateInstanceName
+          - PublicInstanceName
+      - Label:
+          default: "Configuration"
+        Parameters:
+          - Bucket
+          - BucketKey
+
+Parameters:
+  VPCName:
+    Description: VPC name
+    Type: String
+    Default: "My-VPC"
+  VPCCidr:
+    Description: VPC CIDR
+    Type: String
+    Default: 10.10.0.0/16
+
+  SubnetName:
+    Description: Subnet name
+    Type: String
+    Default: "Subnet"
+  PrivateSubnetCidr:
+    Description: Private Subnet CIDR
+    Type: String
+    Default: 10.10.1.0/24
+  PublicSubnetCidr:
+    Description: Public Subnet CIDR
+    Type: String
+    Default: 10.10.0.0/24
+
+  InternetGatewayName:
+    Type: String
+    Default: "VPC-IGW"
+  RouteTableName:
+    Type: String
+    Default: "VPC-RT"
+  
+  InstanceImageId:
+    Description: Instance AMI
+    Type: AWS::EC2::Image::Id
+    Default: ami-015875403620174eb
+  InstanceKeyName: 
+    Description: Instance Key name
+    Type: String
+    Default: "dso-paris"
+  PrivateInstanceName: 
+    Description: Private instance name
+    Type: String
+    Default: "My-Application"
+  PublicInstanceName: 
+    Description: Public instance name
+    Type: String
+    Default: "Bastion"
+
+  Bucket:
+    Description: CloudFormation buket URL
+    Type: String
+    Default: "hawkfund-cloudformation"
+  BucketKey:
+    Description: Key to find object in the bucket
+    Type: String
+    Default: "VPCEndpointForS3"
+
+Resources:
+  VPCAndSubnets:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/54_20_VPCAndSubnets.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        VPCName: !Ref VPCName
+        VPCCidr: !Ref VPCCidr
+        SubnetName: !Ref SubnetName
+        PrivateSubnetCidr: !Ref PrivateSubnetCidr
+        PublicSubnetCidr: !Ref PublicSubnetCidr
+        
+  Roles:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/54_30_Roles.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+
+# Create Internet Gateway and default route table for public subnet
+  InternetGateways:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/54_50_Gateways.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        VPCId: !GetAtt VPCAndSubnets.Outputs.VpcId
+        InternetGatewayName:  !Ref InternetGatewayName
+
+  RouteTables:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/54_60_RouteTables.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        VPCId: !GetAtt VPCAndSubnets.Outputs.VpcId
+        PrivateSubnetId: !GetAtt VPCAndSubnets.Outputs.PrivateSubnetId
+        PublicSubnetId: !GetAtt VPCAndSubnets.Outputs.PublicSubnetId
+        InternetGatewayId:  !GetAtt InternetGateways.Outputs.InternetGatewayId
+        RouteTableName: !Ref RouteTableName
+
+  Endpoints:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/54_70_Endpoints.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        VPCId: !GetAtt VPCAndSubnets.Outputs.VpcId
+        PrivateSubnetId: !GetAtt VPCAndSubnets.Outputs.PrivateSubnetId
+        PrivateRouteTableId: !GetAtt RouteTables.Outputs.PrivateRouteTableId
+
+  Instances:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/54_80_Instances.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        VPCId: !GetAtt VPCAndSubnets.Outputs.VpcId
+        PrivateSubnetId: !GetAtt VPCAndSubnets.Outputs.PrivateSubnetId
+        PublicSubnetId: !GetAtt VPCAndSubnets.Outputs.PublicSubnetId
+        InstanceImageId: !Ref InstanceImageId
+        PrivateInstanceName: !Ref PrivateInstanceName
+        PublicInstanceName: !Ref PublicInstanceName
+        InstanceKeyName: !Ref InstanceKeyName
+        PrivateSourceCidr: !Ref VPCCidr
+        PublicSourceCidr: "0.0.0.0/0"
+        PrivateInstanceProfile: !GetAtt Roles.Outputs.PrivateInstanceProfileId
+  

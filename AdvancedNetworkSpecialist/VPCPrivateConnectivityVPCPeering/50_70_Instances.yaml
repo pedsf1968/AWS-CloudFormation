@@ -3,6 +3,19 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description:  This template create a role for remote account to create VPC Peering
 
 Parameters:
+  # Global parameters
+  Bucket:
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Description: File in the bucket that contain parameters
+    Type: String
+  
+  # Stack parameters
+  # Stack parameters
   VPCId:
     Type: String
   SubnetId:
@@ -33,6 +46,16 @@ Resources:
         - Key: Name
           Value: !Ref InstanceName
   
+  InstanceBackup:
+    Type: AWS::CloudFormation::CustomResource
+    Properties:
+      ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:UpdateParametersFromS3"
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Sub "${BucketKey}/${BucketObject}"
+      Key: !Sub "${AWS::AccountId}:${AWS::Region}:InstanceId"
+      Value: !Ref Instance
+
   SSHSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -46,6 +69,16 @@ Resources:
       Tags:
         - Key: Name
           Value: SSH-SG
+
+  SSHSecurityGroupBackup:
+    Type: AWS::CloudFormation::CustomResource
+    Properties:
+      ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:UpdateParametersFromS3"
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Sub "${BucketKey}/${BucketObject}"
+      Key: !Sub "${AWS::AccountId}:${AWS::Region}:SSHSecurityGroupId"
+      Value: !Ref SSHSecurityGroup
 
   ICMPSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -61,10 +94,26 @@ Resources:
         - Key: Name
           Value: ICMP-SG
 
+  ICMPSecurityGroupBackup:
+    Type: AWS::CloudFormation::CustomResource
+    Properties:
+      ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:UpdateParametersFromS3"
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Sub "${BucketKey}/${BucketObject}"
+      Key: !Sub "${AWS::AccountId}:${AWS::Region}:ICMPSecurityGroupId"
+      Value: !Ref ICMPSecurityGroup
+
 Outputs:
   InstanceId:
     Description: Id of the Instance 
     Value: !Ref Instance
   InstancePrivateIP:
     Description: Private IP v4 of the Instance 
-    Value: !GetAtt Instance.PrivateIp     
+    Value: !GetAtt Instance.PrivateIp
+  SSHSecurityGroupId:
+    Description: SSH Security Group Id of the instance
+    Value: !Ref SSHSecurityGroup
+  ICMPSecurityGroupId:
+    Description: ICMP Security Group Id of the instance
+    Value: !Ref ICMPSecurityGroup

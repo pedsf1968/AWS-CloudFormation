@@ -50,11 +50,14 @@ Resources:
             - !Join [":", ["arn:aws:s3::", !Sub "${Bucket}/${BucketKey}/*"]]
       RoleName: !Sub ${AWS::StackName}-UpdateParametersFromS3Role
 
+
   # Event JSON to test Lambda
   # {
   #   "Bucket": "hawkfund-cloudformation",
   #   "BucketKey": "VPCPeeringCrossAccount/VPCPrivateConnectivityVPCPeering.json",
   #   "Key": "VpcPeeringConnectionId",
+  #   "Delay": "30",
+  #   "DelayCount": "3",
   #  }
   GetParametersFromS3:
     Type: AWS::Lambda::Function
@@ -68,15 +71,37 @@ Resources:
 
           s3 = boto3.resource('s3')
 
+          # def get_parameter(bucket, bucketKey, parameterKey, delay, delayCount):
+          #   response_data = {}
+          #   try:
+          #     obj = s3.Object(bucket, bucketKey)
+          #     data = obj.get()['Body'].read().decode('utf-8')
+          #     response_data['Value'] = json.loads(data)[parameterKey]
+          #     cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)              
+          #   except Exception as err:
+          #     print("[ERROR] No key: ", parameterKey)
+          #     time.sleep(delay)
+          #     delayCount -= 1
+          #     print("delayCount: ", delayCount)
+          #     if delayCount > 0:
+          #       get_parameter(bucket, buketKey, parameterKey, delay, delayCount)
+          #     else:
+          #       response_data['Data'] = str(err)
+          #       cfnresponse.send(event, context, cfnresponse.FAILED, response_data)
+
           def lambda_handler(event, context):
             responseData  = {}
             bucket =  event["ResourceProperties"]["Bucket"]
             bucketKey = event["ResourceProperties"]["BucketKey"]
             parameterKey = event["ResourceProperties"]["Key"]
+            delay = event["ResourceProperties"]["Delay"]
+            delayCount = event["ResourceProperties"]["DelayCount"]              
+            # get_parameter(bucket, bucketKey, parameterKey, delay, delayCount)
             try:
               obj = s3.Object(bucket, bucketKey)
               data = obj.get()['Body'].read().decode('utf-8')
-              responseData["Value"] = json.loads(data)[parameterKey]
+              json_data = json.loads(data)
+              responseData['Value'] = json.loads(data)[parameterKey]
               cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData)                            
             except Exception as err:
               responseData['Data'] = str(err)
@@ -116,14 +141,10 @@ Resources:
               obj = s3.Object(bucket, bucketKey)
               data = obj.get()['Body'].read().decode('utf-8')
               json_data = json.loads(data)
-              print('json_data 1: ', json_data)
               json_data[parameterKey] = parameterValue
-              print('json_data 2: ', json_data)
+              responseData[parameterKey] = parameterValue 
               data = obj.put( Body=(bytes(json.dumps(json_data).encode('UTF-8'))))
-              data = obj.get()['Body'].read().decode('utf-8')
-              json_data = json.loads(data)
-              print('json_data 3: ', json_data)
-              responseData["Value"] = parameterValue 
+              responseData[parameterKey] = parameterValue 
               cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData)                            
             except Exception as err:
               responseData['Data'] = str(err)

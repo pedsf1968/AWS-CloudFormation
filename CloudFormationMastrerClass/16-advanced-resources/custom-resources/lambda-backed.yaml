@@ -60,39 +60,39 @@ Resources:
                   cfnresponse.send(event, context, cfnresponse.FAILED, response_data)
 
   AWSLambdaExecutionRole:
-     Type: AWS::IAM::Role
-     Properties:
-       AssumeRolePolicyDocument:
-         Statement:
-         - Action:
-           - sts:AssumeRole
-           Effect: Allow
-           Principal:
-             Service:
-             - lambda.amazonaws.com
-         Version: '2012-10-17'
-       Path: "/"
-       Policies:
-       - PolicyDocument:
-           Statement:
-           - Action:
-             - logs:CreateLogGroup
-             - logs:CreateLogStream
-             - logs:PutLogEvents
-             Effect: Allow
-             Resource: arn:aws:logs:*:*:*
-           Version: '2012-10-17'
-         PolicyName: !Sub ${AWS::StackName}-${AWS::Region}-AWSLambda-CW
-       - PolicyDocument:
-           Statement:
-           - Action:
-             - s3:PutObject
-             - s3:DeleteObject
-             - s3:List*
-             Effect: Allow
-             Resource:
-             - !Sub arn:aws:s3:::${SampleS3Bucket}
-             - !Sub arn:aws:s3:::${SampleS3Bucket}/*
-           Version: '2012-10-17'
-         PolicyName: !Sub ${AWS::StackName}-${AWS::Region}-AWSLambda-S3
-       RoleName: !Sub ${AWS::StackName}-${AWS::Region}-AWSLambdaExecutionRole
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action:
+          - sts:AssumeRole
+          Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+        Version: '2012-10-17'
+      Path: "/"
+      Policies:
+      - PolicyDocument:
+          Statement:
+          - Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Effect: Allow
+            Resource: arn:aws:logs:*:*:*
+          Version: '2012-10-17'
+        PolicyName: !Sub ${AWS::StackName}-${AWS::Region}-AWSLambda-CW
+      - PolicyDocument:
+          Statement:
+          - Action:
+            - s3:PutObject
+            - s3:DeleteObject
+            - s3:List*
+            Effect: Allow
+            Resource:
+            - !Sub arn:aws:s3:::${SampleS3Bucket}
+            - !Sub arn:aws:s3:::${SampleS3Bucket}/*
+          Version: '2012-10-17'
+        PolicyName: !Sub ${AWS::StackName}-${AWS::Region}-AWSLambda-S3
+      RoleName: !Sub ${AWS::StackName}-${AWS::Region}-AWSLambdaExecutionRole

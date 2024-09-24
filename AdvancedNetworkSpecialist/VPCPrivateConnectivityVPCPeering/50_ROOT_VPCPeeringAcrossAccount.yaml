@@ -1,8 +1,15 @@
 # aws cloudformation validate-template --template-body file:/50_VPCPeeringAcrossAccount.yaml
-# aws cloudformation create-stack --stack-name ANS-50 --template-body file://50_VPCPeeringAcrossAccount.yaml --region eu-west-3 --capabilities CAPABILITY_IAM
-# aws cloudformation create-stack --stack-name ANS-50 --template-body file://50_VPCPeeringAcrossAccount.yaml --region eu-central-1 --capabilities CAPABILITY_IAM
+# aws cloudformation create-stack --stack-name ANS-50 --template-body file://50_ROOT_VPCPeeringAcrossAccount.yaml --region eu-west-3 --capabilities CAPABILITY_IAM
+# aws cloudformation create-stack --stack-name ANS-50 --template-body file://50_ROOT_VPCPeeringAcrossAccount.yaml --region eu-central-1 --capabilities CAPABILITY_IAM
 # aws cloudformation delete-stack --stack-name ANS-50 --region eu-west-3
 # aws cloudformation delete-stack --stack-name ANS-50 --region eu-central-1
+#
+# Steps:
+# 1 - Launch Phase1 on account 1
+# 1 - Launch Phase1 on account 2
+# 1 - Launch Phase2 on account 1
+# 1 - Launch Phase2 on account 2
+
 
 AWSTemplateFormatVersion: "2010-09-09"
 Description: This template deploys a VPC, Public and Private Subnets, Internet Gateway, Route Table, Custom DNS and Instances
@@ -13,14 +20,15 @@ Metadata:
       - Label:
           default: "Configuration"
         Parameters:
-          - BucketUrl
+          - Phase
+          - Bucket
+          - BucketKey
+          - BucketObject
       - Label:
           default: "First Accounts"
         Parameters:
           - FirstAccountId
           - FirstRegion
-          - FirstRoleArn
-          - FirstVPCId
       - Label:
           default: "Second Accounts"
         Parameters:
@@ -33,37 +41,43 @@ Metadata:
           - DefaultRouteTableName
 
 Parameters:
-  BucketUrl:
+  Bucket:
     Description: CloudFormation buket URL
     Type: String
-    Default: "https://hawkfund-cloudformation.s3.eu-west-3.amazonaws.com"
-  FirstAccountId:
+    Default: "hawkfund-cloudformation"
+  BucketKey:
+    Description: Key to find object in the bucket
     Type: String
-    Default: "612187453729"    
+    Default: "VPCPeeringCrossAccount"
+  BucketObject:
+    Description: File in the bucket that contain parameters
+    Type: String
+    Default: "VPCPrivateConnectivityVPCPeering.json"
+  Phase:
+    Description: "Deploy successively Phase1 and Phase2 and alternate between th two Accounts"
+    Type: String
+    Default: Phase1
+    AllowedValues:
+      - Phase1
+      - Phase2
+  FirstAccountId:
+    Description: First AWS Account ID for VPC peering
+    Type: String
   FirstRegion:
+    Description: Region of the first AWS Account for VPC peering
     Type: String
     Default: eu-west-3
   SecondAccountId:
+    Description: Second AWS Account ID for VPC peering
     Type: String
-    # AllowedPattern: "^[0-9]+$"
-    Default: "612187453729"
   SecondRegion:
+    Description: Region of the second AWS Account for VPC peering
     Type: String
     Default: eu-central-1
-  # FirstRoleArn only for the second launch
-  FirstRoleArn:
-    Type: String
-    Default: none
-  # FirstVPCId only for the second launch
-  FirstVPCId:
-    Type: String
-    Default: none
+  
   InternetGatewayName:
     Type: String
     Default: "VPC-IGW"
-  DefaultRouteTableName:
-    Type: String
-    Default: "VPC-Default-RT"
 
 Mappings:
   RegionMap:
@@ -75,7 +89,8 @@ Mappings:
       SubnetName: "A-PublicSubnet"
       SubnetCidrBlock: 10.10.0.0/24
       SubnetPublic: True
-      SubnetRouteTableName: A-SubnetRouteTable
+      DefaultRouteTableName: "A-VPC-Default-RT"      
+      SubnetRouteTableName: "A-Subnet-RT"
       InstanceName: "A-Instance"
       InstanceImageId: ami-015875403620174eb
       KeyName: "dso-paris"
@@ -88,109 +103,130 @@ Mappings:
       SubnetName: "B-PrivateSubnet"
       SubnetCidrBlock: 10.20.0.0/24
       SubnetPublic: False
-      SubnetRouteTableName: B-SubnetRouteTable
+      DefaultRouteTableName: "B-VPC-Default-RT"      
+      SubnetRouteTableName: "B-Subnet-RT"
       InstanceName: "B-Instance"
       InstanceImageId: ami-00060fac2f8c42d30
       KeyName: "dso-francfort"
       InstanceSGCidr: 10.10.0.0/16
-      
 
 Conditions:
   IsFirstAccount: !Equals [!Ref "AWS::Region", !Ref FirstRegion]
   IsSecondAccount: !Equals [!Ref "AWS::Region", !Ref SecondRegion]
+  IsPhaseSecondPhase:  !Equals [ "Phase2", !Ref Phase] 
 
 Resources:
   Lambdas:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
+    UpdateReplacePolicy: Retain
     Properties:
-      TemplateURL: !Sub "${BucketUrl}/VPCPeeringCrossAccount/50_10_Lambda.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/50_10_Lambda.yaml"
       TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
 
   VPCAndSubnets:
     Type: AWS::CloudFormation::Stack
+    DependsOn: Lambdas
     DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
+    UpdateReplacePolicy: Retain
     Properties:
-      TemplateURL: !Sub "${BucketUrl}/VPCPeeringCrossAccount/50_20_VPCAndSubnets.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/50_20_VPCAndSubnets.yaml"
       TimeoutInMinutes: 5
       Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
         VPCName: !FindInMap [RegionMap, !Ref "AWS::Region", VPCName]
         VPCCidrBlock: !FindInMap [RegionMap, !Ref "AWS::Region", VPCCidrBlock]
         SubnetName: !FindInMap [RegionMap, !Ref "AWS::Region", SubnetName]
-        SubnetCidrBlock:
-          !FindInMap [RegionMap, !Ref "AWS::Region", SubnetCidrBlock]
+        SubnetCidrBlock: !FindInMap [RegionMap, !Ref "AWS::Region", SubnetCidrBlock]
         SubnetPublic: !FindInMap [RegionMap, !Ref "AWS::Region", SubnetPublic]
 
   # Create a role for remote account to create VPC Peering
   PeerRole:
     Type: AWS::CloudFormation::Stack
     Condition: IsFirstAccount
+    DependsOn: Lambdas
     DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
+    UpdateReplacePolicy: Retain
     Properties:
-      TemplateURL: !Sub "${BucketUrl}/VPCPeeringCrossAccount/50_30_PeerRole.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/50_30_PeerRole.yaml"
       TimeoutInMinutes: 5
       Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
         FirstAccountId: !Ref FirstAccountId
-        VPCId: !GetAtt VPCAndSubnets.Outputs.VpcId
-        PeerRequesterAccountId: !Ref SecondAccountId
+        PeerRequesterAccountId: !Ref SecondAccountId        
         
   # Make VPC peering with the first account
   VPCPeering:
     Type: AWS::CloudFormation::Stack
     Condition: IsSecondAccount
+    DependsOn: Lambdas
     DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
+    UpdateReplacePolicy: Retain
     Properties:
-      TemplateURL: !Sub "${BucketUrl}/VPCPeeringCrossAccount/50_40_VPCPeering.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/50_40_VPCPeering.yaml"
       TimeoutInMinutes: 5
       Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
         VPCId: !GetAtt VPCAndSubnets.Outputs.VpcId
         PeerAccountId: !Ref FirstAccountId
         PeerRegion: !Ref FirstRegion
-        PeerRoleArn: !Ref FirstRoleArn
-        PeerVPCId: !Ref FirstVPCId
 
   # Create Internet Gateway and default route table for public subnet
   InternetGateway:
     Type: AWS::CloudFormation::Stack
     Condition: IsFirstAccount
+    DependsOn: Lambdas
     DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
+    UpdateReplacePolicy: Retain
     Properties:
-      TemplateURL: !Sub "${BucketUrl}/VPCPeeringCrossAccount/50_50_InternetGateway.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/50_50_InternetGateway.yaml"
       TimeoutInMinutes: 5
       Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
         VPCId: !GetAtt VPCAndSubnets.Outputs.VpcId
-        SubnetId: !GetAtt VPCAndSubnets.Outputs.PublicSubnetId
         InternetGatewayName:  !Ref InternetGatewayName
-        DefaultRouteTableName: !Ref DefaultRouteTableName
-
+ 
+  # Create Route Tables and Routes between subnets
   SubnetRouteTables:
     Type: AWS::CloudFormation::Stack
-    Condition: IsSecondAccount
+    Condition: IsPhaseSecondPhase
     DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
+    UpdateReplacePolicy: Retain
     Properties:
-      TemplateURL: !Sub "${BucketUrl}/VPCPeeringCrossAccount/50_60_SubnetRouteTables.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/50_60_SubnetRouteTables.yaml"
       TimeoutInMinutes: 5
       Parameters:
-        VPCId: !GetAtt VPCAndSubnets.Outputs.VpcId
-        SubnetId: !GetAtt VPCAndSubnets.Outputs.PrivateSubnetId
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        SubnetPublic: !FindInMap [RegionMap, !Ref "AWS::Region", SubnetPublic]
+        DefaultRouteTableName: !FindInMap [RegionMap, !Ref "AWS::Region", DefaultRouteTableName]
         SubnetRouteTableName: !FindInMap [RegionMap, !Ref "AWS::Region", SubnetRouteTableName]
-        VpcPeeringConnectionId: VPCPeering.Outputs.VPCPeeringConnectionId
         DestinationCidrBlock: !FindInMap [RegionMap, !FindInMap [RegionMap, !Ref "AWS::Region", PeerRegion], VPCCidrBlock]
 
   Instances:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
+    DependsOn: Lambdas
+    UpdateReplacePolicy: Retain
     Properties:
-      TemplateURL: !Sub "${BucketUrl}/VPCPeeringCrossAccount/50_70_Instances.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/50_70_Instances.yaml"
       TimeoutInMinutes: 5
       Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
         VPCId: !GetAtt VPCAndSubnets.Outputs.VpcId
         SubnetId: !If [IsFirstAccount, !GetAtt VPCAndSubnets.Outputs.PublicSubnetId, !GetAtt VPCAndSubnets.Outputs.PrivateSubnetId]
         InstanceName: !FindInMap [RegionMap, !Ref "AWS::Region", InstanceName]
