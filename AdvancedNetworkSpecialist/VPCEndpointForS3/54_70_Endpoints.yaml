@@ -23,21 +23,19 @@ Resources:
       PolicyDocument: 
         Version: 2012-10-17
         Statement:
-          -
-            Effect: Allow
+          - Effect: Allow
             Action:
               - s3:Get*
               - s3:Put*
               - s3:List*
               - s3:AbortMultipartUpload 
+            Principal: '*'
             Resource:
               - !Sub "arn:aws:s3:::${Bucket}/${BucketKey}/*"
               - !Sub "arn:aws:s3:::${Bucket}/${BucketKey}"
       RouteTableIds: 
         - !Ref PrivateRouteTableId
-      ServiceName: !Sub "${Bucket}-${BucketKey}-GWE"
-      SubnetIds: 
-        - !Ref PrivateSubnetId
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
       VpcEndpointType: Gateway
       VpcId: !Ref VPCId
 
