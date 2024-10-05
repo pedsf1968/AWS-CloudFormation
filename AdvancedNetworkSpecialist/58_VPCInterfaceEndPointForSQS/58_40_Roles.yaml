@@ -1,13 +1,9 @@
 ---
 AWSTemplateFormatVersion: "2010-09-09"
-Description:  This template create a role for remote account to create VPC Peering
+Description:  This template create a role for S3 Gateway Endpoint
 
 Parameters:
-  Bucket:
-    Description: CloudFormation buket URL
-    Type: String
-  BucketKey:
-    Description: Key to find object in the bucket
+  QueueARN:
     Type: String
 
 Resources:
@@ -35,26 +31,20 @@ Resources:
       Roles: 
        - !Ref PrivateInstanceRole
 
-  InstanceS3Policy:
+  InstanceSQSPolicy:
     Type: AWS::IAM::Policy
     Properties:
-      PolicyName: S3-Allow-Policy
+      PolicyName: SQS-Allow-Policy
       PolicyDocument:
         Version: 2012-10-17
         Statement:
-          -
-            Effect: Allow
+          - Effect: Allow
             Action:
-              - s3:Get*
-              - s3:Put*
-              - s3:List*
-              - s3:AbortMultipartUpload 
+              - "sqs:SendMessage"
             Resource:
-              - !Sub "arn:aws:s3:::${Bucket}/${BucketKey}/*"
-              - !Sub "arn:aws:s3:::${Bucket}/${BucketKey}"
+              - !Ref QueueARN
       Roles:
-        -
-          !Ref PrivateInstanceRole
+        - !Ref PrivateInstanceRole
 
 
 Outputs:
@@ -64,6 +54,6 @@ Outputs:
   PrivateInstanceProfileId:
     Description: ID of the Private Instance Profile
     Value: !Ref PrivateInstanceProfile
-  InstanceS3PolicyId:
+  InstanceSQSPolicyId:
     Description: ID of the Instance S3 Policy
-    Value: !Ref InstanceS3Policy
+    Value: !Ref InstanceSQSPolicy

@@ -1,0 +1,51 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create a SQS Interface Endpoint
+
+Parameters:
+  VPCId:
+    Type: String
+  VPCCidr:
+    Type: String
+  PrivateSubnetId:
+    Type: String
+  QueueARN:
+    Type: String
+
+Resources:
+  SQSInterfaceSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: 'Allow HTTPS traffic from the VPC'
+      VpcId: !Ref VPCId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Ref VPCCidr
+
+  SQSInterfaceEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PolicyDocument: 
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - "sqs:SendMessage"
+            Effect: "Allow"
+            Principal: "*"
+            Resource:
+              - !Ref QueueARN
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !Ref SQSInterfaceSecurityGroup              
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.sqs"
+      SubnetIds: 
+        - !Ref PrivateSubnetId        
+      VpcEndpointType: Interface
+      VpcId: !Ref VPCId
+
+Outputs:
+  GatewayEndpointId:
+    Description: "Id of the SQS Interface Endpoint"
+    Value: !Ref SQSInterfaceEndpoint  

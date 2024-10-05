@@ -48,11 +48,11 @@ Parameters:
   BucketKey:
     Description: Key to find object in the bucket
     Type: String
-    Default: "VPCPeeringCrossAccount"
+    Default: "50_VPCPeeringCrossAccount"
   BucketObject:
     Description: File in the bucket that contain parameters
     Type: String
-    Default: "VPCPrivateConnectivityVPCPeering.json"
+    Default: "50_VPCPrivateConnectivityVPCPeering.json"
   Phase:
     Description: "Deploy successively Phase1 and Phase2 and alternate between th two Accounts"
     Type: String

@@ -1,6 +1,6 @@
 ---
 AWSTemplateFormatVersion: "2010-09-09"
-Description:  This template create a role for remote account to create VPC Peering
+Description:  This template create a S3 Gateway Endpoint
 
 Parameters:
   Bucket:
@@ -10,8 +10,6 @@ Parameters:
     Description: Key to find object in the bucket
     Type: String
   VPCId:
-    Type: String
-  PrivateSubnetId:
     Type: String
   PrivateRouteTableId:
     Type: String

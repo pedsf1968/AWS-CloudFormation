@@ -1,6 +1,6 @@
 ---
 AWSTemplateFormatVersion: "2010-09-09"
-Description:  This template create a role for remote account to create VPC Peering
+Description:  This template create Tables and Route Tables
 
 Parameters:
   VPCId:

@@ -1,5 +1,5 @@
-# aws cloudformation validate-template --template-body file:/54_VPCEndPointForS3.yaml
-# aws cloudformation create-stack --stack-name ANS-54 --template-body file://54_VPCEndPointForS3.yaml --region eu-west-3 --capabilities CAPABILITY_IAM
+# aws cloudformation validate-template --template-body file:/54_VPCGatewayEndPointForS3.yaml
+# aws cloudformation create-stack --stack-name ANS-54 --template-body file:/54_ROOT_VPCGatewayEndpointForS3.yaml --region eu-west-3 --capabilities CAPABILITY_IAM
 # aws cloudformation delete-stack --stack-name ANS-54 --region eu-west-3
 
 # 1 - ssh on bastion: ssh -i "my-key.pem" ec2-user@13.36.247.89
@@ -9,7 +9,7 @@
 # 5 - Create file: ls /etc > test.txt
 # 6 - Copy file to bucket: aws s3 cp test.txt s3://${Bucket}/${BucketKey}/ 
 AWSTemplateFormatVersion: "2010-09-09"
-Description: This template deploys a VPC, Public and Private Subnets and Gateway endpoint for s3
+Description: This template deploys a VPC, Public and Private Subnets, Bastion, application server and Gateway Endpoint for s3
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -97,7 +97,7 @@ Parameters:
   BucketKey:
     Description: Key to find object in the bucket
     Type: String
-    Default: "VPCEndpointForS3"
+    Default: "54_VPCGatewayEndpointForS3"
 
 Resources:
   VPCAndSubnets:
