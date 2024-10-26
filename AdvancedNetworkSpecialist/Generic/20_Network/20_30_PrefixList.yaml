@@ -1,0 +1,46 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  Generic template to create Prefix List
+
+Parameters:
+  # Global parameters
+  EnvironmentName:
+    Description: "Environment name that prefix all resources"
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+  ProjectName:
+    Description: "Project name that prefix all resources"
+    Type: String
+    Default: "ANS"
+
+  # Stack parameters
+  PrefixListName:
+    Type: String
+  PrefixListEntries:
+    Type: String
+
+Resources:
+  PrefixList:
+    Type: AWS::EC2::PrefixList
+    Properties:
+      PrefixListName: !Sub "${ProjectName}-${EnvironmentName}-${PrefixListName}" 
+      AddressFamily: "IPv4"
+      MaxEntries: 5
+      Entries: 
+        - Cidr: !Select [ 0 , !Split [ ",",  !Ref PrefixListEntries] ]
+          Description: !Select [ 1 , !Split [ ",",  !Ref PrefixListEntries] ]
+        - Cidr: !Select [ 2 , !Split [ ",",  !Ref PrefixListEntries] ]
+          Description: !Select [ 3 , !Split [ ",",  !Ref PrefixListEntries] ]
+      Tags:
+        - Key: "Name"
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${PrefixListName}" 
+
+Outputs:
+  PrefixListId:
+    Description: "Prefix List Id"
+    Value: !Ref PrefixList

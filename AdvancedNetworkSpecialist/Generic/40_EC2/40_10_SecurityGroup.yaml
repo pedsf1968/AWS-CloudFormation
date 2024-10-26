@@ -1,0 +1,61 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  "Generic template create Security Groups"
+
+Parameters:
+  # Global parameters
+  EnvironmentName:
+    Description: "Environment name that prefix all resources"
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+  ProjectName:
+    Description: "Project name that prefix all resources"
+    Type: String
+    Default: "ANS"
+
+# Stack parameters
+  EntryCidrIp:
+    Type: String
+    Default: "0.0.0.0/0"
+  EntryFromPort:
+    Type: String
+    Default: 22
+  EntryIpProtocol:
+    Type: String
+    Default: tcp
+  EntryToPort:
+    Type: String
+    Default: 22
+  SecurityGroupDescription:
+    Type: String
+  SecurityGroupName:
+    Type: String
+  VPCId:
+    Description: "ID of the VPC"
+    Type: String
+
+Resources:
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Ref SecurityGroupDescription
+      GroupName: !Sub "${ProjectName}-${EnvironmentName}-${SecurityGroupName}"
+      SecurityGroupIngress:
+        - CidrIp: !Ref EntryCidrIp
+          FromPort: !Ref EntryFromPort
+          IpProtocol: !Ref EntryIpProtocol
+          ToPort: !Ref EntryToPort
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${SecurityGroupName}"
+      VpcId: !Ref VPCId
+
+Outputs:
+  SecurityGroupId:
+    Description: "Security Group Id"
+    Value: !GetAtt SecurityGroup.GroupId

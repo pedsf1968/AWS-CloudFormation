@@ -1,0 +1,54 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create Tables and Route Tables
+
+Parameters:
+  # Global parameters
+  EnvironmentName:
+    Description: "Environment name that prefix all resources"
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+  ProjectName:
+    Description: "Project name that prefix all resources"
+    Type: String
+    Default: "ANS"
+
+  # Stack parameters
+  RouteTableId:
+    Type: String
+  DestinationCidrBlock:
+    Type: String
+    Default: "0.0.0.0/0"
+  InternetGatewayId:
+    Type: String
+
+Resources:  
+  Route:
+    Type: AWS::EC2::Route
+    Properties:
+      # CarrierGatewayId: String
+      # CoreNetworkArn: String
+      DestinationCidrBlock: !Ref DestinationCidrBlock
+      # DestinationIpv6CidrBlock: String
+      # DestinationPrefixListId: String
+      # EgressOnlyInternetGatewayId: String
+      GatewayId: !Ref InternetGatewayId
+      # InstanceId: String
+      # LocalGatewayId: String
+      # NatGatewayId: String
+      # NetworkInterfaceId: String
+      RouteTableId: !Ref RouteTableId
+      # TransitGatewayId: String
+      # VpcEndpointId: String
+      # VpcPeeringConnectionId: String
+
+
+Outputs:
+  RouteId:
+    Description: "ID of the Route"
+    Value: !Ref Route

@@ -1,0 +1,59 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  "Generic template to deploy Subnets"
+
+Parameters:
+  # Global parameters
+  EnvironmentName:
+    Description: "Environment name that prefix all resources"
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+  ProjectName:
+    Description: "Project name that prefix all resources"
+    Type: String
+    Default: "ANS"
+
+  # Stack parameters
+  VPCId:
+    Description: "ID of the VPC"
+    Type: String
+  SubnetName:
+    Description: "Subnet name"
+    Type: String
+  SubnetAvailabilityZone:
+    Description: "Subnet AZ"
+    Type: String
+  SubnetCidrBlock:
+    Description: "Subnet Cidr"
+    Type: String
+  SubnetIsPublic:
+    Description: "Subnet by default is public"
+    Type: String
+    AllowedValues:
+    - true
+    - false
+
+Resources:
+  Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Ref SubnetAvailabilityZone
+      CidrBlock: !Ref SubnetCidrBlock
+      MapPublicIpOnLaunch: !Ref SubnetIsPublic
+      VpcId: !Ref VPCId
+      Tags:
+      - Key: Name
+        Value: !Sub "${ProjectName}-${EnvironmentName}-${SubnetName}"
+
+Outputs:
+  SubnetId:
+    Description: "Id of the Subnet"
+    Value: !Ref Subnet
+  CidrBlock:
+    Description: "CidrBlock of the Subnet"
+    Value: !GetAtt Subnet.CidrBlock

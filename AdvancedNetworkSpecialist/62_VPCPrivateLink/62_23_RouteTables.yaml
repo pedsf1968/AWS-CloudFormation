@@ -1,0 +1,133 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create Tables and Route Tables
+
+Parameters:
+  # Global parameters
+  EnvironmentName:
+    Description: "Environment name that prefix all resources"
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+  ProjectName:
+    Description: "Project name that prefix all resources"
+    Type: String
+    Default: "ANS"
+  Bucket:
+    Description: CloudFormation buket URL
+    Type: String
+    Default: "hawkfund-cloudformation"
+
+  # Stack parameters
+  VPCIds:
+    Type: String
+  SubnetIds:
+    Type: String
+  RouteTableNames:
+    Type: String
+  InternetGatewayId:
+    Type: String
+
+Resources:  
+  FirstSubnetARouteTableStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/20_Network/20_40_RouteTable.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        VPCId: !Select [ 0, !Split [ ",", !Ref VPCIds ] ]
+        RouteTableName: !Join [ "-", [ !Select [ 0, !Split [ ",", !Ref RouteTableNames ] ], "First" ] ]
+        SubnetId: !Select [ 0, !Split [ ",", !Ref SubnetIds ] ]
+
+  FirstSubnetARouteStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/20_Network/20_41_Route.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        RouteTableId: !GetAtt FirstSubnetARouteTableStack.Outputs.RouteTableId
+        DestinationCidrBlock: "0.0.0.0/0"
+        InternetGatewayId: !Ref InternetGatewayId
+
+
+  SecondSubnetARouteTableStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/20_Network/20_40_RouteTable.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        VPCId: !Select [ 0, !Split [ ",", !Ref VPCIds ] ]
+        RouteTableName: !Join [ "-", [ !Select [ 0, !Split [ ",", !Ref RouteTableNames ] ], "Second" ] ]
+        SubnetId: !Select [ 1, !Split [ ",", !Ref SubnetIds ] ]
+
+  FirstSubnetBRouteTableStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/20_Network/20_40_RouteTable.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        VPCId: !Select [ 1, !Split [ ",", !Ref VPCIds ] ]
+        RouteTableName: !Join [ "-", [ !Select [ 1, !Split [ ",", !Ref RouteTableNames ] ], "First" ] ]
+        SubnetId: !Select [ 2, !Split [ ",", !Ref SubnetIds ] ]
+    
+  SecondSubnetBRouteTableStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/20_Network/20_40_RouteTable.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        VPCId: !Select [ 1, !Split [ ",", !Ref VPCIds ] ]
+        RouteTableName: !Join [ "-", [ !Select [ 1, !Split [ ",", !Ref RouteTableNames ] ], "Second" ] ]
+        SubnetId: !Select [ 3, !Split [ ",", !Ref SubnetIds ] ]
+
+
+Outputs:
+  FirstSubnetARouteTableId:
+    Description: "ID of the first Subnet Route TAble of VPC A"
+    Value: !GetAtt FirstSubnetARouteTableStack.Outputs.RouteTableId
+  FirstSubnetARouteTableAssociationId:
+    Description: "ID of the first Subnet Route Table Association of VPC A"
+    Value: !GetAtt FirstSubnetARouteTableStack.Outputs.SubnetRouteTableAssociationId
+  SecondSubnetARouteTableId:
+    Description: "ID of the second Subnet Route Table of VPC A"
+    Value: !GetAtt SecondSubnetARouteTableStack.Outputs.RouteTableId
+  SecondSubnetARouteTableAssociationId:
+    Description: "ID of the second Subnet Route Table Association of VPC A"
+    Value: !GetAtt SecondSubnetARouteTableStack.Outputs.SubnetRouteTableAssociationId
+  FirstSubnetBRouteTableId:
+    Description: "ID of the first Subnet Route TAble of VPC B"
+    Value: !GetAtt FirstSubnetBRouteTableStack.Outputs.RouteTableId
+  FirstSubnetBRouteTableAssociationId:
+    Description: "ID of the first Subnet Route Table Association of VPC B"
+    Value: !GetAtt FirstSubnetBRouteTableStack.Outputs.SubnetRouteTableAssociationId
+  SecondSubnetBRouteTableId:
+    Description: "ID of the second Subnet Route Table of VPC B"
+    Value: !GetAtt SecondSubnetBRouteTableStack.Outputs.RouteTableId
+  SecondSubnetBRouteTableAssociationId:
+    Description: "ID of the second Subnet Route Table Association of VPC B"
+    Value: !GetAtt SecondSubnetBRouteTableStack.Outputs.SubnetRouteTableAssociationId
+  

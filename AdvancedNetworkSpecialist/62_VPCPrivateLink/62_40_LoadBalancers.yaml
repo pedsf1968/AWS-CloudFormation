@@ -1,0 +1,143 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template deploys load balancers
+
+Parameters:
+  # Global parameters
+  EnvironmentName:
+    Description: "Environment name that prefix all resources"
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+  ProjectName:
+    Description: "Project name that prefix all resources"
+    Type: String
+    Default: "ANS"
+  Bucket:
+    Description: CloudFormation buket URL
+    Type: String
+    Default: "hawkfund-cloudformation"
+
+  # Stack parameters
+  VPCId:
+    Type: String
+  NLBSubnetId:
+    Type: String
+  NLBSourceCidr:
+    Type: String
+  NLBName:
+    Type: String
+  NLBPort:
+    Type: String
+    Default: 80
+  NLBProtocol:
+    Type: String
+    Default: TCP
+    AllowedValues:
+         - HTTP
+         - HTTPS
+         - TCP
+         - TLS
+         - UDP
+         - TCP_UDP
+         - GENEVE
+  NLBHealthCheckProtocol:
+    Type: String
+    Default: TCP
+    AllowedValues:
+         - HTTP
+         - HTTPS
+         - TCP
+         - TLS
+         - UDP
+         - TCP_UDP
+         - GENEVE
+  NLBTargetIds:
+    Type: CommaDelimitedList
+
+Resources:
+  # Target Group
+  EC2TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 30
+      HealthCheckProtocol: !Ref NLBHealthCheckProtocol
+      HealthCheckTimeoutSeconds: 15
+      HealthyThresholdCount: 5
+      IpAddressType: ipv4
+      Name: !Sub "${ProjectName}-${EnvironmentName}-${NLBName}-TG"
+      Port: !Ref NLBPort
+      Protocol: !Ref NLBProtocol
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: '30'
+      Targets:
+        - Id: !Select [ 0, !Ref NLBTargetIds]
+          Port: !Ref NLBPort
+        - Id: !Select [ 1, !Ref NLBTargetIds]
+          Port: !Ref NLBPort
+      TargetType: instance
+      UnhealthyThresholdCount: 3
+      VpcId: !Ref VPCId
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${NLBName}-TG"
+
+  NLBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "Security group for ${NLBName}"
+      GroupName: !Sub "${ProjectName}-${EnvironmentName}-${NLBName}-SG"
+      SecurityGroupIngress:
+        - CidrIp: !Ref NLBSourceCidr
+          FromPort: !Ref NLBPort
+          IpProtocol: !Ref NLBProtocol
+          ToPort: !Ref NLBPort
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-{NLBName}-NLBSG"
+      VpcId: !Ref VPCId
+
+  NetworkLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      IpAddressType: ipv4
+      LoadBalancerAttributes:
+        - Key: deletion_protection.enabled
+          Value: false
+        - Key: access_logs.s3.enabled
+          Value: false
+        - Key: load_balancing.cross_zone.enabled
+          Value: false 
+      Name: !Sub "${ProjectName}-${EnvironmentName}-${NLBName}-NLB"
+      Scheme: internal
+      # SecurityGroups: 
+      #   - !Ref NLBSecurityGroup
+      Subnets: 
+        - !Ref NLBSubnetId
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${NLBName}-NLB"
+      Type: network
+
+  ALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref EC2TargetGroup
+      LoadBalancerArn: !Ref NetworkLoadBalancer
+      Port: !Ref NLBPort
+      Protocol: !Ref NLBProtocol
+
+Outputs:
+  NLBSecurityGroupId:
+    Description: "Id of the NLB SecurityGroup"
+    Value: !Ref NLBSecurityGroup
+  NetworkLoadBalancerId:
+    Description: "Id of the Network Load Balancer"
+    Value: !Ref NetworkLoadBalancer

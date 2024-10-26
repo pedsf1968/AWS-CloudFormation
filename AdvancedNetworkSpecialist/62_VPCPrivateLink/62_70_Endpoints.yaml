@@ -1,0 +1,64 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create a SQS Interface Endpoint
+
+
+
+Parameters:
+  # Global parameters
+  EnvironmentName:
+    Description: "Environment name that prefix all resources"
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+  ProjectName:
+    Description: "Project name that prefix all resources"
+    Type: String
+    Default: "ANS"
+  Bucket:
+    Description: CloudFormation buket URL
+    Type: String
+    Default: "hawkfund-cloudformation"
+
+  # Stack parameters
+  NetworkLoadBalancerArn:
+    Description: "The Amazon Resource Names (ARNs) of the Network Load Balancers."
+    Type: String
+    Default: ""
+  VpcEpSecurityGroup:
+    Description: "The Security Group for VPC Endpoint."
+    Type: String
+  VpcEpSubnetId:
+    Type: String
+  VpcEpVpcId:
+    Type: String
+
+Resources:
+  ServicesVPCEndpointService:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/20_Network/20_70_VPC_EndpointService.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        NetworkLoadBalancerArn: !Ref NetworkLoadBalancerArn
+        VPCESType: network
+
+  ConsumerVPCEndpoint:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/20_Network/20_70_VPC_Endpoint.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        SecurityGroupId: !Ref VpcEpSecurityGroup
+        ServiceName: !Join [ ".", [ "com.amazonaws.vpce", !Ref AWS::Region, !GetAtt ServicesVPCEndpointService.Outputs.VPCEndpointServiceId ] ]
+        SubnetId: !Ref VpcEpSubnetId        
+        VpcId: !Ref VpcEpVpcId
+        VpcEndpointType: "Interface"

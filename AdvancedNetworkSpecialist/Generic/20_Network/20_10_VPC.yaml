@@ -1,0 +1,52 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  "Generic template to deploy a VPC"
+
+Parameters:
+  # Global parameters
+  EnvironmentName:
+    Description: "Environment name that prefix all resources"
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+  ProjectName:
+    Description: "Project name that prefix all resources"
+    Type: String
+    Default: "ANS"
+
+  # Stack parameters
+  VPCCidr:
+    Description: "The IPv4 network range for the VPC, in CIDR notation."
+    Type: String
+  EnableDnsHostnames:
+    Description: "Indicates whether the instances launched in the VPC get DNS hostnames."
+    Type: String
+    Default: "true"
+  EnableDnsSupport:
+    Description: "Indicates whether the DNS resolution is supported for the VPC."
+    Type: String
+    Default: "true"
+  VPCName:
+    Description: "VPC name"
+    Type: String
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VPCCidr
+      EnableDnsSupport: !Ref EnableDnsSupport
+      EnableDnsHostnames: !Ref EnableDnsHostnames
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${VPCName}"
+
+Outputs:
+  VpcId:
+    Description: "The ID of the VPC."
+    Value: !Ref VPC

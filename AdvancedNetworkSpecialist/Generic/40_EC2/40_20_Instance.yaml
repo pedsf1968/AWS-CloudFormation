@@ -1,0 +1,75 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  "Generic template create Instances"
+
+Parameters:
+  # Global parameters
+  EnvironmentName:
+    Description: "Environment name that prefix all resources"
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+  ProjectName:
+    Description: "Project name that prefix all resources"
+    Type: String
+    Default: "ANS"
+
+# Stack parameters
+  AvailabilityZone:
+    Description: "Instance AZ"
+    Type: String
+  ImageId:
+    Description: "Instance AMI"
+    Type: AWS::EC2::Image::Id
+    Default: ami-0d3f86bfba5ee6472
+  InstanceName: 
+    Description: "Instance name"
+    Type: String
+  InstanceType: 
+    Description: "Type of Instance"
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+         - t2.micro
+         - t2.small
+         - t2.large
+  KeyName: 
+    Description: "Instance Key name"
+    Type: String
+  SecurityGroup:
+    Description: "Instance Security Group ID"
+    Type: String
+  SubnetId:
+    Description: "Instance Subnet ID"
+    Type: String
+  UserData:
+    Description: "Script to launch on the first start"
+    Type: String
+    Default: ""
+
+Resources:     
+  Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone:  !Ref AvailabilityZone
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      SecurityGroupIds: 
+        - !Ref SecurityGroup
+      SubnetId: !Ref SubnetId
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${InstanceName}"
+      UserData: !Ref UserData
+
+Outputs:
+  InstanceId:
+    Description: "Id of the Instance"
+    Value: !Ref Instance
+  InstancePrivateIP:
+    Description: "Private IP v4 of the Instance"
+    Value: !GetAtt Instance.PrivateIp

@@ -1,0 +1,118 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template deploys a VPC, and Subnets
+
+Parameters:
+  # Global parameters
+  EnvironmentName:
+    Description: "Environment name that prefix all resources"
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+  ProjectName:
+    Description: "Project name that prefix all resources"
+    Type: String
+    Default: "ANS"
+  Bucket:
+    Description: CloudFormation buket URL
+    Type: String
+    Default: "hawkfund-cloudformation"
+
+# Stack parameters
+  VPCName:
+    Description: VPC name
+    Type: String
+  VPCCidr:
+    Description: VPC CIDR
+    Type: String
+  FirstSubnetName:
+    Description: "First Subnet name"
+    Type: String
+  FirstSubnetPublic:
+    Description: "First Subnet is public"
+    Type: String
+    AllowedValues:
+    - true
+    - false
+  SecondSubnetName:
+    Description: "Second Subnet name"
+    Type: String
+  SecondSubnetPublic:
+    Description: "Second Subnet is public"
+    Type: String
+    AllowedValues:
+    - true
+    - false
+
+Resources:
+  VPCStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/20_Network/20_10_VPC.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        VPCCidr: !Ref VPCCidr
+        VPCName: !Ref VPCName
+    
+  FirstSubnetStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/20_Network/20_20_Subnet.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SubnetAvailabilityZone: !Select [ 0, !GetAZs ]
+        SubnetCidrBlock:
+          !Select 
+            - 0
+            - Fn::Cidr: [ !Ref VPCCidr, 2, 8] 
+        SubnetIsPublic: !Ref FirstSubnetPublic
+        SubnetName: !Ref FirstSubnetName
+        VPCId: !GetAtt VPCStack.Outputs.VpcId
+        
+  SecondSubnetStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/20_Network/20_20_Subnet.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SubnetAvailabilityZone: !Select [ 0, !GetAZs ]
+        SubnetCidrBlock:
+          !Select 
+            - 1
+            - Fn::Cidr: [ !Ref VPCCidr, 2, 8] 
+        SubnetIsPublic: !Ref SecondSubnetPublic
+        SubnetName: !Ref SecondSubnetName
+        VPCId: !GetAtt VPCStack.Outputs.VpcId
+
+Outputs:
+  VpcId:
+    Description: "Id of the VPC"
+    Value: !GetAtt VPCStack.Outputs.VpcId
+  FirstSubnetId:
+    Description: "Id of the first Subnet"
+    Value: !GetAtt FirstSubnetStack.Outputs.SubnetId
+  FirstCidr:
+    Description: "Cidr of the first Subnet"
+    Value: !GetAtt FirstSubnetStack.Outputs.CidrBlock
+  SecondSubnetId:
+    Description: "Id of the second Subnet"
+    Value: !GetAtt SecondSubnetStack.Outputs.SubnetId
+  SecondCidr:
+    Description: "Cidr of the second Subnet"
+    Value: !GetAtt SecondSubnetStack.Outputs.CidrBlock

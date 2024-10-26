@@ -1,0 +1,147 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create all Security Groups
+
+Parameters:
+  # Global parameters
+  EnvironmentName:
+    Description: "Environment name that prefix all resources"
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+  ProjectName:
+    Description: "Project name that prefix all resources"
+    Type: String
+    Default: "ANS"
+  Bucket:
+    Description: CloudFormation buket URL
+    Type: String
+    Default: "hawkfund-cloudformation"
+
+  # Stack parameters
+  BastionVPCId:
+    Type: String
+  BastionCidrIp:
+    Type: String
+    Default: "0.0.0.0/0"
+  ConsumerVPCId:
+    Type: String
+  ConsumerCidrIp:
+    Type: String
+  WebServerVPCId:
+    Type: String
+  PrefixListEntries:
+    Type: String
+
+Resources:
+  PrefixList:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/20_Network/20_30_PrefixList.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        PrefixListName: "All-VPC-pl"
+        PrefixListEntries: !Ref PrefixListEntries
+
+  BastionSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Security Group for Bastion"
+      GroupName: "BastionSecurityGroup"
+      SecurityGroupIngress:
+        - CidrIp: !Ref BastionCidrIp
+          FromPort: -1
+          IpProtocol: icmp
+          ToPort: -1
+        - CidrIp: !Ref BastionCidrIp
+          FromPort: 22
+          IpProtocol: tcp
+          ToPort: 22
+      Tags:
+        - Key: Name
+          Value:  !Sub "${ProjectName}-${EnvironmentName}-Default-SG"
+      VpcId: !Ref BastionVPCId
+
+  ConsumerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Security Group for Consumer"
+      GroupName: "ConsumerSecurityGroup"
+      SecurityGroupIngress:
+        - CidrIp: !Ref ConsumerCidrIp
+          FromPort: -1
+          IpProtocol: icmp
+          ToPort: -1
+        - CidrIp: !Ref ConsumerCidrIp
+          FromPort: 22
+          IpProtocol: tcp
+          ToPort: 22
+      Tags:
+        - Key: Name
+          Value:  !Sub "${ProjectName}-${EnvironmentName}-Consumer-SG"
+      VpcId: !Ref ConsumerVPCId
+
+  WebServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Security group for WebServer"
+      GroupName: "WebServerSecurityGroup"
+      SecurityGroupIngress:
+        - SourcePrefixListId: !GetAtt PrefixList.Outputs.PrefixListId
+          FromPort: -1
+          IpProtocol: icmp
+          ToPort: -1
+        - SourcePrefixListId: !GetAtt PrefixList.Outputs.PrefixListId
+          FromPort: 22
+          IpProtocol: tcp
+          ToPort: 22
+        - SourcePrefixListId: !GetAtt PrefixList.Outputs.PrefixListId
+          FromPort: 80
+          IpProtocol: tcp
+          ToPort: 80
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-WebServer-SG"
+      VpcId: !Ref WebServerVPCId
+
+  VPCEndpointServiceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Security group for VPC Endpoint"
+      GroupName: "VPCEndpointServiceSecurityGroup"
+      SecurityGroupIngress:
+        - SourcePrefixListId: !GetAtt PrefixList.Outputs.PrefixListId
+          FromPort: 80
+          IpProtocol: tcp
+          ToPort: 80
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-VPCEndpointService-SG"
+      VpcId: !Ref ConsumerVPCId
+
+Outputs:
+  PrefixListId:
+    Description: "Prefix List Id for all VPCs"
+    Value: !Ref PrefixList
+  BastionSecurityGroupId:
+    Description: "Security GroupId for the Bastion"
+    Value: !GetAtt BastionSecurityGroup.GroupId
+  ConsumerSecurityGroupId:
+    Description: "Security GroupId for the Consumer"
+    Value: !GetAtt ConsumerSecurityGroup.GroupId
+  WebServerSecurityGroupId:
+    Description: "Security GroupId for the WebServer"
+    Value: !GetAtt WebServerSecurityGroup.GroupId
+  VpcEndpointServiceSecurityGroupId:
+    Description: "Security GroupId for the VpcEndpointServiceSecurityGroup"
+    Value: !GetAtt VPCEndpointServiceSecurityGroup.GroupId
+
+  
