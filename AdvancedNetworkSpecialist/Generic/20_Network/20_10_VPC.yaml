@@ -19,18 +19,26 @@ Parameters:
     Default: "ANS"
 
   # Stack parameters
-  VPCCidr:
+  CidrBlock:
     Description: "The IPv4 network range for the VPC, in CIDR notation."
     Type: String
   EnableDnsHostnames:
+    Default: "true"
     Description: "Indicates whether the instances launched in the VPC get DNS hostnames."
-    Type: String
-    Default: "true"
+    Type: String    
   EnableDnsSupport:
-    Description: "Indicates whether the DNS resolution is supported for the VPC."
-    Type: String
     Default: "true"
-  VPCName:
+    Description: "Indicates whether the DNS resolution is supported for the VPC."
+    Type: String    
+  InstanceTenancy:
+    AllowedValues: 
+      - default
+      - dedicated
+      - host
+    Default: default
+    Description: "The allowed tenancy of instances launched into the VPC."
+    Type: String    
+  VpcName:
     Description: "VPC name"
     Type: String
 
@@ -38,13 +46,13 @@ Resources:
   VPC:
     Type: AWS::EC2::VPC
     Properties:
-      CidrBlock: !Ref VPCCidr
-      EnableDnsSupport: !Ref EnableDnsSupport
+      CidrBlock: !Ref CidrBlock
       EnableDnsHostnames: !Ref EnableDnsHostnames
-      InstanceTenancy: default
+      EnableDnsSupport: !Ref EnableDnsSupport
+      InstanceTenancy: !Ref InstanceTenancy
       Tags:
         - Key: Name
-          Value: !Sub "${ProjectName}-${EnvironmentName}-${VPCName}"
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${VpcName}-VPC"
 
 Outputs:
   VpcId:

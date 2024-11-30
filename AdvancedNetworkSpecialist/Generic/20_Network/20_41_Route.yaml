@@ -19,36 +19,51 @@ Parameters:
     Default: "ANS"
 
   # Stack parameters
-  RouteTableId:
-    Type: String
   DestinationCidrBlock:
+    Description: "The IPv4 CIDR address block used for the destination match."
     Type: String
-    Default: "0.0.0.0/0"
+    Default: ""
+  Destinationtype:
+    Description: "The destination type of the route"
+    Type: String
+    Default: "InternetGateway"
+    AllowedValues:
+         - "InternetGateway"
+         - "TransitGateway"
   InternetGatewayId:
+    Description: "The ID of an internet gateway or virtual private gateway attached to your VPC."
     Type: String
+    Default: ""
+  RouteTableId:
+    Description: "The ID of the route table for the route."
+    Type: String
+  TransitGatewayId:
+    Description: "The ID of a transit gateway."
+    Type: String
+    Default: ""
+
+Conditions:
+  isInternetGatewayType: !Equals [ !Ref Destinationtype, "InternetGateway" ]
+  isTransitGatewayType: !Equals [ !Ref Destinationtype, "TransitGateway" ]
 
 Resources:  
-  Route:
+  InternetGatewayRoute:
     Type: AWS::EC2::Route
+    Condition: isInternetGatewayType
     Properties:
-      # CarrierGatewayId: String
-      # CoreNetworkArn: String
       DestinationCidrBlock: !Ref DestinationCidrBlock
-      # DestinationIpv6CidrBlock: String
-      # DestinationPrefixListId: String
-      # EgressOnlyInternetGatewayId: String
       GatewayId: !Ref InternetGatewayId
-      # InstanceId: String
-      # LocalGatewayId: String
-      # NatGatewayId: String
-      # NetworkInterfaceId: String
       RouteTableId: !Ref RouteTableId
-      # TransitGatewayId: String
-      # VpcEndpointId: String
-      # VpcPeeringConnectionId: String
 
+  TransitGatewayRoute:
+    Type: AWS::EC2::Route
+    Condition: isTransitGatewayType
+    Properties:
+      DestinationCidrBlock: !Ref DestinationCidrBlock
+      RouteTableId: !Ref RouteTableId
+      TransitGatewayId: !Ref TransitGatewayId
 
 Outputs:
   RouteId:
     Description: "ID of the Route"
-    Value: !Ref Route
+    Value: !If [  isInternetGatewayType, !Ref InternetGatewayRoute, !Ref TransitGatewayRoute ]

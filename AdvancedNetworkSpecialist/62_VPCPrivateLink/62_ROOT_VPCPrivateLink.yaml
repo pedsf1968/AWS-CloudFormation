@@ -21,7 +21,7 @@ Metadata:
           default: "VPC A configuration"
         Parameters:
           - VPCAName
-          - VPCACidr
+          - VpcACidrBlock
       - Label:
           default: "Subnets configuration"
         Parameters:
@@ -32,7 +32,7 @@ Metadata:
           default: "VPC B configuration"
         Parameters:
           - VPCBName
-          - VPCBCidr
+          - VpcBCidrBlock
       - Label:
           default: "Instances"
         Parameters:
@@ -80,7 +80,7 @@ Parameters:
     Description: "VPC A name"
     Type: String
     Default: "Service Consumer VPC-A"
-  VPCACidr:
+  VpcACidrBlock:
     Description: "VPC A CIDR"
     Type: String
     Default: "10.10.0.0/16"
@@ -88,7 +88,7 @@ Parameters:
     Description: "VPC B name"
     Type: String
     Default: "Service Provider VPC-B"
-  VPCBCidr:
+  VpcBCidrBlock:
     Description: "VPC B CIDR"
     Type: String
     Default: "10.20.0.0/16"
@@ -106,11 +106,11 @@ Parameters:
 
   # Instances parameters
   InstanceImageId:
-    Description: Instance AMI
+    Description: "Instance AMI"
     Type: AWS::EC2::Image::Id
     Default: ami-0d3f86bfba5ee6472
   WebServerInstanceImageId:
-    Description: Instance AMI
+    Description: "AMI of the web server"
     Type: AWS::EC2::Image::Id
     Default: ami-01dfa1f2708b3ec57
   InstanceKeyName: 
@@ -143,7 +143,7 @@ Parameters:
     Default: t2.micro
 
 Resources:
-  VPCAndSubnetsA:
+  VpcAndSubnetsA:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -156,12 +156,13 @@ Resources:
         ProjectName: !Ref ProjectName
         FirstSubnetName: !Sub "${VPCAName}-${PublicSubnetName}-1"
         FirstSubnetPublic: false
+        AvailabilityZone: !Select [ 0, !GetAZs ]
         SecondSubnetName: !Sub "${VPCAName}-${PrivateSubnetName}-2"
         SecondSubnetPublic: true
-        VPCCidr: !Ref VPCACidr
-        VPCName: !Ref VPCAName
+        VpcCidrBlock: !Ref VpcACidrBlock
+        VpcName: !Ref VPCAName
         
-  VPCAndSubnetsB:
+  VpcAndSubnetsB:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -172,12 +173,13 @@ Resources:
         Bucket: !Ref Bucket
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        AvailabilityZone: !Select [ 0, !GetAZs ]
         FirstSubnetName: !Sub "${VPCBName}-${PrivateSubnetName}-1"
         FirstSubnetPublic: false
         SecondSubnetName: !Sub "${VPCBName}-${PrivateSubnetName}-2"
         SecondSubnetPublic: true
-        VPCCidr: !Ref VPCBCidr
-        VPCName: !Ref VPCBName
+        VpcCidrBlock: !Ref VpcBCidrBlock
+        VpcName: !Ref VPCBName
 
   SecurityGroups:
     Type: AWS::CloudFormation::Stack
@@ -190,11 +192,11 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         BastionCidrIp: "0.0.0.0/0"
-        BastionVPCId: !GetAtt VPCAndSubnetsA.Outputs.VpcId
-        ConsumerCidrIp: !GetAtt VPCAndSubnetsA.Outputs.FirstCidr
-        ConsumerVPCId: !GetAtt VPCAndSubnetsA.Outputs.VpcId
-        PrefixListEntries: !Join [",", [!Ref VPCACidr, "VPC-A", !Ref VPCBCidr, "VPC-B" ] ]
-        WebServerVPCId: !GetAtt VPCAndSubnetsB.Outputs.VpcId
+        BastionVPCId: !GetAtt VpcAndSubnetsA.Outputs.VpcId
+        ConsumerCidrIp: !GetAtt VpcAndSubnetsA.Outputs.FirstCidr
+        ConsumerVPCId: !GetAtt VpcAndSubnetsA.Outputs.VpcId
+        PrefixListEntries: !Join [",", [!Ref VpcACidrBlock, "VPC-A", !Ref VpcBCidrBlock, "VPC-B" ] ]
+        WebServerVPCId: !GetAtt VpcAndSubnetsB.Outputs.VpcId
 
   InternetGateways:
     Type: AWS::CloudFormation::Stack
@@ -207,7 +209,7 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         InternetGatewayName:  !Ref InternetGatewayName
-        VPCId: !GetAtt VPCAndSubnetsA.Outputs.VpcId
+        VPCId: !GetAtt VpcAndSubnetsA.Outputs.VpcId
 
   RouteTables:
     Type: AWS::CloudFormation::Stack
@@ -220,8 +222,8 @@ Resources:
         Bucket: !Ref Bucket
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
-        VPCIds: !Join [ ",", [ !GetAtt VPCAndSubnetsA.Outputs.VpcId, !GetAtt VPCAndSubnetsB.Outputs.VpcId ] ]
-        SubnetIds: !Join [ ",", [ !GetAtt VPCAndSubnetsA.Outputs.FirstSubnetId, !GetAtt VPCAndSubnetsA.Outputs.SecondSubnetId, !GetAtt VPCAndSubnetsB.Outputs.FirstSubnetId, !GetAtt VPCAndSubnetsB.Outputs.SecondSubnetId  ] ]
+        VPCIds: !Join [ ",", [ !GetAtt VpcAndSubnetsA.Outputs.VpcId, !GetAtt VpcAndSubnetsB.Outputs.VpcId ] ]
+        SubnetIds: !Join [ ",", [ !GetAtt VpcAndSubnetsA.Outputs.FirstSubnetId, !GetAtt VpcAndSubnetsA.Outputs.SecondSubnetId, !GetAtt VpcAndSubnetsB.Outputs.FirstSubnetId, !GetAtt VpcAndSubnetsB.Outputs.SecondSubnetId  ] ]
         RouteTableNames: "A,B"
         InternetGatewayId: !GetAtt InternetGateways.Outputs.InternetGatewayId
  
@@ -236,11 +238,11 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         KeyName: !Ref InstanceKeyName
-        ImageIds: !Join [ ",", [ !Ref InstanceImageId, !Ref InstanceImageId, !Ref WebServerIn stanceImageId ] ]
-        InstanceNames: !Join [ ",", [ !Ref BastionInstanceName, !Ref ConsumerInstanceName, ApplicationInstanceName ] ]
+        ImageIds: !Join [ ",", [ !Ref InstanceImageId, !Ref InstanceImageId, !Ref WebServerInstanceImageId ] ]
+        InstanceNames: !Join [ ",", [ !Ref BastionInstanceName, !Ref ConsumerInstanceName, !Ref ApplicationInstanceName ] ]
         InstanceTypes: !Join [ ",", [ !Ref BastionInstanceType, !Ref ConsumerInstanceType, !Ref ApplicationInstanceType ] ]
         SecurityGroups: !Join [ ",", [ !GetAtt SecurityGroups.Outputs.BastionSecurityGroupId, !GetAtt SecurityGroups.Outputs.ConsumerSecurityGroupId, !GetAtt SecurityGroups.Outputs.WebServerSecurityGroupId ] ]
-        SubnetIds: !Join [ ",", [ !GetAtt VPCAndSubnetsA.Outputs.FirstSubnetId, !GetAtt VPCAndSubnetsA.Outputs.SecondSubnetId, !GetAtt VPCAndSubnetsB.Outputs.SecondSubnetId  ] ]
+        SubnetIds: !Join [ ",", [ !GetAtt VpcAndSubnetsA.Outputs.FirstSubnetId, !GetAtt VpcAndSubnetsA.Outputs.SecondSubnetId, !GetAtt VpcAndSubnetsB.Outputs.SecondSubnetId  ] ]
         
   LoadBalancers:
     Type: AWS::CloudFormation::Stack
@@ -253,10 +255,10 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         NLBName: !Sub "${ApplicationInstanceName}"
-        NLBSourceCidr: !GetAtt VPCAndSubnetsA.Outputs.SecondCidr
-        NLBSubnetId: !GetAtt VPCAndSubnetsB.Outputs.FirstSubnetId
+        NLBSourceCidr: !GetAtt VpcAndSubnetsA.Outputs.SecondCidr
+        NLBSubnetId: !GetAtt VpcAndSubnetsB.Outputs.FirstSubnetId
         NLBTargetIds: !Join [ ",", [ !GetAtt Instances.Outputs.ApplicationInstance1Id, !GetAtt Instances.Outputs.ApplicationInstance2Id ] ]
-        VPCId: !GetAtt VPCAndSubnetsB.Outputs.VpcId
+        VPCId: !GetAtt VpcAndSubnetsB.Outputs.VpcId
 
   VPCEndpoints:
     Type: AWS::CloudFormation::Stack
@@ -267,6 +269,6 @@ Resources:
       TimeoutInMinutes: 5
       Parameters:
         NetworkLoadBalancerArn: !GetAtt LoadBalancers.Outputs.NetworkLoadBalancerId
-        VpcEpSubnetId: !GetAtt VPCAndSubnetsA.Outputs.SecondSubnetId
-        VpcEpVpcId: !GetAtt VPCAndSubnetsA.Outputs.VpcId
+        VpcEpSubnetId: !GetAtt VpcAndSubnetsA.Outputs.SecondSubnetId
+        VpcEpVpcId: !GetAtt VpcAndSubnetsA.Outputs.VpcId
         VpcEpSecurityGroup: !GetAtt SecurityGroups.Outputs.VpcEndpointServiceSecurityGroupId 

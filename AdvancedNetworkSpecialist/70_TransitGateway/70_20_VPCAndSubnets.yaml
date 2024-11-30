@@ -5,51 +5,43 @@ Description:  This template deploys a VPC, and Subnets
 Parameters:
   # Global parameters
   EnvironmentName:
-    Description: "Environment name that prefix all resources"
-    Type: String
-    Default: "dev"
     AllowedValues:
       - "dev"
       - "test"
       - "prod"
     ConstraintDescription: Must specify dev, test or prod
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String
   ProjectName:
+    Default: "ANS"
     Description: "Project name that prefix all resources"
     Type: String
-    Default: "ANS"
   Bucket:
+    Default: "hawkfund-cloudformation"
     Description: CloudFormation buket URL
     Type: String
-    Default: "hawkfund-cloudformation"
-
+  
 # Stack parameters
   AvailabilityZone:
+    Description: "The AZ of the subnets"
+    Type: String
+  CreatePublicSubnet:
+    AllowedValues:
+      - "false"
+      - "true"      
+    Default: "false"
     Description: "The AZ of the subnets"
     Type: String
   VpcName:
     Description: "VPC name"
     Type: String
   VpcCidrBlock:
-    Description: VPC CIDR
+    Description: "The IPv4 network range for the VPC, in CIDR notation."
     Type: String
-  FirstSubnetName:
-    Description: "First Subnet name"
-    Type: String
-  FirstSubnetPublic:
-    Description: "First Subnet is public"
-    Type: String
-    AllowedValues:
-    - true
-    - false
-  SecondSubnetName:
-    Description: "Second Subnet name"
-    Type: String
-  SecondSubnetPublic:
-    Description: "Second Subnet is public"
-    Type: String
-    AllowedValues:
-    - true
-    - false
+
+Conditions:
+  createPublicSubnet: !Equals [ !Ref CreatePublicSubnet, "true"]
 
 Resources:
   VpcStack:
@@ -64,9 +56,10 @@ Resources:
         ProjectName: !Ref ProjectName
         CidrBlock: !Ref VpcCidrBlock
         VpcName: !Ref VpcName
-    
-  FirstSubnetStack:
+
+  PublicSubnetStack:
     Type: AWS::CloudFormation::Stack
+    Condition: createPublicSubnet
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
@@ -80,11 +73,11 @@ Resources:
           !Select 
             - 0
             - Fn::Cidr: [ !Ref VpcCidrBlock, 2, 8] 
-        SubnetIsPublic: !Ref FirstSubnetPublic
-        SubnetName: !Ref FirstSubnetName
+        MapPublicIpOnLaunch: true
+        SubnetName: !Sub "${EnvironmentName}-${ProjectName}-${VpcName}-PublicSubnet"
         VpcId: !GetAtt VpcStack.Outputs.VpcId
         
-  SecondSubnetStack:
+  PrivateSubnetStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -95,27 +88,27 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         AvailabilityZone: !Ref AvailabilityZone
-        SubnetCidrBlock:
+        CidrBlock:
           !Select 
             - 1
             - Fn::Cidr: [ !Ref VpcCidrBlock, 2, 8] 
-        SubnetIsPublic: !Ref SecondSubnetPublic
-        SubnetName: !Ref SecondSubnetName
+        MapPublicIpOnLaunch: false
+        SubnetName: !Sub "${EnvironmentName}-${ProjectName}-${VpcName}-PrivateSubnet"
         VpcId: !GetAtt VpcStack.Outputs.VpcId
 
 Outputs:
   VpcId:
     Description: "Id of the VPC"
     Value: !GetAtt VpcStack.Outputs.VpcId
-  FirstSubnetId:
-    Description: "Id of the first Subnet"
-    Value: !GetAtt FirstSubnetStack.Outputs.SubnetId
+  PublicSubnetId:
+    Description: "Id of the Public Subnet"
+    Value: !If [ createPublicSubnet, !GetAtt PublicSubnetStack.Outputs.SubnetId, "" ]
   FirstCidr:
-    Description: "Cidr of the first Subnet"
-    Value: !GetAtt FirstSubnetStack.Outputs.CidrBlock
-  SecondSubnetId:
-    Description: "Id of the second Subnet"
-    Value: !GetAtt SecondSubnetStack.Outputs.SubnetId
+    Description: "Cidr of the Public Subnet"
+    Value: !If [ createPublicSubnet, !GetAtt PublicSubnetStack.Outputs.CidrBlock, "" ]
+  PrivateSubnetId:
+    Description: "Id of the Private Subnet"
+    Value: !GetAtt PrivateSubnetStack.Outputs.SubnetId
   SecondCidr:
-    Description: "Cidr of the second Subnet"
-    Value: !GetAtt SecondSubnetStack.Outputs.CidrBlock
+    Description: "Cidr of the Private Subnet"
+    Value: !GetAtt PrivateSubnetStack.Outputs.CidrBlock

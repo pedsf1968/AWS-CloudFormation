@@ -13,7 +13,7 @@ Metadata:
           default: "VPC configuration"
         Parameters:
           - VPCName
-          - VPCCidr
+          - VpcCidrBlock
       - Label:
           default: "Subnets configuration"
         Parameters:
@@ -45,11 +45,11 @@ Metadata:
 
 Parameters:
   VPCName:
-    Description: VPC name
+    Description: "VPC name"
     Type: String
     Default: "My-VPC"
-  VPCCidr:
-    Description: VPC CIDR
+  VpcCidrBlock:
+    Description: "The IPv4 network range for the VPC, in CIDR notation."
     Type: String
     Default: 10.10.0.0/16
 
@@ -81,7 +81,6 @@ Parameters:
   RouteTableName:
     Type: String
     Default: "VPC-RT"
-
  
   InstanceImageId:
     Description: Instance AMI
@@ -119,7 +118,7 @@ Resources:
       TimeoutInMinutes: 5
       Parameters:
         VPCName: !Ref VPCName
-        VPCCidr: !Ref VPCCidr
+        VpcCidrBlock: !Ref VpcCidrBlock
         SubnetName: !Ref SubnetName
         PrivateSubnetCidr: !Ref PrivateSubnetCidr
         PublicSubnetCidr: !Ref PublicSubnetCidr
@@ -181,7 +180,7 @@ Resources:
       Parameters:
         QueueARN: !GetAtt SQS.Outputs.QueueARN
         VPCId: !GetAtt VPCAndSubnets.Outputs.VpcId
-        VPCCidr: !Ref VPCCidr
+        VpcCidrBlock: !Ref VpcCidrBlock
         PrivateSubnetId: !GetAtt VPCAndSubnets.Outputs.PrivateSubnetId
 
   Instances:
@@ -199,7 +198,7 @@ Resources:
         PrivateInstanceName: !Ref PrivateInstanceName
         PublicInstanceName: !Ref PublicInstanceName
         InstanceKeyName: !Ref InstanceKeyName
-        PrivateSourceCidr: !Ref VPCCidr
+        PrivateSourceCidr: !Ref VpcCidrBlock
         PublicSourceCidr: "0.0.0.0/0"
         PrivateInstanceProfile: !GetAtt Roles.Outputs.PrivateInstanceProfileId
   

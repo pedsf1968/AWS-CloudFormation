@@ -3,10 +3,10 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description:  This template deploys a VPC, Public and Private Subnets
 
 Parameters:
-  VPCName:
+  VpcName:
     Description: VPC name
     Type: String
-  VPCCidr:
+  VpcCidrBlock:
     Description: VPC CIDR
     Type: String
   SubnetName:
@@ -24,13 +24,13 @@ Resources:
   VPC:
     Type: AWS::EC2::VPC
     Properties:
-      CidrBlock: !Ref VPCCidr
+      CidrBlock: !Ref VpcCidrBlock
       EnableDnsSupport: "true"
       EnableDnsHostnames: "true"
       InstanceTenancy: default
       Tags:
         - Key: Name
-          Value: !Ref VPCName
+          Value: !Ref VpcName
 
   PublicSubnet:
     Type: AWS::EC2::Subnet

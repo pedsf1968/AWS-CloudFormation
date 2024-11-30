@@ -21,14 +21,14 @@ Parameters:
     Default: ""
   VPCESType:
     Type: String
-    Default: network
+    Default: "network"
     AllowedValues:
-      - network
-      - gateway
+      - "network"
+      - "gateway"
 
 Conditions:
-  isNetworkType: !Equals [ !Ref VPCESType, network ]
-  isGatewayType: !Equals [ !Ref VPCESType, gateway ]
+  isNetworkType: !Equals [ !Ref VPCESType, "network" ]
+  isGatewayType: !Equals [ !Ref VPCESType, "gateway" ]
 
 Resources:
   NLBEndpointService:

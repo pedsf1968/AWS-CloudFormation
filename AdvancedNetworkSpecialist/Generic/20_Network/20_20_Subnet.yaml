@@ -19,33 +19,33 @@ Parameters:
     Default: "ANS"
 
   # Stack parameters
-  VPCId:
-    Description: "ID of the VPC"
-    Type: String
-  SubnetName:
-    Description: "Subnet name"
-    Type: String
-  SubnetAvailabilityZone:
+  AvailabilityZone:
     Description: "Subnet AZ"
     Type: String
-  SubnetCidrBlock:
+  CidrBlock:
     Description: "Subnet Cidr"
     Type: String
-  SubnetIsPublic:
+  MapPublicIpOnLaunch:
     Description: "Subnet by default is public"
     Type: String
     AllowedValues:
     - true
     - false
+  SubnetName:
+    Description: "Subnet name"
+    Type: String
+  VpcId:
+    Description: "ID of the VPC"
+    Type: String
 
 Resources:
   Subnet:
     Type: AWS::EC2::Subnet
     Properties:
-      AvailabilityZone: !Ref SubnetAvailabilityZone
-      CidrBlock: !Ref SubnetCidrBlock
-      MapPublicIpOnLaunch: !Ref SubnetIsPublic
-      VpcId: !Ref VPCId
+      AvailabilityZone: !Ref AvailabilityZone
+      CidrBlock: !Ref CidrBlock
+      MapPublicIpOnLaunch: !Ref MapPublicIpOnLaunch
+      VpcId: !Ref VpcId
       Tags:
       - Key: Name
         Value: !Sub "${ProjectName}-${EnvironmentName}-${SubnetName}"
