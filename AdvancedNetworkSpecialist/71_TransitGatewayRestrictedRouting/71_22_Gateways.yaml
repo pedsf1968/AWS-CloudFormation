@@ -112,6 +112,30 @@ Resources:
         - Key: Name
           Value: !Sub "${ProjectName}-${EnvironmentName}-${TgwName}-TGW" 
       VpnEcmpSupport: !Ref TgwVpnEcmpSupport
+  
+  TransitGatewayRouteTableA:
+    Type: AWS::EC2::TransitGatewayRouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${TgwName}-VPCA-TGWRT" 
+      TransitGatewayId: !Ref TransitGateway
+  
+  TransitGatewayRouteTableB:
+    Type: AWS::EC2::TransitGatewayRouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${TgwName}-VPCB-TGWRT" 
+      TransitGatewayId: !Ref TransitGateway
+
+  TransitGatewayRouteTableC:
+    Type: AWS::EC2::TransitGatewayRouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${TgwName}-VPCC-TGWRT" 
+      TransitGatewayId: !Ref TransitGateway
 
   TransitGatewayAttachmentA:
     Type: AWS::EC2::TransitGatewayAttachment
@@ -145,6 +169,49 @@ Resources:
           Value: !Sub "${ProjectName}-${EnvironmentName}-${TgwName}-VPCC-Attachement" 
       TransitGatewayId: !Ref TransitGateway
       VpcId: !Select [ 2, !Split [ ",", !Ref TgwVpcIds ]]
+
+
+  TransitGatewayRouteTableAssociationA:
+    Type: AWS::EC2::TransitGatewayRouteTableAssociation
+    Properties:
+      TransitGatewayAttachmentId: !Ref TransitGatewayAttachmentA
+      TransitGatewayRouteTableId: !Ref TransitGatewayRouteTableA
+
+  TransitGatewayRouteTableAssociationB:
+    Type: AWS::EC2::TransitGatewayRouteTableAssociation
+    Properties:
+      TransitGatewayAttachmentId: !Ref TransitGatewayAttachmentB
+      TransitGatewayRouteTableId: !Ref TransitGatewayRouteTableB
+
+  TransitGatewayRouteTableAssociationC:
+    Type: AWS::EC2::TransitGatewayRouteTableAssociation
+    Properties:
+      TransitGatewayAttachmentId: !Ref TransitGatewayAttachmentC
+      TransitGatewayRouteTableId: !Ref TransitGatewayRouteTableC
+
+  TransitGatewayRouteTablePropagationA:
+    Type: AWS::EC2::TransitGatewayRouteTablePropagation
+    Properties:
+      TransitGatewayAttachmentId: !Ref TransitGatewayAttachmentB
+      TransitGatewayRouteTableId: !Ref TransitGatewayRouteTableA
+
+  TransitGatewayRouteTablePropagationB1:
+    Type: AWS::EC2::TransitGatewayRouteTablePropagation
+    Properties:
+      TransitGatewayAttachmentId: !Ref TransitGatewayAttachmentA
+      TransitGatewayRouteTableId: !Ref TransitGatewayRouteTableB
+
+  TransitGatewayRouteTablePropagationB2:
+    Type: AWS::EC2::TransitGatewayRouteTablePropagation
+    Properties:
+      TransitGatewayAttachmentId: !Ref TransitGatewayAttachmentC
+      TransitGatewayRouteTableId: !Ref TransitGatewayRouteTableB
+
+  TransitGatewayRouteTablePropagationC:
+    Type: AWS::EC2::TransitGatewayRouteTablePropagation
+    Properties:
+      TransitGatewayAttachmentId: !Ref TransitGatewayAttachmentB
+      TransitGatewayRouteTableId: !Ref TransitGatewayRouteTableC
 
 Outputs:
   InternetGatewayId:
