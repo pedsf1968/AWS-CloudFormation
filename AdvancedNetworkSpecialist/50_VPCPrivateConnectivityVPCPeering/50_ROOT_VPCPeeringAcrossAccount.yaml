@@ -233,4 +233,4 @@ Resources:
         InstanceImageId: !FindInMap [RegionMap, !Ref "AWS::Region", InstanceImageId]
         KeyName: !FindInMap [RegionMap, !Ref "AWS::Region", KeyName]
         InstanceSGCidr: !FindInMap [RegionMap, !Ref "AWS::Region",InstanceSGCidr]
-    
+        

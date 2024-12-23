@@ -1,0 +1,106 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create a Security Group
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: "CloudFormation bucket URL"
+    Type: String    
+  BucketKey:
+    Default: "data.json"
+    Description: File name to save parameters in the bucket
+    Type: String
+  EnvironmentName:
+    Description: "Environment name that prefix all resources"
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+  ProjectName:
+    Description: "Project name that prefix all resources"
+    Type: String
+    Default: "ANS"
+  SaveInS3File:
+    AllowedValues:
+      - "false"
+      - "true"
+    Default: "false"
+    Description: "Backup values in file specified by Bucket and BucketKey"
+    Type: String
+
+  # Stack parameters
+  GroupDescription:
+    Description: "Description of the Security Group"
+    Type: String
+  GroupName:
+    Description: "Name of the Security Group"
+    Type: String 
+  VpcId:
+    Description: "VPC of the Security Group"
+    Type: String
+  IngressCidrIps:
+    Default: "0.0.0.0/0"
+    Description: "Ingress CIDRs for the Security Group"
+    Type: String
+  IngressDescriptions:
+    Default: "Allow ICMP"
+    Description: "Ingress Description for the Security Group"
+    Type: String
+  IngressFromPorts:
+      Default: "All"
+      Description: "Ingress CIDRs for the Security Group"
+      Type: String
+  IngressIpProtocols:
+      Default: "ICMP"
+      Description: "Ingress Protocols for the Security Group"
+      Type: String
+  IngressToPorts:
+      Default: "All"
+      Description: "Ingress CIDRs for the Security Group"
+      Type: String
+
+Conditions:
+  isSavedInS3File: !Equals [ !Ref SaveInS3File, "true"]
+
+Resources:
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Ref GroupDescription
+      GroupName: !Ref GroupName
+      Tags:
+        - Key: Name
+          Value:  !Sub "${ProjectName}-${EnvironmentName}-${GroupName}-SG"
+      VpcId: !Ref VpcId
+
+  SecurityGroupIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      CidrIp: !Ref IngressCidrIps
+      Description: !Ref IngressDescriptions
+      FromPort: !Ref IngressFromPorts
+      GroupId: !Ref SecurityGroup
+      IpProtocol: !Ref IngressIpProtocols
+      ToPort: !Ref IngressToPorts
+
+  SecurityGroupIdBackup:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: isSavedInS3File
+    Properties:
+      ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:UpdateParametersFromS3"
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      Key: !Sub "${AWS::Region}-${ProjectName}-${EnvironmentName}-${GroupName}-SecurityGroupId"
+      Value: !Ref SecurityGroup
+
+
+Outputs:
+  SecurityGroupId:
+    Description: "ID of Security GroupId "
+    Value: !Ref SecurityGroup

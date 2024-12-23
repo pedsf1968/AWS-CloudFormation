@@ -1,0 +1,100 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create Site to Site VPN Connection
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: "CloudFormation bucket URL"
+    Type: String    
+  BucketKey:
+    Default: "data.json"
+    Description: File name to save parameters in the bucket
+    Type: String
+  EnvironmentName:
+    Description: "Environment name that prefix all resources"
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+  ProjectName:
+    Description: "Project name that prefix all resources"
+    Type: String
+    Default: "ANS"
+  SaveInS3File:
+    AllowedValues:
+      - "false"
+      - "true"
+    Default: "false"
+    Description: "Backup values in file specified by Bucket and BucketKey"
+    Type: String
+
+  # Stack parameters
+  CustomerGatewayId:
+    Description: "The ID of the customer gateway at your end of the VPN connection."
+    Type: String
+  LocalIpv4NetworkCidr:
+    Default: "0.0.0.0/0"
+    Description: "The IPv4 CIDR on the customer gateway (on-premises) side of the VPN connection."
+    Type: String
+  Name:
+    Default: "Default"
+    Description: "Site To Site VPN Connection name"
+    Type: String
+  RemoteIpv4NetworkCidr:
+    Default: "0.0.0.0/0"
+    Description: "The IPv4 CIDR on the AWS side of the VPN connection."
+    Type: String
+  StaticRoutesOnly:
+    AllowedValues:
+      - false
+      - true
+    Default: true
+    Description: "Indicates whether the VPN connection uses static routes only. Static routes must be used for devices that don't support BGP."
+    Type: String  
+  Type:
+    AllowedValues:
+      - ipsec.1
+    Default: ipsec.1
+    Description: "The type of VPN connection."
+    Type: String    
+  VpnGatewayId:
+    Description: "The ID of the virtual private gateway at the AWS side of the VPN connection."
+    Type: String
+
+Conditions:
+  isSavedInS3File: !Equals [ !Ref SaveInS3File, "true"]
+
+Resources:
+  VpnConnection:
+    Type: AWS::EC2::VPNConnection
+    Properties:
+      CustomerGatewayId: !Ref CustomerGatewayId
+      LocalIpv4NetworkCidr: !Ref LocalIpv4NetworkCidr
+      RemoteIpv4NetworkCidr: !Ref RemoteIpv4NetworkCidr
+      StaticRoutesOnly: !Ref StaticRoutesOnly
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${Name}" 
+      Type: !Ref Type
+      VpnGatewayId: !Ref VpnGatewayId
+
+  VpnConnectionIdBackup:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: isSavedInS3File
+    Properties:
+      ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:UpdateParametersFromS3"
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      Key: !Sub "${AWS::Region}-${ProjectName}-${EnvironmentName}-${Name}-VpnConnectionId"
+      Value: !Ref VpnConnection
+
+Outputs:
+  VpnConnectionId:
+    Description: "Id of the VpnConnection"
+    Value: !Ref VpnConnection

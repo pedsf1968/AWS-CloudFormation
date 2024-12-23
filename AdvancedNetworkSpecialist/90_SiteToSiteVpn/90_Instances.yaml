@@ -1,0 +1,113 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: This template create Instance
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Description: "CloudFormation bucket URL"
+    Type: String
+    Default: "hawkfund-cloudformation"
+  BucketKey:
+    Description: "File name to save parameters in the bucket"
+    Type: String
+  EnvironmentName:
+    Description: "Environment name that prefix all resources"
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+  ProjectName:
+    Description: "Project name that prefix all resources"
+    Type: String
+    Default: "ANS"
+
+  # Stack parameters
+  AvailabilityZone:
+    Description: "AZ of the Instance"
+    Type: String
+  ImageId:
+    Description: "Instance AMI"
+    Type: String
+  InstanceName:
+    Description: "Instance name"
+    Type: String
+  InstanceType:
+    Description: "Instance type"
+    Type: String
+  KeyName:
+    Description: "SSH key to connect to the instance"
+    Type: String
+  SecurityGroup:
+    Description: "InstanceSecurity Groups"
+    Type: String
+  SubnetId:
+    Description: "Instance Subnet ID"
+    Type: String
+
+Conditions:
+  IsEuWest3: !Equals [!Ref "AWS::Region", "eu-west-3" ]
+
+Resources:
+  Instance:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/EC2/Instance.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        AvailabilityZone: !Ref AvailabilityZone
+        KeyName: !Ref KeyName
+        ImageId: !Ref ImageId
+        InstanceName: !Ref InstanceName
+        InstanceType: !Ref InstanceType
+        SaveInS3File: "true"
+        SecurityGroup: !Ref SecurityGroup
+        SubnetId: !Ref SubnetId
+        UserData: !If 
+          - IsEuWest3
+          - Fn::Base64: |
+              #!/bin/bash
+              # Configure fedora repository
+              cat << EOF > /etc/yum.repos.d/fedora.repo
+              [fedora] 
+              name=Fedora 36 - $basearch
+              #baseurl=http://download.example/pub/fedora/linux/releases/36/Everything/$basearch/os/ 
+              metalink=https://mirrors.fedoraproject.org/metalink?repo=fedora-36&arch=$basearch 
+              enabled=0 
+              countme=1 
+              metadata_expire=7d 
+              repo_gpgcheck=0 
+              type=rpm 
+              gpgcheck=1 
+              gpgkey=https://getfedora.org/static/fedora.gpg 
+              skip_if_unavailable=False
+              EOF
+              
+              # Install libreswan
+              dnf install libreswan -y
+
+              # Configure ip filters
+              cat << EOF > /etc/sysctl.conf
+              net.ipv4.ip_forward = 1 
+              net.ipv4.conf.default.rp_filter = 0 
+              net.ipv4.conf.default.accept_source_route = 0
+              EOF
+              sysctl -p
+          - ""
+
+Outputs:
+  InstanceId:
+    Description: "Id of the Instance"
+    Value: !GetAtt Instance.Outputs.InstanceId
+  PrivateIP:
+    Description: "Private IP of the Instance"
+    Value: !GetAtt Instance.Outputs.InstancePrivateIP

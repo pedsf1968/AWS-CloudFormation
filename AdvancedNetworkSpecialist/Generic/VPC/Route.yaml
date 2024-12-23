@@ -4,6 +4,14 @@ Description:  This template create Tables and Route Tables
 
 Parameters:
   # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: "CloudFormation bucket URL"
+    Type: String    
+  BucketKey:
+    Default: "data.json"
+    Description: File name to save parameters in the bucket
+    Type: String
   EnvironmentName:
     Description: "Environment name that prefix all resources"
     Type: String
@@ -17,6 +25,13 @@ Parameters:
     Description: "Project name that prefix all resources"
     Type: String
     Default: "ANS"
+  SaveInS3File:
+    AllowedValues:
+      - "false"
+      - "true"
+    Default: "false"
+    Description: "Backup values in file specified by Bucket and BucketKey"
+    Type: String
 
   # Stack parameters
   DestinationCidrBlock:
@@ -30,7 +45,8 @@ Parameters:
     AllowedValues:
          - "InternetGateway"
          - "TransitGateway"
-  InternetGatewayId:
+         - "VirtualPrivateGateway"
+  GatewayId:
     Description: "The ID of an internet gateway or virtual private gateway attached to your VPC."
     Type: String
     Default: ""
@@ -41,18 +57,21 @@ Parameters:
     Description: "The ID of a transit gateway."
     Type: String
     Default: ""
-
+  
 Conditions:
-  isInternetGatewayType: !Equals [ !Ref Destinationtype, "InternetGateway" ]
+  isInternetOrVirtualPrivateGatewayType: !Or
+    - !Equals [ !Ref Destinationtype, "InternetGateway" ]
+    - !Equals [ !Ref Destinationtype, "VirtualPrivateGateway" ]
+  isSavedInS3File: !Equals [ !Ref SaveInS3File, "true"]    
   isTransitGatewayType: !Equals [ !Ref Destinationtype, "TransitGateway" ]
 
 Resources:  
-  InternetGatewayRoute:
+  InternetOrVirtualPrivateGatewayRoute:
     Type: AWS::EC2::Route
-    Condition: isInternetGatewayType
+    Condition: isInternetOrVirtualPrivateGatewayType
     Properties:
       DestinationCidrBlock: !Ref DestinationCidrBlock
-      GatewayId: !Ref InternetGatewayId
+      GatewayId: !Ref GatewayId
       RouteTableId: !Ref RouteTableId
 
   TransitGatewayRoute:
@@ -62,8 +81,19 @@ Resources:
       DestinationCidrBlock: !Ref DestinationCidrBlock
       RouteTableId: !Ref RouteTableId
       TransitGatewayId: !Ref TransitGatewayId
+      
+  RouteBackup:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: isSavedInS3File
+    Properties:
+      ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:UpdateParametersFromS3"
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      Key: !Sub "${AWS::Region}-${ProjectName}-${EnvironmentName}-${Destinationtype}-RouteId"
+      Value: !If [  isInternetOrVirtualPrivateGatewayType, !Ref InternetOrVirtualPrivateGatewayRoute, !Ref TransitGatewayRoute ]
 
 Outputs:
   RouteId:
     Description: "ID of the Route"
-    Value: !If [  isInternetGatewayType, !Ref InternetGatewayRoute, !Ref TransitGatewayRoute ]
+    Value: !If [  isInternetOrVirtualPrivateGatewayType, !Ref InternetOrVirtualPrivateGatewayRoute, !Ref TransitGatewayRoute ]

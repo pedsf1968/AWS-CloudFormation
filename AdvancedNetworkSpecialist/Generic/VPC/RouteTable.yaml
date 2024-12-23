@@ -1,0 +1,93 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create Tables and Route Tables
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: "CloudFormation bucket URL"
+    Type: String    
+  BucketKey:
+    Default: "data.json"
+    Description: File name to save parameters in the bucket
+    Type: String
+  EnvironmentName:
+    Description: "Environment name that prefix all resources"
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+  ProjectName:
+    Description: "Project name that prefix all resources"
+    Type: String
+    Default: "ANS"
+  SaveInS3File:
+    AllowedValues:
+      - "false"
+      - "true"
+    Default: "false"
+    Description: "Backup values in file specified by Bucket and BucketKey"
+    Type: String
+
+  # Stack parameters
+  RouteTableName:
+    Description: "The name of the Route Table"
+    Type: String
+  SubnetId:
+    Description: "The ID of the Subnet to attach the Route Table"
+    Type: String
+  VPCId:
+    Description: "The ID of the VPC where to create the Route Table"
+    Type: String
+
+Conditions:
+  isSavedInS3File: !Equals [ !Ref SaveInS3File, "true"]
+
+Resources:  
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPCId
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${RouteTableName}-RT"
+
+  SubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref SubnetId
+
+  RouteTableIdBackup:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: isSavedInS3File
+    Properties:
+      ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:UpdateParametersFromS3"
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      Key: !Sub "${AWS::Region}-${ProjectName}-${EnvironmentName}-${RouteTableName}-RTId"
+      Value: !Ref RouteTable
+
+  SubnetRouteTableAssociationIdBackup:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: isSavedInS3File
+    Properties:
+      ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:UpdateParametersFromS3"
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      Key: !Sub "${AWS::Region}-${ProjectName}-${EnvironmentName}-${RouteTableName}-SubnetRTAId"
+      Value: !Ref SubnetRouteTableAssociation
+
+Outputs:
+  RouteTableId:
+    Description: "ID of the Root Table"
+    Value: !Ref RouteTable
+  SubnetRouteTableAssociationId:
+    Description: "ID of the Root Table Association"
+    Value: !Ref SubnetRouteTableAssociation

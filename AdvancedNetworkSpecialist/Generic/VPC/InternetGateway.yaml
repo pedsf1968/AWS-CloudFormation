@@ -1,0 +1,91 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create Internet Gateway and Attachement
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: "CloudFormation bucket URL"
+    Type: String    
+  BucketKey:
+    Default: "data.json"
+    Description: File name to save parameters in the bucket
+    Type: String
+  EnvironmentName:
+    Description: "Environment name that prefix all resources"
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+  ProjectName:
+    Description: "Project name that prefix all resources"
+    Type: String
+    Default: "ANS"
+  SaveInS3File:
+    AllowedValues:
+      - "false"
+      - "true"
+    Default: "false"
+    Description: "Backup values in file specified by Bucket and BucketKey"
+    Type: String
+
+  # Stack parameters
+  Name:
+    Default: "Default"
+    Description: "Internet Gateway name"
+    Type: String
+  VpcId:
+    Description: "Internet Gateway VPC ID"
+    Type: String
+
+Conditions:
+  isSavedInS3File: !Equals [ !Ref SaveInS3File, "true"]
+
+Resources:
+  # Internet Gateway and Attachment
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${Name}-IGW" 
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VpcId
+
+  InternetGatewayIdBackup:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: isSavedInS3File
+    Properties:
+      ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:UpdateParametersFromS3"
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      Key: !Sub "${AWS::Region}-${ProjectName}-${EnvironmentName}-${Name}-IGWId"
+      Value: !Ref InternetGateway
+
+  InternetGatewayAttachmentIdBackup:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: isSavedInS3File
+    Properties:
+      ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:UpdateParametersFromS3"
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      Key: !Sub "${AWS::Region}-${ProjectName}-${EnvironmentName}-${Name}-IGWAId"
+      Value: !Ref InternetGatewayAttachment
+
+Outputs:
+  InternetGatewayId:
+    Description: "Id of the Internet Gateway"
+    Value: !Ref InternetGateway
+  InternetGatewayAttachmentId:
+    Description: "Id of the Internet Gateway Attachment"
+    Value: !Ref InternetGatewayAttachment

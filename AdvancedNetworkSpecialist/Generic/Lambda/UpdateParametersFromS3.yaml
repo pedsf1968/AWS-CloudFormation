@@ -1,0 +1,67 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template for creating lambda used by CloudFormation other's stacks
+
+Resources:
+  # Event JSON to test Lambda
+  # {
+  #   "ResourceProperties": {
+  #     "Bucket": "hawkfund-cloudformation",
+  #     "BucketKey": "hawkfund-cloudformation/90_SiteToSiteVpn/Data.json",
+  #     "Value": "vpc-0a42e016ae062848d",
+  #     "Key": "eu-west-3-ANS-dev-DC-VpcId"
+  #   }
+  # }
+  UpdateParametersFromS3:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          import boto3
+          import cfnresponse
+          import json
+          responseData = {}
+          client = boto3.client('s3')
+
+          def lambda_handler(event, context):
+            bucket =  event["ResourceProperties"]["Bucket"]
+            bucketKey = event["ResourceProperties"]["BucketKey"]
+            parameterKey = event["ResourceProperties"]["Key"]
+            parameterValue = event["ResourceProperties"]["Value"]
+
+            try:
+              # Read file from s3
+              response = client.get_object(
+                  Bucket=bucket,
+                  Key=bucketKey
+              )
+              print(response)
+              json_data = response["Body"].read().decode('utf-8')
+              data = json.loads(json_data)             
+            except Exception as err:
+              print("WARNING: No file present on the s3 Bucket")
+              data = {}
+
+            # Change data value for specified key
+            data[parameterKey] = parameterValue
+
+            # Write file from s3
+            response = client.put_object(
+                Body=bytes(json.dumps(data).encode('UTF-8')),
+                Bucket=bucket,
+                Key=bucketKey
+            )
+
+            responseData["Value"] = parameterValue 
+            cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData)                            
+      Description: Function to update parameter from JSON file in a S3 bucket
+      FunctionName: UpdateParametersFromS3
+      Handler: index.lambda_handler
+      MemorySize: 128
+      Role: !Join [":", ["arn:aws:iam:", !Sub "${AWS::AccountId}", !Sub "role/UpdateParametersFromS3" ] ]
+      Runtime: python3.9
+
+Outputs:
+  UpdateParametersFromS3Arn:
+    Description: ARN of UpdateParametersFromS3 Lambda
+    Value: !GetAtt UpdateParametersFromS3.Arn    

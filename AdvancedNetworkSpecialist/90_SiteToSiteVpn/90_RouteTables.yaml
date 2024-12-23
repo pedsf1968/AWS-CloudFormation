@@ -1,0 +1,85 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create Tables and Route Tables
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Description: "CloudFormation bucket URL"
+    Type: String
+    Default: "hawkfund-cloudformation"
+  BucketKey:
+    Description: "File name to save parameters in the bucket"
+    Type: String
+  EnvironmentName:
+    Description: "Environment name that prefix all resources"
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+  ProjectName:
+    Description: "Project name that prefix all resources"
+    Type: String
+    Default: "ANS"
+
+  # Stack parameters
+  DestinationCidrBlocks:
+    Description: "C"
+    Type: String
+  Destinationtype:
+    AllowedValues:
+         - "InternetGateway"
+         - "VirtualPrivateGateway"
+    Default: "InternetGateway" 
+    Type: String  
+  GatewayId:
+    Type: String
+  RouteTableNames:
+    Type: String
+  SubnetIds:
+    Type: String
+  VpcIds:
+    Type: String
+
+Conditions:
+  IsEuWest3: !Equals [!Ref "AWS::Region", "eu-west-3" ]
+  IsEuCentral1: !Equals [!Ref "AWS::Region", "eu-central-1" ]
+
+Resources:  
+  SubnetRouteTableStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/RouteTable.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Sub "${BucketKey}/Data.json"
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        VPCId: !Select [ 0 , !Split [",", !Ref VpcIds ] ] 
+        RouteTableName: !Select [ 0 , !Split [",", !Ref RouteTableNames ] ] 
+        SaveInS3File: "true"
+        SubnetId:  !Select [ 0, !Split [ ",", !Ref SubnetIds ] ]
+
+  SubnetRouteStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/Route.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Sub "${BucketKey}/Data.json"
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        RouteTableId: !GetAtt SubnetRouteTableStack.Outputs.RouteTableId
+        DestinationCidrBlock: !Select [ 0, !Split [ ",", !Ref DestinationCidrBlocks ] ]
+        Destinationtype: !Ref Destinationtype
+        GatewayId: !Ref GatewayId
+        SaveInS3File: "true"

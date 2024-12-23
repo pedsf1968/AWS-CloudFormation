@@ -43,7 +43,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/20_Network/20_70_VPC_EndpointService.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/VpcEndpointService.yaml"
       TimeoutInMinutes: 5
       Parameters:
         NetworkLoadBalancerArn: !Ref NetworkLoadBalancerArn
@@ -54,7 +54,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/20_Network/20_70_VPC_Endpoint.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/70_VPC_Endpoint.yaml"
       TimeoutInMinutes: 5
       Parameters:
         SecurityGroupId: !Ref VpcEpSecurityGroup

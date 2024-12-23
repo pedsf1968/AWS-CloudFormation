@@ -1,0 +1,55 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template deploy Lambda to use
+
+Parameters:
+  # Stack parameters
+  Bucket:
+    Description: "CloudFormation bucket URL"
+    Type: String
+    Default: "hawkfund-cloudformation"  
+  BucketKey:
+    Description: "File name to save parameters in the bucket"
+    Type: String
+
+Conditions:
+  IsEuWest3: !Equals [!Ref "AWS::Region", "eu-west-3" ]
+
+Resources:
+  GetParametersFromS3Role:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsEuWest3
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/IAM/RoleGetParametersFromS3.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+
+  UpdateParametersFromS3Role:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsEuWest3
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/IAM/RoleUpdateParametersFromS3.yaml"                         
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+
+  GetParametersFromS3:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/Lambda/GetParametersFromS3.yaml"
+      TimeoutInMinutes: 5
+
+  UpdateParametersFromS3:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/Lambda/UpdateParametersFromS3.yaml"                         
+      TimeoutInMinutes: 5

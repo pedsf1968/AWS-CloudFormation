@@ -4,6 +4,14 @@ Description:  "Generic template create Security Groups"
 
 Parameters:
   # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: "CloudFormation bucket URL"
+    Type: String    
+  BucketKey:
+    Default: "data.json"
+    Description: File name to save parameters in the bucket
+    Type: String
   EnvironmentName:
     Description: "Environment name that prefix all resources"
     Type: String
@@ -17,6 +25,13 @@ Parameters:
     Description: "Project name that prefix all resources"
     Type: String
     Default: "ANS"
+  SaveInS3File:
+    AllowedValues:
+      - "false"
+      - "true"
+    Default: "false"
+    Description: "Backup values in file specified by Bucket and BucketKey"
+    Type: String
 
 # Stack parameters
   EntryCidrIp:

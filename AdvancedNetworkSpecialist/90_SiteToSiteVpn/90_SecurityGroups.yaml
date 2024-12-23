@@ -1,0 +1,136 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create all Security Groups
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Description: "File name to save parameters in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+
+  # Stack parameters
+  GroupDescription:
+    Description: "Description of the Security Group"
+    Type: String
+  GroupName:
+    Description: "Name of the Security Group"
+    Type: String 
+  VpcId:
+    Description: "VPC of the Security Group"
+    Type: String
+  IngressCidrIp:
+    Default: "0.0.0.0/0"
+    Description: "Ingress CIDR for the Security Group"
+    Type: String
+  ICMPAllowed:
+    AllowedValues:
+         - "false"
+         - "true"
+    Default: "true"
+    Description: "Allow ICMP Ingress by default"
+    Type: String
+  SSHAllowed:
+    AllowedValues:
+         - "false"
+         - "true"
+    Default: "false"
+    Description: "Allow SSH Ingress"
+    Type: String
+  HTTPAllowed:
+    AllowedValues:
+         - "false"
+         - "true"
+    Default: "false"
+    Description: "Allow HTTP Ingress"
+    Type: String
+  HTTPSAllowed:
+    AllowedValues:
+         - "false"
+         - "true"
+    Default: "true"
+    Description: "Allow HTTPS Ingress"
+    Type: String
+
+Conditions:
+  IsICMP: !Equals [!Ref ICMPAllowed, "true" ]
+  IsSSH: !Equals [!Ref SSHAllowed, "true" ]
+  IsHTTP: !Equals [!Ref HTTPAllowed, "true" ]
+  IsHTTPS: !Equals [!Ref HTTPSAllowed, "true" ]
+
+
+Resources:
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Ref GroupDescription
+      GroupName: !Ref GroupName
+      Tags:
+        - Key: Name
+          Value:  !Sub "${ProjectName}-${EnvironmentName}-${GroupName}-SG"
+      VpcId: !Ref VpcId
+
+  ICMPSecurityGroupIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: IsICMP
+    Properties:
+      CidrIp: !Ref IngressCidrIp
+      Description: "ICMP Ingress Security Group"
+      FromPort: -1
+      GroupId: !Ref SecurityGroup
+      IpProtocol: icmp
+      ToPort: -1
+
+  SSHSecurityGroupIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: IsSSH
+    Properties:
+      CidrIp: !Ref IngressCidrIp
+      Description: "SSH Ingress Security Group"
+      FromPort: 22
+      GroupId: !Ref SecurityGroup
+      IpProtocol: tcp
+      ToPort: 22
+
+  HTTPSecurityGroupIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: IsHTTP
+    Properties:
+      CidrIp: !Ref IngressCidrIp
+      Description: "HTTP Ingress Security Group"
+      FromPort: 80
+      GroupId: !Ref SecurityGroup
+      IpProtocol: tcp
+      ToPort: 80
+
+  HTTPSSecurityGroupIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: IsHTTPS
+    Properties:
+      CidrIp: !Ref IngressCidrIp
+      Description: "HTTPS Ingress Security Group"
+      FromPort: 443
+      GroupId: !Ref SecurityGroup
+      IpProtocol: tcp
+      ToPort: 443
+
+Outputs:
+  SecurityGroupId:
+    Description: "ID of Security GroupId "
+    Value: !Ref SecurityGroup

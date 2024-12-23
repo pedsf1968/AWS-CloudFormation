@@ -4,6 +4,10 @@ Description:  This template deploys a VPC, and Subnets
 
 Parameters:
   # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
   EnvironmentName:
     AllowedValues:
       - "dev"
@@ -16,10 +20,6 @@ Parameters:
   ProjectName:
     Default: "ANS"
     Description: "Project name that prefix all resources"
-    Type: String
-  Bucket:
-    Default: "hawkfund-cloudformation"
-    Description: CloudFormation buket URL
     Type: String
   
 # Stack parameters
@@ -49,7 +49,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/20_Network/20_10_VPC.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/Vpc.yaml"
       TimeoutInMinutes: 5
       Parameters:
         EnvironmentName: !Ref EnvironmentName
@@ -63,7 +63,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/20_Network/20_20_Subnet.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/Subnet.yaml"
       TimeoutInMinutes: 5
       Parameters:
         EnvironmentName: !Ref EnvironmentName
@@ -82,7 +82,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/20_Network/20_20_Subnet.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/Subnet.yaml"
       TimeoutInMinutes: 5
       Parameters:
         EnvironmentName: !Ref EnvironmentName

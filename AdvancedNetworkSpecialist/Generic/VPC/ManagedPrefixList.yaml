@@ -4,6 +4,14 @@ Description:  Generic template to create Prefix List
 
 Parameters:
   # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: "CloudFormation bucket URL"
+    Type: String    
+  BucketKey:
+    Default: "data.json"
+    Description: File name to save parameters in the bucket
+    Type: String
   EnvironmentName:
     Description: "Environment name that prefix all resources"
     Type: String
@@ -17,12 +25,22 @@ Parameters:
     Description: "Project name that prefix all resources"
     Type: String
     Default: "ANS"
+  SaveInS3File:
+    AllowedValues:
+      - "false"
+      - "true"
+    Default: "false"
+    Description: "Backup values in file specified by Bucket and BucketKey"
+    Type: String
 
   # Stack parameters
   PrefixListName:
     Type: String
   PrefixListEntries:
     Type: String
+
+Conditions:
+  isSavedInS3File: !Equals [ !Ref SaveInS3File, "true"]
 
 Resources:
   PrefixList:
@@ -39,6 +57,17 @@ Resources:
       Tags:
         - Key: "Name"
           Value: !Sub "${ProjectName}-${EnvironmentName}-${PrefixListName}" 
+
+  PrefixListIdBackup:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: isSavedInS3File
+    Properties:
+      ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:UpdateParametersFromS3"
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      Key: !Sub "${AWS::Region}-${ProjectName}-${EnvironmentName}-${SubnetName}-PrefixListId"
+      Value: !Ref PrefixList
 
 Outputs:
   PrefixListId:

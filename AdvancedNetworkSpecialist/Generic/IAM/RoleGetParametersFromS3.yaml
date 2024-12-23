@@ -1,0 +1,70 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template for creating Role for Lambda to read parameters in file from S3
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: "CloudFormation bucket URL"
+    Type: String    
+  BucketKey:
+    Default: "data.json"
+    Description: File name to save parameters in the bucket
+    Type: String
+  EnvironmentName:
+    Description: "Environment name that prefix all resources"
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+  ProjectName:
+    Description: "Project name that prefix all resources"
+    Type: String
+    Default: "ANS"
+
+Resources:
+  GetParametersFromS3:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      Policies:
+      - PolicyName: AppendToLogsPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: "*"
+      - PolicyName: GetParametersFromS3Policy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - s3:GetObject
+            - s3:List*
+            Resource: 
+            - !Join [":", ["arn:aws:s3::", !Sub "${Bucket}/${BucketKey}"]]
+            - !Join [":", ["arn:aws:s3::", !Sub "${Bucket}/${BucketKey}/*"]]
+      RoleName: GetParametersFromS3
+
+Outputs:
+  GetParametersFromS3Arn:
+    Description: "ARN of GetParametersFromS3 Lambda"
+    Value: !GetAtt GetParametersFromS3.Arn

@@ -46,7 +46,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/40_EC2/40_20_Instances.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/EC2/Instances.yaml"
       TimeoutInMinutes: 5
       Parameters:
         EnvironmentName: !Ref EnvironmentName
@@ -64,7 +64,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/40_EC2/40_20_Instances.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/EC2/Instances.yaml"
       TimeoutInMinutes: 5
       Parameters:
         EnvironmentName: !Ref EnvironmentName
@@ -82,7 +82,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/40_EC2/40_20_Instances.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/EC2/Instances.yaml"
       TimeoutInMinutes: 5
       Parameters:
         EnvironmentName: !Ref EnvironmentName
@@ -101,7 +101,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/40_EC2/40_20_Instances.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/EC2/Instances.yaml"
       TimeoutInMinutes: 5
       Parameters:
         EnvironmentName: !Ref EnvironmentName

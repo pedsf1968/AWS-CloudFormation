@@ -1,0 +1,107 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template VPC Endpoint Service for NLB or GLB
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: "CloudFormation bucket URL"
+    Type: String    
+  BucketKey:
+    Default: "data.json"
+    Description: File name to save parameters in the bucket
+    Type: String
+  EnvironmentName:
+    Description: "Environment name that prefix all resources"
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+  ProjectName:
+    Description: "Project name that prefix all resources"
+    Type: String
+    Default: "ANS"
+  SaveInS3File:
+    AllowedValues:
+      - "false"
+      - "true"
+    Default: "false"
+    Description: "Backup values in file specified by Bucket and BucketKey"
+    Type: String
+
+  # Stack parameters
+  AcceptanceRequired:
+    Description: "Indicates whether requests from service consumers to create an endpoint to your service must be accepted."
+    Type: String
+    Default: false
+    AllowedValues:
+      - true
+      - false
+  GatewayLoadBalancerArn:
+    Description: "The Amazon Resource Names (ARNs) of the Gateway Load Balancers."
+    Type: String
+    Default: ""
+  NetworkLoadBalancerArn:
+    Description: "The Amazon Resource Names (ARNs) of the Network Load Balancers."
+    Type: String
+    Default: ""
+  VpcESType:
+    Type: String
+    Default: "network"
+    AllowedValues:
+      - "network"
+      - "gateway"
+
+Conditions:
+  isNetworkType: !Equals [ !Ref VpcESType, "network" ]
+  isGatewayType: !Equals [ !Ref VpcESType, "gateway" ]
+  networkTypeServiceIsSavedInS3File: !And [ !Equals [ !Ref VpcESType, "network" ], !Equals [ !Ref SaveInS3File, "true"] ]
+  gatewayTypeServiceIsSavedInS3File: !And [ !Equals [ !Ref VpcESType, "gateway" ], !Equals [ !Ref SaveInS3File, "true"] ]
+
+Resources:
+  NLBEndpointService:
+    Type: AWS::EC2::VPCEndpointService
+    Condition: isNetworkType
+    Properties:
+      AcceptanceRequired: !Ref AcceptanceRequired
+      NetworkLoadBalancerArns: 
+        - !Ref NetworkLoadBalancerArn
+
+  GLBEndpointService:
+    Type: AWS::EC2::VPCEndpointService
+    Condition: isGatewayType
+    Properties:
+      AcceptanceRequired: !Ref AcceptanceRequired
+      NetworkLoadBalancerArns: 
+        - !Ref GatewayLoadBalancerArn
+
+  NLBEndpointServiceIdBackup:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: networkTypeServiceIsSavedInS3File
+    Properties:
+      ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:UpdateParametersFromS3"
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      Key: !Sub "${AWS::Region}-${ProjectName}-${EnvironmentName}-${VpcESType}-NLBServiceId"
+      Value: !Ref NLBEndpointService
+
+  GLBEndpointServiceIdBackup:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: gatewayTypeServiceIsSavedInS3File
+    Properties:
+      ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:UpdateParametersFromS3"
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      Key: !Sub "${AWS::Region}-${ProjectName}-${EnvironmentName}-${VpcESType}-GLBServiceId"
+      Value: !Ref GLBEndpointService
+
+Outputs:
+  VPCEndpointServiceId:
+    Description: "Returns the ID of the VPC endpoint service configuration."
+    Value: !If [ isNetworkType, !Ref NLBEndpointService, !Ref GLBEndpointService ]

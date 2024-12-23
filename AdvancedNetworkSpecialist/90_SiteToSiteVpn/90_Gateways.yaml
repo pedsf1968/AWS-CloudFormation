@@ -1,0 +1,157 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create Internet Gateway and Attachement
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Description: "File name to save parameters in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+
+  # Stack parameters
+  CgwIpAddress:
+    Default: "Default"
+    Description: "Customer Gateway IP"
+    Type: String
+  CgwName:
+    Default: "Default"
+    Description: "Customer Gateway name"
+    Type: String
+  IgwName:
+    Default: "Default"
+    Description: "Internet Gateway name"
+    Type: String
+  IgwVpcId:
+    Default: ""
+    Description: "Internet Gateway VPC ID"
+    Type: String
+  StsVpnLocalIpv4NetworkCidr:
+    Default: "0.0.0.0/0"
+    Description: "The IPv4 CIDR on the customer gateway (on-premises) side of the VPN connection."
+    Type: String
+  StsVpnName:
+    Default: "Default"
+    Description: "Site To Site VPN Connection name"
+    Type: String
+  StsVpnRemoteIpv4NetworkCidr:
+    Default: "0.0.0.0/0"
+    Description: "The IPv4 CIDR on the AWS side of the VPN connection."
+    Type: String
+  VpgwName:
+    Default: "Default"
+    Description: "Virtual Private Gateway name"
+    Type: String
+  VpgwVpcId:
+    Default: ""
+    Description: "Virtual Private Gateway VPC ID"
+    Type: String
+
+Conditions:
+  IsEuWest3: !Equals [!Ref "AWS::Region", "eu-west-3" ]
+  IsEuCentral1: !Equals [!Ref "AWS::Region", "eu-central-1" ]
+
+Resources:
+  InternetGatewayStack:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsEuWest3
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/InternetGateway.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Sub "${BucketKey}/Data.json"
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        Name: !Ref IgwName
+        SaveInS3File: "true"
+        VpcId: !Ref IgwVpcId
+
+  CustomerGatewayStack:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsEuCentral1
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/CustomerGateway.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Sub "${BucketKey}/Data.json"
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        IpAddress: !Ref CgwIpAddress
+        Name: !Ref CgwName
+        SaveInS3File: "true"
+
+  VirtualPrivateGatewayStack:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsEuCentral1
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/VirtualPrivateGateway.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Sub "${BucketKey}/Data.json"
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        Name: !Ref VpgwName
+        SaveInS3File: "true"
+        VpcId: !Ref VpgwVpcId
+
+  SiteToSiteVpnConnection:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsEuCentral1
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/SiteToSiteVpnConnection.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Sub "${BucketKey}/Data.json"
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        CustomerGatewayId: !GetAtt CustomerGatewayStack.Outputs.CustomerGatewayId
+        Name: !Ref StsVpnName
+        LocalIpv4NetworkCidr: !Ref StsVpnLocalIpv4NetworkCidr
+        RemoteIpv4NetworkCidr: !Ref StsVpnRemoteIpv4NetworkCidr
+        SaveInS3File: "true"
+        VpnGatewayId: !GetAtt VirtualPrivateGatewayStack.Outputs.VirtualPrivateGatewayId
+
+Outputs:
+  CustomerGatewayId:
+    Description: "Id of the Customer Gateway"
+    Value: !If [ IsEuCentral1, !GetAtt CustomerGatewayStack.Outputs.CustomerGatewayId, ""]
+  InternetGatewayId:
+    Description: "Id of the Internet Gateway"
+    Value: !If [ IsEuWest3, !GetAtt InternetGatewayStack.Outputs.InternetGatewayId, ""]
+  InternetGatewayAttachmentId:
+    Description: "Id of the Internet Gateway Attachment"
+    Value: !If [ IsEuWest3, !GetAtt InternetGatewayStack.Outputs.InternetGatewayAttachmentId, ""]
+  VirtualPrivateGatewayId:
+    Description: "Id of the Internet Gateway"
+    Value: !If [ IsEuCentral1, !GetAtt VirtualPrivateGatewayStack.Outputs.VirtualPrivateGatewayId, ""]
+  VirtualPrivateGatewayAttachmentId:
+    Description: "Id of the Internet Gateway Attachment"
+    Value: !If [ IsEuCentral1, !GetAtt VirtualPrivateGatewayStack.Outputs.VirtualPrivateGatewayAttachmentId, ""]    

@@ -43,7 +43,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/20_Network/20_40_RouteTable.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/RouteTable.yaml"
       TimeoutInMinutes: 5
       Parameters:
         EnvironmentName: !Ref EnvironmentName
@@ -57,7 +57,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/20_Network/20_41_Route.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/Route.yaml"
       TimeoutInMinutes: 5
       Parameters:
         EnvironmentName: !Ref EnvironmentName
@@ -72,7 +72,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/20_Network/20_40_RouteTable.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/RouteTable.yaml"
       TimeoutInMinutes: 5
       Parameters:
         EnvironmentName: !Ref EnvironmentName
@@ -86,7 +86,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/20_Network/20_41_Route.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/Route.yaml"
       TimeoutInMinutes: 5
       Parameters:
         EnvironmentName: !Ref EnvironmentName
@@ -101,7 +101,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/20_Network/20_40_RouteTable.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/RouteTable.yaml"
       TimeoutInMinutes: 5
       Parameters:
         EnvironmentName: !Ref EnvironmentName
@@ -115,7 +115,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/20_Network/20_41_Route.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/Route.yaml"
       TimeoutInMinutes: 5
       Parameters:
         EnvironmentName: !Ref EnvironmentName
@@ -130,7 +130,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/20_Network/20_40_RouteTable.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/RouteTable.yaml"
       TimeoutInMinutes: 5
       Parameters:
         EnvironmentName: !Ref EnvironmentName
@@ -144,7 +144,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/20_Network/20_41_Route.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/Route.yaml"
       TimeoutInMinutes: 5
       Parameters:
         EnvironmentName: !Ref EnvironmentName
@@ -193,6 +193,3 @@ Outputs:
   SubnetCPrivateRouteId:
     Description: "ID of the Private Subnet Route VPC C"
     Value: !GetAtt SubnetCPrivateRouteStack.Outputs.RouteId
-
-
-

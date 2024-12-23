@@ -1,0 +1,100 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create Internet Gateway and Attachement
+
+Parameters:
+  # Stack parameters
+  InstanceId:
+    Description: "Id of the Instance"
+    Type: String
+  IpsecLeftId:
+    Description: "Id of the left IPSEC"
+    Type: String
+  IpsecRightId:
+    Description: "Id of the right IPSEC"
+    Type: String
+  IpsecLeftCidr:
+    Description: "CIDR of the left IPSEC"
+    Type: String
+  IpsecRightCidr:
+    Description: "CIDR of the right IPSEC"
+    Type: String
+  IpsecSecret:
+    Description: "Secret of the IPSEC"
+    Type: String
+
+Conditions:
+  IsEuWest3: !Equals [!Ref "AWS::Region", "eu-west-3" ]
+
+Resources:
+  document: 
+    Type: AWS::SSM::Document
+    Condition: IsEuWest3
+    Properties:
+      Content:
+        schemaVersion: '2.2'
+        description: "Configure IPSEC connection on instance."
+        parameters:
+          commands:
+            type: String
+            description: "(Required) The commands to run or the path to an existing script on the instance."
+            default: 'echo Hello World'
+          InstanceId:
+            type: String
+            description: "(Required) The instance ID you want to run commands on."
+            default: ''            
+        mainSteps:
+        - name: IpsecConfiguration
+          action: aws:runShellScript
+          inputs:
+            timeoutSeconds: '60'
+            runCommand:
+            - !Sub |
+                cat << EOF > /etc/ipsec.d/aws.conf
+                conn Tunnel1
+                  authby=secret
+                  auto=start
+                  left=%defaultroute
+                  leftid=${IpsecLeftId}
+                  right=${IpsecRightId}
+                  type=tunnel
+                  ikelifetime=8h
+                  keylife=1h
+                  phase2alg=aes_gcm
+                  ike=aes256-sha1
+                  keyingtries=%forever
+                  keyexchange=ike
+                  leftsubnet=${IpsecLeftCidr}
+                  rightsubnet=${IpsecRightCidr}
+                  dpddelay=10
+                  dpdtimeout=30
+                  dpdaction=restart_by_peer
+                  encapsulation=yes
+                EOF
+        - name: IpsecSecret
+          action: aws:runShellScript          
+          inputs:
+            timeoutSeconds: '60'
+            runCommand:
+            - !Sub |
+                cat << EOF > /etc/ipsec.d/aws.secrets
+                ${IpsecSecret}
+                EOF
+        - name: IpsecStart
+          action: aws:runShellScript          
+          inputs:
+            timeoutSeconds: '60'
+            runCommand:
+            - systemctl start ipsec.service
+      DocumentFormat: YAML
+      DocumentType: Command
+      Name: 'AWS-RunShellScript'
+
+  SpecificInstanceIdAssociation:
+    Type: AWS::SSM::Association
+    Condition: IsEuWest3
+    Properties:
+      Name: AWS-RunShellScript
+      InstanceId: !Ref InstanceId
+            
+

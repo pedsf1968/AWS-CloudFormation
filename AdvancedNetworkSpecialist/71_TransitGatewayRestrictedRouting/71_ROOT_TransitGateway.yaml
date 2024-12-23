@@ -98,7 +98,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/71_20_VPCAndSubnets.yaml"                    
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/71_VPCAndSubnets.yaml"                    
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -114,7 +114,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/71_20_VPCAndSubnets.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/71_VPCAndSubnets.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -129,7 +129,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/71_20_VPCAndSubnets.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/71_VPCAndSubnets.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -144,7 +144,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/71_21_SecurityGroups.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/71_SecurityGroups.yaml"
       TimeoutInMinutes: 5
       Parameters:
         EnvironmentName: !Ref EnvironmentName
@@ -159,7 +159,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/71_22_Gateways.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/71_Gateways.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -179,7 +179,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/71_23_RouteTables.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/71_RouteTables.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -197,7 +197,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/71_30_Instances.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/71_Instances.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket

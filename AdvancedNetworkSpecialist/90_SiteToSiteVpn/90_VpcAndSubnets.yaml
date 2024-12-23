@@ -1,0 +1,97 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template deploys a VPC, and Subnets
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Description: "File name to save parameters in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  
+# Stack parameters
+  AvailabilityZone:
+    Description: "The AZ of the subnet"
+    Type: String
+  SubnetCidrBlock:
+    Description: "The IPv4 network range for the Subnet, in CIDR notation."
+    Type: String
+  SubnetMapPublicIpOnLaunch:
+    AllowedValues:
+      - "false"
+      - "true"      
+    Default: "false"
+    Description: "To allow the subnet to be public"
+    Type: String
+  SubnetName:
+    Description: "Subnet name"
+    Type: String
+  VpcCidrBlock:
+    Description: "The IPv4 network range for the VPC, in CIDR notation."
+    Type: String
+  VpcName:
+    Description: "VPC name"
+    Type: String
+
+Resources:
+  VpcStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/Vpc.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Sub "${BucketKey}/Data.json"
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        CidrBlock: !Ref VpcCidrBlock
+        SaveInS3File: "true"
+        VpcName: !Ref VpcName
+
+  SubnetStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/Subnet.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Sub "${BucketKey}/Data.json"
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        AvailabilityZone: !Ref AvailabilityZone
+        CidrBlock: !Ref SubnetCidrBlock
+        MapPublicIpOnLaunch: !Ref SubnetMapPublicIpOnLaunch
+        SaveInS3File: "true"
+        SubnetName: !Ref SubnetName
+        VpcId: !GetAtt VpcStack.Outputs.VpcId
+
+Outputs:
+  VpcId:
+    Description: "Id of the VPC"
+    Value: !GetAtt VpcStack.Outputs.VpcId
+  SubnetId:
+    Description: "Id of the Subnet"
+    Value: !GetAtt SubnetStack.Outputs.SubnetId
+  SubnetCidr:
+    Description: "Cidr of the Subnet"
+    Value: !GetAtt SubnetStack.Outputs.CidrBlock

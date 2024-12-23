@@ -189,12 +189,14 @@ Resources:
       TransitGatewayAttachmentId: !Ref TransitGatewayAttachmentC
       TransitGatewayRouteTableId: !Ref TransitGatewayRouteTableC
 
+  # From A you can only go to B
   TransitGatewayRouteTablePropagationA:
     Type: AWS::EC2::TransitGatewayRouteTablePropagation
     Properties:
       TransitGatewayAttachmentId: !Ref TransitGatewayAttachmentB
       TransitGatewayRouteTableId: !Ref TransitGatewayRouteTableA
 
+  # From B you can go to A and C
   TransitGatewayRouteTablePropagationB1:
     Type: AWS::EC2::TransitGatewayRouteTablePropagation
     Properties:
@@ -207,6 +209,7 @@ Resources:
       TransitGatewayAttachmentId: !Ref TransitGatewayAttachmentC
       TransitGatewayRouteTableId: !Ref TransitGatewayRouteTableB
 
+  # From C you can only go to B
   TransitGatewayRouteTablePropagationC:
     Type: AWS::EC2::TransitGatewayRouteTablePropagation
     Properties:
