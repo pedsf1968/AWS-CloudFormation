@@ -9,9 +9,13 @@ Parameters:
     Description: "CloudFormation bucket URL"
     Type: String    
   BucketKey:
-    Default: "data.json"
-    Description: File name to save parameters in the bucket
+    Description: "Key to find object in the bucket"
     Type: String
+    Default: ""
+  BucketObject:
+    Description: "File to store data in the bucket"
+    Type: String
+    Default: "Data.json"
   EnvironmentName:
     Description: "Environment name that prefix all resources"
     Type: String
@@ -72,26 +76,32 @@ Resources:
         - Key: Name
           Value: !Sub "${ProjectName}-${EnvironmentName}-${VpcName}-Vpc"
 
-  VpcIdBackup:
+  VpcIdToS3:
     Type: AWS::CloudFormation::CustomResource
     Condition: isSavedInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
-      ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:UpdateParametersFromS3"
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:UpdateParametersFromS3"]]
       ServiceTimeout: 60
       Bucket: !Ref Bucket
       BucketKey: !Ref BucketKey
-      Key: !Sub "${AWS::Region}-${ProjectName}-${EnvironmentName}-${VpcName}-VpcId"
+      BucketObject: !Ref BucketObject
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:VPC:${VpcName}:Id"
       Value: !Ref VPC
 
-  VpcCidrBackup:
+  VpcCidrToS3:
     Type: AWS::CloudFormation::CustomResource
     Condition: isSavedInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
-      ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:UpdateParametersFromS3"
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:UpdateParametersFromS3"]]
       ServiceTimeout: 60
       Bucket: !Ref Bucket
       BucketKey: !Ref BucketKey
-      Key: !Sub "${AWS::Region}-${ProjectName}-${EnvironmentName}-${VpcName}-VpcCidr"
+      BucketObject: !Ref BucketObject
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:VPC:${VpcName}:Cidr"
       Value: !Ref CidrBlock
 
 Outputs:

@@ -1,0 +1,85 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  "This template for creating a Role for transitGatewayParametersToS3 Lambda Function"
+
+Parameters:     
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: "CloudFormation bucket URL"
+    Type: String    
+  BucketKey:
+    Description: "Key to find object in the bucket"
+    Type: String
+    Default: ""
+  BucketObject:
+    Description: "File to store data in the bucket"
+    Type: String
+    Default: "Data.json"
+  EnvironmentName:
+    Description: "Environment name that prefix all resources"
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+  ProjectName:
+    Description: "Project name that prefix all resources"
+    Type: String
+    Default: "ANS"
+
+Resources:
+  TransitGatewayParametersToS3Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      Policies:
+      - PolicyName: AppendToLogsPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: "*"
+      - PolicyName: UpdateParametersFromS3Policy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - s3:GetObject
+            - s3:PutObject
+            - s3:DeleteObject
+            - s3:List*
+            Resource: 
+            - !Join [":", ["arn:aws:s3::", !Sub "${Bucket}/${BucketKey}"]]
+            - !Join [":", ["arn:aws:s3::", !Sub "${Bucket}/${BucketKey}/*"]]
+      - PolicyName: TransitGatewayParametersToS3Policy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - ec2:DescribeTransitGateways
+            Resource: 
+            - "*"
+      RoleName: CustomerTransitParametersToS3Role
+
+Outputs:
+  TransitGatewayParametersToS3RoleArn:
+    Description: "TransitGatewayParametersToS3 Lambda Role Arn"
+    Value: !GetAtt TransitGatewayParametersToS3Role.Arn

@@ -9,8 +9,13 @@ Parameters:
     Description: CloudFormation buket URL
     Type: String
   BucketKey:
-    Description: "File name to save parameters in the bucket"
+    Description: "Key to find object in the bucket"
     Type: String
+    Default: "90_SiteToSiteVpn"
+  BucketObject:
+    Description: "File to store data in the bucket"
+    Type: String
+    Default: "Data.json"
   EnvironmentName:
     AllowedValues:
       - "dev"

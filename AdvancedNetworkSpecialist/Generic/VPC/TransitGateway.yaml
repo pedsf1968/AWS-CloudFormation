@@ -1,0 +1,128 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create Internet Gateway and Attachement
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: "CloudFormation bucket URL"
+    Type: String    
+  BucketKey:
+    Description: "Key to find object in the bucket"
+    Type: String
+    Default: ""
+  BucketObject:
+    Description: "File to store data in the bucket"
+    Type: String
+    Default: "Data.json"
+  EnvironmentName:
+    Description: "Environment name that prefix all resources"
+    Type: String
+    Default: "dev"
+    AllowedValues: 
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+  ProjectName:
+    Description: "Project name that prefix all resources"
+    Type: String
+    Default: "ANS"
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Backup values in file specified by Bucket and BucketKey"
+    Type: String
+
+  # Stack parameters
+  AmazonSideAsn:
+    Default: 64512
+    Description: "A private Autonomous System Number (ASN) for the Amazon side of a BGP session. The range is 64512 to 65534"
+    Type: String
+  AutoAcceptSharedAttachments: 
+    AllowedValues: [ "enable", "disable" ]
+    Default: "disable"
+    Description: "Enable or disable automatic acceptance of attachment requests. Disabled by default."
+    Type: String
+  DefaultRouteTableAssociation: 
+    AllowedValues: [ "enable", "disable" ]
+    Default: "enable"
+    Description: "Enable or disable automatic association with the default association route table. Enabled by default."
+    Type: String
+  DefaultRouteTablePropagation:
+    AllowedValues: [ "enable", "disable" ]
+    Default: "enable"
+    Description: "Enable or disable automatic propagation of routes to the default propagation route table. Enabled by default."
+    Type: String
+  Description:
+    Default: ""
+    Description: "Description of the Transit Gateway"
+    Type: String
+  DnsSupport:
+    AllowedValues: [ "enable", "disable" ]
+    Default: "enable"
+    Description: "Enable or disable DNS support. Enabled by default." 
+    Type: String
+  Name:
+    Default: "Default"
+    Description: "Transit Gateway name"
+    Type: String
+  PropagationDefaultRouteTableId:
+    Default: ""
+    Description: "The ID of the default propagation route table."
+    Type: String
+  SecurityGroupReferencingSupport:
+    AllowedValues: [ "enable", "disable" ]
+    Default: "disable"
+    Description: "Enables you to reference a security group across VPCs attached to a transit gateway (TGW). "
+    Type: String
+  VpnEcmpSupport:
+    AllowedValues: [ "enable", "disable" ]
+    Default: "disable"
+    Description: "Enable or disable Equal Cost Multipath Protocol support. Enabled by default."
+    Type: String
+
+Conditions:
+  isSavedInS3File: !Equals [ !Ref SaveInS3File, "true"]
+
+Resources:
+  TransitGateway:
+    Type: AWS::EC2::TransitGateway
+    Properties:
+      AmazonSideAsn: !Ref AmazonSideAsn
+      AutoAcceptSharedAttachments: !Ref AutoAcceptSharedAttachments
+      DefaultRouteTableAssociation: !Ref DefaultRouteTableAssociation
+      DefaultRouteTablePropagation: !Ref DefaultRouteTablePropagation
+      Description: !Ref Description
+      DnsSupport: !Ref DnsSupport
+      PropagationDefaultRouteTableId: !Ref PropagationDefaultRouteTableId
+      SecurityGroupReferencingSupport: !Ref SecurityGroupReferencingSupport
+      Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${Name}-TGW" 
+        - Key: ProjectName
+          Value: !Ref ProjectName
+          
+      VpnEcmpSupport: !Ref VpnEcmpSupport
+
+  TransitGatewayIdToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: isSavedInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:UpdateParametersFromS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:TransitGateway:${Name}:Id"
+      Value: !Ref TransitGateway
+
+Outputs:
+  TransitGatewayId:
+    Description: "Id of the Transit Gateway"
+    Value: !Ref TransitGateway

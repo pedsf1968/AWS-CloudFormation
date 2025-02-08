@@ -3,15 +3,40 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description:  This template create Internet Gateway and Attachement
 
 Parameters:
+  # Global parameters
+  Bucket:
+    Description: "CloudFormation bucket URL"
+    Type: String
+    Default: "hawkfund-cloudformation"
+  BucketKey:
+    Description: "Key to find object in the bucket"
+    Type: String
+    Default: "90_SiteToSiteVpn"
+  BucketObject:
+    Description: "File to store data in the bucket"
+    Type: String
+    Default: "Data.json"
+  EnvironmentName:
+    Description: "Environment name that prefix all resources"
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+  ProjectName:
+    Description: "Project name that prefix all resources"
+    Type: String
+    Default: "ANS"
+
   # Stack parameters
+  CustomerInstanceName:
+    Default: "OpenSwan"
+    Description: "Name of the Customer side Instance"
+    Type: String
   InstanceId:
     Description: "Id of the Instance"
-    Type: String
-  IpsecLeftId:
-    Description: "Id of the left IPSEC"
-    Type: String
-  IpsecRightId:
-    Description: "Id of the right IPSEC"
     Type: String
   IpsecLeftCidr:
     Description: "CIDR of the left IPSEC"
@@ -19,82 +44,148 @@ Parameters:
   IpsecRightCidr:
     Description: "CIDR of the right IPSEC"
     Type: String
-  IpsecSecret:
-    Description: "Secret of the IPSEC"
+  RemoteRegion:
+    Default: ""
+    Description: "The remote Region"
+    Type: String
+  StsVpnName: 
+    Default: "Site2Site"
+    Description: "The VPN Site to Site name"
     Type: String
 
 Conditions:
   IsEuWest3: !Equals [!Ref "AWS::Region", "eu-west-3" ]
 
 Resources:
+  GetIpsecLeftId:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: IsEuWest3
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:GetParametersFromS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Key: !Join [ ":", [ !Sub "${AWS::Region}", !Ref ProjectName, !Ref EnvironmentName, "EC2:Instance", !Ref CustomerInstanceName,"PublicIp"]]
+
+  GetIpsecRightId:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: IsEuWest3
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:GetParametersFromS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Key: !Join [ ":", [ !Ref RemoteRegion, !Ref ProjectName, !Ref EnvironmentName, "EC2:VPNConnection", !Ref StsVpnName, "OutsideIpAddress1"]]
+
+  GetIpsecSecret:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: IsEuWest3
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:GetParametersFromS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Key: !Join [ ":", [ !Ref RemoteRegion, !Ref ProjectName, !Ref EnvironmentName, "EC2:VPNConnection", !Ref StsVpnName, "PreSharedKey1"]]
+
   document: 
     Type: AWS::SSM::Document
     Condition: IsEuWest3
     Properties:
       Content:
-        schemaVersion: '2.2'
+        schemaVersion: "2.2"
         description: "Configure IPSEC connection on instance."
         parameters:
-          commands:
+          IpsecLeftId:
             type: String
-            description: "(Required) The commands to run or the path to an existing script on the instance."
-            default: 'echo Hello World'
-          InstanceId:
+            description: "Id of the left IPSEC"
+            default: ''
+          IpsecRightId:
             type: String
-            description: "(Required) The instance ID you want to run commands on."
-            default: ''            
+            description: "Id of the right IPSEC"
+            default: ''
+          IpsecLeftCidr:
+            type: String
+            description: "CIDR of the left IPSEC"
+            default: ''
+          IpsecRightCidr:
+            type: String
+            description: "CIDR of the right IPSEC"
+            default: ''
+          IpsecSecret:
+            type: String
+            description: "Secret of the IPSEC"
+            default: ''
         mainSteps:
         - name: IpsecConfiguration
           action: aws:runShellScript
           inputs:
             timeoutSeconds: '60'
             runCommand:
-            - !Sub |
-                cat << EOF > /etc/ipsec.d/aws.conf
-                conn Tunnel1
-                  authby=secret
-                  auto=start
-                  left=%defaultroute
-                  leftid=${IpsecLeftId}
-                  right=${IpsecRightId}
-                  type=tunnel
-                  ikelifetime=8h
-                  keylife=1h
-                  phase2alg=aes_gcm
-                  ike=aes256-sha1
-                  keyingtries=%forever
-                  keyexchange=ike
-                  leftsubnet=${IpsecLeftCidr}
-                  rightsubnet=${IpsecRightCidr}
-                  dpddelay=10
-                  dpdtimeout=30
-                  dpdaction=restart_by_peer
-                  encapsulation=yes
-                EOF
+              - |
+                  cat << EOF > /etc/ipsec.d/aws.conf
+                  conn Tunnel1
+                    authby=secret
+                    auto=start
+                    left=%defaultroute
+                    leftid={{IpsecLeftId}}
+                    right={{IpsecRightId}}
+                    type=tunnel
+                    ikelifetime=8h
+                    keylife=1h
+                    phase2alg=aes256-sha1;modp2048
+                    ike=aes256-sha1;modp2048
+                    keyingtries=%forever
+                    keyexchange=ike
+                    leftsubnet={{IpsecLeftCidr}}
+                    rightsubnet={{IpsecRightCidr}}
+                    dpddelay=10
+                    dpdtimeout=30
+                    dpdaction=restart_by_peer
+                    encapsulation=yes
+                  EOF
         - name: IpsecSecret
           action: aws:runShellScript          
           inputs:
             timeoutSeconds: '60'
             runCommand:
-            - !Sub |
-                cat << EOF > /etc/ipsec.d/aws.secrets
-                ${IpsecSecret}
-                EOF
+              - |
+                  cat << EOF > /etc/ipsec.d/aws.secrets
+                  {{IpsecLeftId}} {{IpsecRightId}}: PSK "{{IpsecSecret}}"
+                  EOF
         - name: IpsecStart
           action: aws:runShellScript          
           inputs:
             timeoutSeconds: '60'
             runCommand:
-            - systemctl start ipsec.service
+              - systemctl start ipsec.service
       DocumentFormat: YAML
       DocumentType: Command
-      Name: 'AWS-RunShellScript'
+      Name: ConfigureIpsecDocument
+      TargetType: "/AWS::EC2::Instance"
 
   SpecificInstanceIdAssociation:
     Type: AWS::SSM::Association
     Condition: IsEuWest3
     Properties:
-      Name: AWS-RunShellScript
-      InstanceId: !Ref InstanceId
+      Name: ConfigureIpsecDocument
+      Targets:
+      - Key: InstanceIds
+        Values:
+        - !Ref InstanceId
+      Parameters:           
+        IpsecLeftId: 
+          - !GetAtt GetIpsecLeftId.Value
+        IpsecRightId: 
+          - !GetAtt GetIpsecRightId.Value
+        IpsecLeftCidr: 
+          - !Ref IpsecLeftCidr
+        IpsecRightCidr: 
+          - !Ref IpsecRightCidr
+        IpsecSecret: 
+          - !GetAtt GetIpsecSecret.Value
+
             
 

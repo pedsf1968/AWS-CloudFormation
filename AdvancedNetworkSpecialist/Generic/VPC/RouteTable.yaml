@@ -9,9 +9,13 @@ Parameters:
     Description: "CloudFormation bucket URL"
     Type: String    
   BucketKey:
-    Default: "data.json"
-    Description: File name to save parameters in the bucket
+    Description: "Key to find object in the bucket"
     Type: String
+    Default: ""
+  BucketObject:
+    Description: "File to store data in the bucket"
+    Type: String
+    Default: "Data.json"
   EnvironmentName:
     Description: "Environment name that prefix all resources"
     Type: String
@@ -53,8 +57,12 @@ Resources:
     Properties:
       VpcId: !Ref VPCId
       Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
         - Key: Name
           Value: !Sub "${ProjectName}-${EnvironmentName}-${RouteTableName}-RT"
+        - Key: ProjectName
+          Value: !Ref ProjectName
 
   SubnetRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
@@ -62,26 +70,32 @@ Resources:
       RouteTableId: !Ref RouteTable
       SubnetId: !Ref SubnetId
 
-  RouteTableIdBackup:
+  RouteTableIdToS3:
     Type: AWS::CloudFormation::CustomResource
     Condition: isSavedInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
-      ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:UpdateParametersFromS3"
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:UpdateParametersFromS3"]]
       ServiceTimeout: 60
       Bucket: !Ref Bucket
       BucketKey: !Ref BucketKey
-      Key: !Sub "${AWS::Region}-${ProjectName}-${EnvironmentName}-${RouteTableName}-RTId"
+      BucketObject: !Ref BucketObject
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:RouteTable:${RouteTableName}:Id"
       Value: !Ref RouteTable
 
-  SubnetRouteTableAssociationIdBackup:
+  SubnetRouteTableAssociationIdToS3:
     Type: AWS::CloudFormation::CustomResource
     Condition: isSavedInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
-      ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:UpdateParametersFromS3"
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:UpdateParametersFromS3"]]
       ServiceTimeout: 60
       Bucket: !Ref Bucket
       BucketKey: !Ref BucketKey
-      Key: !Sub "${AWS::Region}-${ProjectName}-${EnvironmentName}-${RouteTableName}-SubnetRTAId"
+      BucketObject: !Ref BucketObject
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:SubnetRouteTableAssociation:${RouteTableName}:Id"
       Value: !Ref SubnetRouteTableAssociation
 
 Outputs:

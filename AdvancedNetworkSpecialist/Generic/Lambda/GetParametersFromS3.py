@@ -1,20 +1,37 @@
 import boto3
-import cfnresponse
 import json
-import time
 
-s3 = boto3.resource('s3')
+bucket =  "hawkfund-cloudformation"
+bucketKey = "90_SiteToSiteVpn/Data.json"
+parameterKey = "eu-west-3:ANS:dev:EC2:VPC:D"
 
-def lambda_handler(event, context):
-  responseData  = {}
-  bucket =  event["ResourceProperties"]["Bucket"]
-  bucketKey = event["ResourceProperties"]["BucketKey"]
-  parameterKey = event["ResourceProperties"]["Key"]
-  try:
-    obj = s3.Object(bucket, bucketKey)
-    data = obj.get()['Body'].read().decode('utf-8')
-    responseData["Value"] = json.loads(data)[parameterKey]
-    cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData)                            
-  except Exception as err:
-    responseData['Data'] = str(err)
-    cfnresponse.send(event, context, cfnresponse.FAILED, responseData)
+  
+
+client = boto3.client('s3')
+
+def get_node(my_dict, paths) -> dict:
+  for key in paths:
+      my_dict = my_dict.setdefault(key)
+  return my_dict   
+
+value = None
+
+try:
+  # Read file from s3
+  response = client.get_object(
+      Bucket=bucket,
+      Key=bucketKey
+  )
+  json_data = response["Body"].read().decode('utf-8')
+  data = json.loads(json_data)
+  paths = parameterKey.split(":")
+  last_index = paths.pop()
+
+  value = get_node(data, paths)[last_index]
+except KeyError:
+  print("ERROR: Bad key!")
+except Exception as err:
+  print("ERROR: No file!")
+
+print(value)
+

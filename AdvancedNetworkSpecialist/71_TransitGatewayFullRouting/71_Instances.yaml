@@ -8,6 +8,14 @@ Parameters:
     Description: "CloudFormation bucket URL"
     Type: String
     Default: "hawkfund-cloudformation"
+  BucketKey:
+    Description: Key to find object in the bucket
+    Type: String
+    Default: "71_TransitGatewayRestrictedRouting"
+  BucketObject:
+    Description: "File to store data in the bucket"
+    Type: String
+    Default: "Data.json"
   EnvironmentName:
     Description: "Environment name that prefix all resources"
     Type: String
@@ -23,17 +31,8 @@ Parameters:
     Default: "ANS"
 
   # Stack parameters
-  ApplicationAvailabilityZones:
-    Description: "AZ of the Instances"
-    Type: String
-  ApplicationImageId:
-    Description: "Application Instance AMI"
-    Type: String
   ApplicationInstanceName:
     Description: "Application Instance name"
-    Type: String
-  ApplicationInstanceType:
-    Description: "Application Instances type"
     Type: String
   ApplicationSubnetIds:
     Description: "Application Subnet IDs"
@@ -41,17 +40,8 @@ Parameters:
   ApplicationSecurityGroups:
     Description: "Application Security Groups"
     Type: String
-  BastionAvailabilityZone:
-    Description: "AZ of the Bastion"
-    Type: String
-  BastionImageId:
-    Description: "Bastion Instance AMI"
-    Type: String
   BastionInstanceName:
     Description: "Bastion Instance name"
-    Type: String
-  BastionInstanceType:
-    Description: "Bastion Instance type"
     Type: String
   BastionSecurityGroup:
     Description: "Bastion Security Group"
@@ -59,7 +49,16 @@ Parameters:
   BastionSubnetId:
     Description: "Bastion Subnet ID"
     Type: String
+  ImageId:
+    Default: ami-08461dc8cd9e834e0
+    Description: "Instance AMI"
+    Type: String
+  InstanceType:
+    Default: t2.micro
+    Description: "Instances type"
+    Type: String
   KeyName:
+    Default: "dso-paris"
     Description: "Instances Key name"
     Type: String
 
@@ -69,16 +68,21 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/EC2/Instances.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/EC2/Instance.yaml"
       TimeoutInMinutes: 5
       Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
-        AvailabilityZone: !Ref BastionAvailabilityZone
-        KeyName: !Ref KeyName
-        ImageId: !Ref BastionImageId
+        AvailabilityZone: !Select [ 0, !GetAZs ]
+        ElasticIP: "true"
+        ImageId: !Ref ImageId
         InstanceName: !Ref BastionInstanceName
-        InstanceType: !Ref BastionInstanceType
+        InstanceType: !Ref InstanceType
+        KeyName: !Ref KeyName
+        SaveInS3File: "true"
         SecurityGroup: !Ref BastionSecurityGroup
         SubnetId: !Ref BastionSubnetId
 
@@ -87,60 +91,66 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/EC2/Instances.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/EC2/Instance.yaml"
       TimeoutInMinutes: 5
       Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
-        AvailabilityZone: !Select [0, !Split [",", !Ref ApplicationAvailabilityZones ] ]
-        KeyName: !Ref KeyName
-        ImageId: !Ref ApplicationImageId
+        AvailabilityZone: !Select [ 0, !GetAZs ]
+        ImageId: !Ref ImageId
         InstanceName: !Sub "${ApplicationInstanceName}-A"
-        InstanceType: !Ref ApplicationInstanceType
-        SecurityGroup: !Select [0, !Split [",", !Ref ApplicationSecurityGroups]]
-        SubnetId: !Select [0, !Split [",", !Ref ApplicationSubnetIds]]
+        InstanceType: !Ref InstanceType
+        KeyName: !Ref KeyName
+        SaveInS3File: "true"
+        SecurityGroup: !Select [ 0, !Split [ ",", !Ref ApplicationSecurityGroups ] ]
+        SubnetId: !Select [ 0, !Split [ ",", !Ref ApplicationSubnetIds ] ]
 
   ApplicationBInstance:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/EC2/Instances.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/EC2/Instance.yaml"
       TimeoutInMinutes: 5
       Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
-        AvailabilityZone: !Select [1, !Split [",", !Ref ApplicationAvailabilityZones ] ]
-        KeyName: !Ref KeyName
-        ImageId: !Ref ApplicationImageId
+        AvailabilityZone: !Select [ 1, !GetAZs ]
+        ImageId: !Ref ImageId
         InstanceName: !Sub "${ApplicationInstanceName}-B"
-        InstanceType: !Ref ApplicationInstanceType
-        SecurityGroup: !Select [1, !Split [",", !Ref ApplicationSecurityGroups]]
-        SubnetId: !Select [1, !Split [",", !Ref ApplicationSubnetIds]]
+        InstanceType: !Ref InstanceType
+        KeyName: !Ref KeyName
+        SaveInS3File: "true"
+        SecurityGroup: !Select [ 1, !Split [ ",", !Ref ApplicationSecurityGroups ] ]
+        SubnetId: !Select [ 1, !Split [ ",", !Ref ApplicationSubnetIds ] ]
 
   ApplicationCInstance:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/EC2/Instances.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/EC2/Instance.yaml"
       TimeoutInMinutes: 5
       Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
-        AvailabilityZone: !Select [2, !Split [",", !Ref ApplicationAvailabilityZones ] ]
-        KeyName: !Ref KeyName
-        ImageId: !Ref ApplicationImageId
+        AvailabilityZone: !Select [ 2, !GetAZs ]
+        ImageId: !Ref ImageId
         InstanceName: !Sub "${ApplicationInstanceName}-C"
-        InstanceType: !Ref ApplicationInstanceType
+        InstanceType: !Ref InstanceType
+        KeyName: !Ref KeyName
+        SaveInS3File: "true"
         SecurityGroup: !Select [2, !Split [",", !Ref ApplicationSecurityGroups]]
         SubnetId: !Select [2, !Split [",", !Ref ApplicationSubnetIds]]
-
-  BastionInstanceEIP:
-    Type: AWS::EC2::EIP
-    Properties:
-      InstanceId: !GetAtt BastionInstance.Outputs.InstanceId
-
 
 Outputs:
   BastionInstancesId:
@@ -151,7 +161,7 @@ Outputs:
     Value: !GetAtt BastionInstance.Outputs.InstancePrivateIP
   BastionPublicIP:
     Description: "Public IP of the Bastion Instance"
-    Value: !Ref BastionInstanceEIP
+    Value: !GetAtt BastionInstance.Outputs.InstancePublicIP
   ApplicationAInstanceId:
     Description: "Id of the Application A Instance"
     Value: !GetAtt ApplicationAInstance.Outputs.InstanceId

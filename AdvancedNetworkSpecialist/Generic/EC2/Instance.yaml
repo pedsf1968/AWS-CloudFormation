@@ -8,9 +8,13 @@ Parameters:
     Description: "CloudFormation bucket URL"
     Type: String    
   BucketKey:
-    Default: "data.json"
-    Description: File name to save parameters in the bucket
+    Description: "Key to find object in the bucket"
     Type: String
+    Default: ""
+  BucketObject:
+    Description: "File to store data in the bucket"
+    Type: String
+    Default: "Data.json"
   EnvironmentName:
     Description: "Environment name that prefix all resources"
     Type: String
@@ -32,7 +36,7 @@ Parameters:
     Description: "Backup values in file specified by Bucket and BucketKey"
     Type: String
 
-# Stack parameters
+  # Stack parameters
   AvailabilityZone:
     Description: "Instance AZ"
     Type: String
@@ -44,37 +48,52 @@ Parameters:
     Description: "Create elastic IP for the instance"
     Type: String
   ImageId:
+    Default: ami-08461dc8cd9e834e0
     Description: "Instance AMI"
     Type: AWS::EC2::Image::Id
-    Default: ami-0d3f86bfba5ee6472
   InstanceName: 
     Description: "Instance name"
     Type: String
+  IamInstanceProfile: 
+    Default: ""
+    Description: "Instance Profile"
+    Type: String    
   InstanceType: 
-    Description: "Type of Instance"
-    Type: String
-    Default: t2.micro
     AllowedValues:
       - t2.micro
       - t2.small
       - t2.large
+    Default: t2.micro
+    Description: "Type of Instance"
+    Type: String
   KeyName: 
+    Default: "dso-paris"
     Description: "Instance Key name"
     Type: String
   SecurityGroup:
     Description: "Instance Security Group ID"
     Type: String
+  SourceDestCheck:
+    AllowedValues:
+      - "false"
+      - "true"
+    Default: "true"
+    Description: "Enable or disable source/destination checks"
+    Type: String
   SubnetId:
     Description: "Instance Subnet ID"
     Type: String
   UserData:
+    Default: ""
     Description: "Script to launch on the first start"
     Type: String
-    Default: ""
 
 Conditions:
   hasElasticIP: !Equals [!Ref ElasticIP, "true" ]
   isSavedInS3File: !Equals [ !Ref SaveInS3File, "true"]
+  elasticIPSavedInS3File: !And 
+    - !Equals [!Ref ElasticIP, "true" ]
+    - !Equals [ !Ref SaveInS3File, "true"]
 
 Resources:     
   Instance:
@@ -83,16 +102,18 @@ Resources:
       AvailabilityZone:  !Ref AvailabilityZone
       ImageId: !Ref ImageId
       InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref IamInstanceProfile
       KeyName: !Ref KeyName
       SecurityGroupIds: 
         - !Ref SecurityGroup
       SubnetId: !Ref SubnetId
+      SourceDestCheck: !Ref SourceDestCheck
       Tags:
         - Key: Name
           Value: !Sub "${ProjectName}-${EnvironmentName}-${InstanceName}"
       UserData: !Ref UserData
 
-  InstanceEIP:
+  EIP:
     Type: AWS::EC2::EIP
     Condition: hasElasticIP
     Properties:
@@ -105,34 +126,49 @@ Resources:
     Type: AWS::CloudFormation::CustomResource
     Condition: isSavedInS3File
     Properties:
-      ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:UpdateParametersFromS3"
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:UpdateParametersFromS3"]]
       ServiceTimeout: 60
       Bucket: !Ref Bucket
-      BucketKey: !Sub "${Bucket}/${BucketKey}"
-      Key: !Sub "${AWS::Region}-${ProjectName}-${EnvironmentName}-${InstanceName}-Id"
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:Instance:${InstanceName}:Id"
       Value: !Ref Instance
 
   InstancePrivateIPBackup:
     Type: AWS::CloudFormation::CustomResource
     Condition: isSavedInS3File
     Properties:
-      ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:UpdateParametersFromS3"
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:UpdateParametersFromS3"]]
       ServiceTimeout: 60
       Bucket: !Ref Bucket
-      BucketKey: !Sub "${Bucket}/${BucketKey}"
-      Key: !Sub "${AWS::Region}-${ProjectName}-${EnvironmentName}-${InstanceName}-PrivateIP"
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:Instance:${InstanceName}:PrivateIp"
       Value: !GetAtt Instance.PrivateIp
 
   InstancePublicIPBackup:
     Type: AWS::CloudFormation::CustomResource
-    Condition: isSavedInS3File
+    Condition: elasticIPSavedInS3File
     Properties:
-      ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:UpdateParametersFromS3"
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:UpdateParametersFromS3"]]
       ServiceTimeout: 60
       Bucket: !Ref Bucket
-      BucketKey: !Sub "${Bucket}/${BucketKey}"
-      Key: !Sub "${AWS::Region}-${ProjectName}-${EnvironmentName}-${InstanceName}-PublicIP"
-      Value: !If [ hasElasticIP, !GetAtt InstanceEIP.PublicIp, ""]
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:Instance:${InstanceName}:PublicIp"
+      Value: !If [ hasElasticIP, !GetAtt EIP.PublicIp, ""]
+
+  EIPBackup:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: elasticIPSavedInS3File
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:UpdateParametersFromS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:EIP:${InstanceName}:PublicIp"
+      Value: !If [ hasElasticIP, !GetAtt EIP.PublicIp, ""]
 
 Outputs:
   InstanceId:
@@ -143,4 +179,4 @@ Outputs:
     Value: !GetAtt Instance.PrivateIp
   InstancePublicIP:
     Description: "Public IP v4 of the Instance"
-    Value: !If [ hasElasticIP, !GetAtt InstanceEIP.PublicIp, ""]
+    Value: !If [ hasElasticIP, !GetAtt EIP.PublicIp, ""]

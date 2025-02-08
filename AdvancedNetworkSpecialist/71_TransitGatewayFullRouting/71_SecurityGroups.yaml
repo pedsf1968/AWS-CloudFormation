@@ -4,6 +4,18 @@ Description:  This template create all Security Groups
 
 Parameters:
   # Global parameters
+  Bucket:
+    Description: "CloudFormation bucket URL"
+    Type: String
+    Default: "hawkfund-cloudformation"
+  BucketKey:
+    Description: Key to find object in the bucket
+    Type: String
+    Default: "71_TransitGatewayRestrictedRouting"
+  BucketObject:
+    Description: "File to store data in the bucket"
+    Type: String
+    Default: "Data.json"
   EnvironmentName:
     Description: "Environment name that prefix all resources"
     Type: String
@@ -26,7 +38,8 @@ Parameters:
     Type: String
   ApplicationVpcIds:
     Type: String
-  ApplicationIngressCidrIps:
+  ApplicationIngressCidrIp:
+    Default: "10.0.0.0/8"
     Type: String
 
 Resources:
@@ -55,15 +68,15 @@ Resources:
       GroupDescription: "Security Group for A Application"
       GroupName: "ApplicationASecurityGroup"
       SecurityGroupIngress:
-        - CidrIp: !Select [ 0, !Split [ ",", !Ref ApplicationIngressCidrIps ] ]
+        - CidrIp: !Ref ApplicationIngressCidrIp
           FromPort: -1
           IpProtocol: icmp
           ToPort: -1
-        - CidrIp: !Select [ 0, !Split [ ",", !Ref ApplicationIngressCidrIps ] ]
+        - CidrIp: !Ref ApplicationIngressCidrIp
           FromPort: 22
           IpProtocol: tcp
           ToPort: 22
-        - CidrIp: !Select [ 0, !Split [ ",", !Ref ApplicationIngressCidrIps ] ]
+        - CidrIp: !Ref ApplicationIngressCidrIp
           FromPort: 80
           IpProtocol: tcp
           ToPort: 80
@@ -78,15 +91,15 @@ Resources:
       GroupDescription: "Security Group for BApplication"
       GroupName: "ApplicationBSecurityGroup"
       SecurityGroupIngress:
-        - CidrIp: !Select [ 1, !Split [ ",", !Ref ApplicationIngressCidrIps ] ]
+        - CidrIp: !Ref ApplicationIngressCidrIp
           FromPort: -1
           IpProtocol: icmp
           ToPort: -1
-        - CidrIp: !Select [ 1, !Split [ ",", !Ref ApplicationIngressCidrIps ] ]
+        - CidrIp: !Ref ApplicationIngressCidrIp
           FromPort: 22
           IpProtocol: tcp
           ToPort: 22
-        - CidrIp: !Select [ 1, !Split [ ",", !Ref ApplicationIngressCidrIps ] ]
+        - CidrIp: !Ref ApplicationIngressCidrIp
           FromPort: 80
           IpProtocol: tcp
           ToPort: 80
@@ -101,15 +114,15 @@ Resources:
       GroupDescription: "Security Group for C Application"
       GroupName: "ApplicationCSecurityGroup"
       SecurityGroupIngress:
-        - CidrIp: !Select [ 2, !Split [ ",", !Ref ApplicationIngressCidrIps ] ]
+        - CidrIp: !Ref ApplicationIngressCidrIp
           FromPort: -1
           IpProtocol: icmp
           ToPort: -1
-        - CidrIp: !Select [ 2, !Split [ ",", !Ref ApplicationIngressCidrIps ] ]
+        - CidrIp: !Ref ApplicationIngressCidrIp
           FromPort: 22
           IpProtocol: tcp
           ToPort: 22
-        - CidrIp: !Select [ 2, !Split [ ",", !Ref ApplicationIngressCidrIps ] ]
+        - CidrIp: !Ref ApplicationIngressCidrIp
           FromPort: 80
           IpProtocol: tcp
           ToPort: 80
@@ -122,14 +135,8 @@ Outputs:
   BastionSecurityGroupId:
     Description: "Security GroupId for the Bastion"
     Value: !GetAtt BastionSecurityGroup.GroupId
-  ApplicationASecurityGroupId:
-    Description: "Security GroupId for the A Application"
-    Value: !GetAtt ApplicationASecurityGroup.GroupId
-  ApplicationBSecurityGroupId:
-    Description: "Security GroupId for the B Application"
-    Value: !GetAtt ApplicationBSecurityGroup.GroupId
-  ApplicationCSecurityGroupId:
-    Description: "Security GroupId for the C Application"
-    Value: !GetAtt ApplicationCSecurityGroup.GroupId
+  ApplicationSecurityGroupIds:
+    Description: "Security GroupIds for the Application"
+    Value: !Join [",", [!GetAtt ApplicationASecurityGroup.GroupId, !GetAtt ApplicationBSecurityGroup.GroupId, !GetAtt ApplicationCSecurityGroup.GroupId]]
 
   

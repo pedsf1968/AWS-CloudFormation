@@ -1,0 +1,246 @@
+# aws cloudformation validate-template --template-body file:/72_ROOT_TransitGateway.yaml
+# aws cloudformation create-stack --stack-name ANS-71 --template-body file:/72_ROOT_TransitGateway.yaml --region eu-west-3 --capabilities CAPABILITY_IAM
+# aws cloudformation delete-stack --stack-name ANS-71 --region eu-west-3
+#
+AWSTemplateFormatVersion: "2010-09-09"
+Description: This template deploys a 3 VPC and Transit Gateway with no route between A to C
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Project Configuration"
+        Parameters:
+          - ProjectName
+          - EnvironmentName
+      - Label:
+          default: "Configuration"
+        Parameters:
+          - Bucket
+          - BucketKey
+          - BucketObject
+      - Label:
+          default: "VPC configuration"
+        Parameters:
+          - VpcNames
+          - VpcCidrBlocks
+      - Label:
+          default: "Subnets configuration"
+        Parameters:
+          - SubnetNames
+          - SubnetPrivateCidrBlocks
+          - SubnetPublicCidrBlocks
+      - Label:
+          default: "Instances"
+        Parameters:
+          - InstanceImageId
+          - InstanceKeyName
+          - InstanceType
+          - ApplicationInstanceName
+          - BastionInstanceName
+
+Parameters:
+  # Global parameters
+  EnvironmentName:
+    Description: "Environment name that prefix all resources"
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+  ProjectName:
+    Description: "Project name that prefix all resources"
+    Type: String
+    Default: "ANS"
+  Bucket:
+    Description: CloudFormation buket URL
+    Type: String
+    Default: "hawkfund-cloudformation"
+  BucketKey:
+    Description: Key to find object in the bucket
+    Type: String
+    Default: "72_TransitGatewayRestrictedRouting"
+  BucketObject:
+    Description: "File to store data in the bucket"
+    Type: String
+    Default: "Data.json"
+
+  # Network parameters
+  SubnetNames:
+    Description: "Subnet names"
+    Type: String
+    Default: "A,B,C"
+  SubnetPrivateCidrBlocks:
+    Description: "Subnet CIDRs"
+    Type: String
+    Default: "10.0.1.0/24,10.1.1.0/24,10.2.1.0/24"
+  SubnetPublicCidrBlocks:
+    Description: "Subnet CIDRs"
+    Type: String
+    Default: "10.0.0.0/24"
+  VpcCidrBlocks:
+    Description: "VPC CIDRs"
+    Type: String
+    Default: "10.0.0.0/16,10.1.0.0/16,10.2.0.0/16"
+  VpcNames:
+    Description: "VPC names"
+    Type: String
+    Default: "A,B,C"
+
+  # Instances parameters
+  InstanceImageId:
+    Description: "Instance AMI"
+    Type: AWS::EC2::Image::Id
+    Default: ami-08461dc8cd9e834e0
+  InstanceKeyName: 
+    Description: Instance Key name
+    Type: String
+    Default: "dso-paris"
+  InstanceType: 
+    Description: "Instance type"
+    Type: String
+    Default: t2.micro
+
+Resources:
+  Roles:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/72_Roles.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+
+  Lambdas:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+         - Roles
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/72_Lambdas.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+
+  VpcAndSubnets:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+         - Roles
+         - Lambdas
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/72_VpcAndSubnets.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SubnetPrivateCidrBlocks: !Ref SubnetPrivateCidrBlocks
+        SubnetPublicCidrBlocks: !Ref SubnetPublicCidrBlocks
+        SubnetNames: !Ref SubnetNames 
+        VpcCidrBlocks: !Ref VpcCidrBlocks
+        VpcNames: !Ref VpcNames
+
+  SecurityGroups:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+         - Roles
+         - Lambdas
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/72_SecurityGroups.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        BastionIngressCidrIp: "0.0.0.0/0"
+        BastionVpcId: !Select [0, !Split [",", !GetAtt VpcAndSubnets.Outputs.VpcIds]]
+        ApplicationIngressCidrIp: "10.0.0.0/8"
+        ApplicationVpcIds: !GetAtt VpcAndSubnets.Outputs.VpcIds
+
+  Gateway:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+         - Roles
+         - Lambdas
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/72_Gateways.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        IgwName: "Default"
+        TgwName: "Default"
+        SubnetIds: !GetAtt VpcAndSubnets.Outputs.SubnetPrivateIds
+        VpcIds: !GetAtt VpcAndSubnets.Outputs.VpcIds
+
+  RouteTables:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+         - Roles
+         - Lambdas
+         - VpcAndSubnets
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/72_RouteTables.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        DestinationCidrBlock: "10.0.0.0/8"
+        VpcIds: !GetAtt VpcAndSubnets.Outputs.VpcIds
+        SubnetPrivateIds: !GetAtt VpcAndSubnets.Outputs.SubnetPrivateIds
+        SubnetPublicId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId
+        RouteTableNames: "A,B,C"
+        InternetGatewayId: !GetAtt Gateway.Outputs.InternetGatewayId
+        TransitGatewayId: !GetAtt Gateway.Outputs.TransitGatewayId
+ 
+  Instances:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+         - Roles
+         - Lambdas
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/72_Instances.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        ImageId: !Ref InstanceImageId
+        InstanceType: !Ref InstanceType
+        KeyName: !Ref InstanceKeyName
+        ApplicationInstanceName: "Application"
+        ApplicationSecurityGroups: !GetAtt SecurityGroups.Outputs.ApplicationSecurityGroupIds
+        ApplicationSubnetIds: !GetAtt VpcAndSubnets.Outputs.SubnetPrivateIds
+        BastionInstanceName: "Bastion"
+        BastionSecurityGroup: !GetAtt SecurityGroups.Outputs.BastionSecurityGroupId
+        BastionSubnetId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId

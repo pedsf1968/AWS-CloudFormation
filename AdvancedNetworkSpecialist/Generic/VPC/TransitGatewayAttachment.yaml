@@ -1,0 +1,96 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create Internet Gateway and Attachement
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: "CloudFormation bucket URL"
+    Type: String    
+  BucketKey:
+    Description: "Key to find object in the bucket"
+    Type: String
+    Default: ""
+  BucketObject:
+    Description: "File to store data in the bucket"
+    Type: String
+    Default: "Data.json"
+  EnvironmentName:
+    Description: "Environment name that prefix all resources"
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+  ProjectName:
+    Description: "Project name that prefix all resources"
+    Type: String
+    Default: "ANS"
+  SaveInS3File:
+    AllowedValues:
+      - "false"
+      - "true"
+    Default: "false"
+    Description: "Backup values in file specified by Bucket and BucketKey"
+    Type: String
+
+  # Stack parameters
+  Name:
+    Default: "Default"
+    Description: "Transit Gateway Attachment name"
+    Type: String
+  SubnetId:
+    Description: "Subnet ID"
+    Type: String
+  TgwName:
+    Default: "Default"
+    Description: "Transit Gateway name"
+    Type: String
+  TransitGatewayId:
+    Description: "ID of the Transit Gateway"
+    Type: String
+  VpcId:
+    Description: "ID of VPC"
+    Type: String
+
+Conditions:
+  isSavedInS3File: !Equals [ !Ref SaveInS3File, "true"]
+
+Resources:
+  # Transit Gateway Attachment
+  TransitGatewayAttachment:
+    Type: AWS::EC2::TransitGatewayAttachment
+    Properties:
+      SubnetIds: 
+        - !Ref SubnetId
+      Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${TgwName}-${Name}-Attachement"
+        - Key: ProjectName
+          Value: !Ref ProjectName
+      TransitGatewayId: !Ref TransitGatewayId
+      VpcId: !Ref VpcId
+
+  TransitGatewayAttachmentIdToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: isSavedInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:UpdateParametersFromS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:TransitGatewayAttachment:${Name}:Id"
+      Value: !Ref TransitGatewayAttachment
+
+Outputs:
+  TransitGatewayAttachmentId:
+    Description: "Transit Gateway Attachment ID"
+    Value: !Ref TransitGatewayAttachment

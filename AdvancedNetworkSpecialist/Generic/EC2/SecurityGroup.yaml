@@ -10,7 +10,7 @@ Parameters:
     Type: String    
   BucketKey:
     Default: "data.json"
-    Description: File name to save parameters in the bucket
+    Description: "File name to save parameters in the bucket"
     Type: String
   EnvironmentName:
     Description: "Environment name that prefix all resources"

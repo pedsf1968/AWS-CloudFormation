@@ -9,9 +9,13 @@ Parameters:
     Description: "CloudFormation bucket URL"
     Type: String    
   BucketKey:
-    Default: "data.json"
-    Description: File name to save parameters in the bucket
+    Description: "Key to find object in the bucket"
     Type: String
+    Default: ""
+  BucketObject:
+    Description: "File to store data in the bucket"
+    Type: String
+    Default: "Data.json"
   EnvironmentName:
     Description: "Environment name that prefix all resources"
     Type: String
@@ -79,26 +83,32 @@ Resources:
       NetworkLoadBalancerArns: 
         - !Ref GatewayLoadBalancerArn
 
-  NLBEndpointServiceIdBackup:
+  NLBEndpointServiceIdToS3:
     Type: AWS::CloudFormation::CustomResource
     Condition: networkTypeServiceIsSavedInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:UpdateParametersFromS3"
       ServiceTimeout: 60
       Bucket: !Ref Bucket
       BucketKey: !Ref BucketKey
-      Key: !Sub "${AWS::Region}-${ProjectName}-${EnvironmentName}-${VpcESType}-NLBServiceId"
+      BucketObject: !Ref BucketObject
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:VPCEndpointService:${VpcESType}:Id"
       Value: !Ref NLBEndpointService
 
-  GLBEndpointServiceIdBackup:
+  GLBEndpointServiceIdToS3:
     Type: AWS::CloudFormation::CustomResource
     Condition: gatewayTypeServiceIsSavedInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:UpdateParametersFromS3"
       ServiceTimeout: 60
       Bucket: !Ref Bucket
       BucketKey: !Ref BucketKey
-      Key: !Sub "${AWS::Region}-${ProjectName}-${EnvironmentName}-${VpcESType}-GLBServiceId"
+      BucketObject: !Ref BucketObject
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:VPCEndpointService:${VpcESType}:Id"
       Value: !Ref GLBEndpointService
 
 Outputs:

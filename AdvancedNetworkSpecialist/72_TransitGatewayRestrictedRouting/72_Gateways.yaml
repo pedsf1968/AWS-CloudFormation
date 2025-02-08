@@ -1,0 +1,230 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create Internet Gateway and Attachement
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: "CloudFormation bucket URL"
+    Type: String    
+  BucketKey:
+    Description: Key to find object in the bucket
+    Type: String
+    Default: "71_TransitGatewayRestrictedRouting"
+  BucketObject:
+    Description: "File to store data in the bucket"
+    Type: String
+    Default: "Data.json"
+  EnvironmentName:
+    Description: "Environment name that prefix all resources"
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+  ProjectName:
+    Description: "Project name that prefix all resources"
+    Type: String
+    Default: "ANS"
+
+  # Stack parameters
+  IgwName:
+    Default: "Default"
+    Description: "Internet Gateway name"
+    Type: String
+  SubnetIds:
+    Description: "Private Subnets IDs"
+    Type: String
+  TgwName:
+    Default: "Default"
+    Description: "Transit Gateway name"
+    Type: String
+  VpcIds:
+    Description: "VPC IDs"
+    Type: String
+
+Resources:
+  # Internet Gateway and Attachment
+  InternetGatewayStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/InternetGateway.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        Name: !Ref IgwName
+        SaveInS3File: "true"
+        VpcId: !Select [0, !Split [",", !Ref VpcIds]]
+
+  TransitGatewayStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/TransitGateway.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        Description: !Sub "${ProjectName} ${EnvironmentName} Transit Gateway ${TgwName}"
+        # Disable Route Table Association
+        DefaultRouteTableAssociation: "disable"
+        # Disable Propagation
+        DefaultRouteTablePropagation: "disable"
+        Name: !Ref TgwName
+        SaveInS3File: "true"
+
+  TransitGatewayAttachmentStackA:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/TransitGatewayAttachment.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        Name: "A"
+        TgwName: !Ref TgwName
+        TransitGatewayId: !GetAtt TransitGatewayStack.Outputs.TransitGatewayId
+        SaveInS3File: "true"
+        SubnetId: !Select [0, !Split [",", !Ref SubnetIds]]
+        VpcId: !Select [0, !Split [",", !Ref VpcIds]]
+
+  TransitGatewayAttachmentStackB:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/TransitGatewayAttachment.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        Name: "B"
+        TgwName: !Ref TgwName
+        TransitGatewayId: !GetAtt TransitGatewayStack.Outputs.TransitGatewayId
+        SaveInS3File: "true"
+        SubnetId: !Select [1, !Split [",", !Ref SubnetIds]]
+        VpcId: !Select [1, !Split [",", !Ref VpcIds]]
+
+  TransitGatewayAttachmentStackC:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/TransitGatewayAttachment.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        Name: "C"
+        TgwName: !Ref TgwName
+        TransitGatewayId: !GetAtt TransitGatewayStack.Outputs.TransitGatewayId
+        SaveInS3File: "true"
+        SubnetId: !Select [2, !Split [",", !Ref SubnetIds]]
+        VpcId: !Select [2, !Split [",", !Ref VpcIds]]
+
+  TransitGatewayAttachmentRouteTableStackA:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/TransitGatewayRouteTable.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        Name: "A"
+        TgwName: !Ref TgwName
+        TransitGatewayAttachmentId: !GetAtt TransitGatewayAttachmentStackA.Outputs.TransitGatewayAttachmentId
+        TransitGatewayId: !GetAtt TransitGatewayStack.Outputs.TransitGatewayId
+        SaveInS3File: "true"
+  
+  TransitGatewayAttachmentRouteTableStackB:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/TransitGatewayRouteTable.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        Name: "B"
+        TgwName: !Ref TgwName
+        TransitGatewayAttachmentId: !GetAtt TransitGatewayAttachmentStackB.Outputs.TransitGatewayAttachmentId
+        TransitGatewayId: !GetAtt TransitGatewayStack.Outputs.TransitGatewayId
+        SaveInS3File: "true"
+  
+  TransitGatewayAttachmentRouteTableStackC:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/TransitGatewayRouteTable.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        Name: "C"
+        TgwName: !Ref TgwName
+        TransitGatewayAttachmentId: !GetAtt TransitGatewayAttachmentStackC.Outputs.TransitGatewayAttachmentId
+        TransitGatewayId: !GetAtt TransitGatewayStack.Outputs.TransitGatewayId
+        SaveInS3File: "true"
+
+Outputs:
+  InternetGatewayAttachmentId:
+    Description: "Internet Gateway Attachment ID"
+    Value: !GetAtt InternetGatewayStack.Outputs.InternetGatewayAttachmentId
+  InternetGatewayId:
+    Description: "Internet Gateway ID"
+    Value: !GetAtt InternetGatewayStack.Outputs.InternetGatewayId
+
+  TransitGatewayRouteTableIdIds:
+    Description: "Transit Gateway Attachment IDs"
+    Value: !Join
+      - ","
+      - - !GetAtt TransitGatewayAttachmentRouteTableStackA.Outputs.TransitGatewayRouteTableId
+        - !GetAtt TransitGatewayAttachmentRouteTableStackB.Outputs.TransitGatewayRouteTableId 
+        - !GetAtt TransitGatewayAttachmentRouteTableStackC.Outputs.TransitGatewayRouteTableId
+  TransitGatewayAttachmentIds:
+    Description: "Transit Gateway Attachment IDs"
+    Value: !Join
+      - ","
+      - - !GetAtt TransitGatewayAttachmentStackA.Outputs.TransitGatewayAttachmentId
+        - !GetAtt TransitGatewayAttachmentStackB.Outputs.TransitGatewayAttachmentId 
+        - !GetAtt TransitGatewayAttachmentStackC.Outputs.TransitGatewayAttachmentId
+  TransitGatewayId:
+    Description: "Transit Gateway ID"
+    Value: !GetAtt TransitGatewayStack.Outputs.TransitGatewayId

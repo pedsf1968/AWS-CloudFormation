@@ -9,8 +9,13 @@ Parameters:
     Type: String
     Default: "hawkfund-cloudformation"
   BucketKey:
-    Description: "File name to save parameters in the bucket"
+    Description: "Key to find object in the bucket"
     Type: String
+    Default: "90_SiteToSiteVpn"
+  BucketObject:
+    Description: "File to store data in the bucket"
+    Type: String
+    Default: "Data.json"
   EnvironmentName:
     Description: "Environment name that prefix all resources"
     Type: String
@@ -44,10 +49,6 @@ Parameters:
   VpcIds:
     Type: String
 
-Conditions:
-  IsEuWest3: !Equals [!Ref "AWS::Region", "eu-west-3" ]
-  IsEuCentral1: !Equals [!Ref "AWS::Region", "eu-central-1" ]
-
 Resources:  
   SubnetRouteTableStack:
     Type: AWS::CloudFormation::Stack
@@ -58,7 +59,8 @@ Resources:
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
-        BucketKey: !Sub "${BucketKey}/Data.json"
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         VPCId: !Select [ 0 , !Split [",", !Ref VpcIds ] ] 
@@ -75,7 +77,8 @@ Resources:
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
-        BucketKey: !Sub "${BucketKey}/Data.json"
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         RouteTableId: !GetAtt SubnetRouteTableStack.Outputs.RouteTableId

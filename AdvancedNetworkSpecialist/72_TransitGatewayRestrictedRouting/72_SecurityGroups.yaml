@@ -1,0 +1,142 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create all Security Groups
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Description: "CloudFormation bucket URL"
+    Type: String
+    Default: "hawkfund-cloudformation"
+  BucketKey:
+    Description: Key to find object in the bucket
+    Type: String
+    Default: "71_TransitGatewayRestrictedRouting"
+  BucketObject:
+    Description: "File to store data in the bucket"
+    Type: String
+    Default: "Data.json"
+  EnvironmentName:
+    Description: "Environment name that prefix all resources"
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+  ProjectName:
+    Description: "Project name that prefix all resources"
+    Type: String
+    Default: "ANS"
+
+  # Stack parameters
+  BastionVpcId:
+    Type: String
+  BastionIngressCidrIp:
+    Default: "0.0.0.0/0"
+    Type: String
+  ApplicationVpcIds:
+    Type: String
+  ApplicationIngressCidrIp:
+    Default: "10.0.0.0/8"
+    Type: String
+
+Resources:
+  BastionSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Security Group for Bastion"
+      GroupName: "BastionSecurityGroup"
+      SecurityGroupIngress:
+        - CidrIp: !Ref BastionIngressCidrIp
+          FromPort: -1
+          IpProtocol: icmp
+          ToPort: -1
+        - CidrIp: !Ref BastionIngressCidrIp
+          FromPort: 22
+          IpProtocol: tcp
+          ToPort: 22
+      Tags:
+        - Key: Name
+          Value:  !Sub "${ProjectName}-${EnvironmentName}-Bastion-SG"
+      VpcId: !Ref BastionVpcId
+
+  ApplicationASecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Security Group for A Application"
+      GroupName: "ApplicationASecurityGroup"
+      SecurityGroupIngress:
+        - CidrIp: !Ref ApplicationIngressCidrIp
+          FromPort: -1
+          IpProtocol: icmp
+          ToPort: -1
+        - CidrIp: !Ref ApplicationIngressCidrIp
+          FromPort: 22
+          IpProtocol: tcp
+          ToPort: 22
+        - CidrIp: !Ref ApplicationIngressCidrIp
+          FromPort: 80
+          IpProtocol: tcp
+          ToPort: 80
+      Tags:
+        - Key: Name
+          Value:  !Sub "${ProjectName}-${EnvironmentName}-A-Application-SG"
+      VpcId: !Select [ 0, !Split [ ",", !Ref ApplicationVpcIds ] ]
+
+  ApplicationBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Security Group for BApplication"
+      GroupName: "ApplicationBSecurityGroup"
+      SecurityGroupIngress:
+        - CidrIp: !Ref ApplicationIngressCidrIp
+          FromPort: -1
+          IpProtocol: icmp
+          ToPort: -1
+        - CidrIp: !Ref ApplicationIngressCidrIp
+          FromPort: 22
+          IpProtocol: tcp
+          ToPort: 22
+        - CidrIp: !Ref ApplicationIngressCidrIp
+          FromPort: 80
+          IpProtocol: tcp
+          ToPort: 80
+      Tags:
+        - Key: Name
+          Value:  !Sub "${ProjectName}-${EnvironmentName}-B-Application-SG"
+      VpcId: !Select [ 1, !Split [ ",", !Ref ApplicationVpcIds ] ]
+
+  ApplicationCSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Security Group for C Application"
+      GroupName: "ApplicationCSecurityGroup"
+      SecurityGroupIngress:
+        - CidrIp: !Ref ApplicationIngressCidrIp
+          FromPort: -1
+          IpProtocol: icmp
+          ToPort: -1
+        - CidrIp: !Ref ApplicationIngressCidrIp
+          FromPort: 22
+          IpProtocol: tcp
+          ToPort: 22
+        - CidrIp: !Ref ApplicationIngressCidrIp
+          FromPort: 80
+          IpProtocol: tcp
+          ToPort: 80
+      Tags:
+        - Key: Name
+          Value:  !Sub "${ProjectName}-${EnvironmentName}-C-Application-SG"
+      VpcId: !Select [ 2, !Split [ ",", !Ref ApplicationVpcIds ] ]
+
+Outputs:
+  BastionSecurityGroupId:
+    Description: "Security GroupId for the Bastion"
+    Value: !GetAtt BastionSecurityGroup.GroupId
+  ApplicationSecurityGroupIds:
+    Description: "Security GroupIds for the Application"
+    Value: !Join [",", [!GetAtt ApplicationASecurityGroup.GroupId, !GetAtt ApplicationBSecurityGroup.GroupId, !GetAtt ApplicationCSecurityGroup.GroupId]]
+
+  

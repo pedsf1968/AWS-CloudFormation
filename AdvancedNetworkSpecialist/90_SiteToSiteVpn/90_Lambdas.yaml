@@ -5,39 +5,26 @@ Description:  This template deploy Lambda to use
 Parameters:
   # Stack parameters
   Bucket:
+    Default: "hawkfund-cloudformation"  
     Description: "CloudFormation bucket URL"
     Type: String
-    Default: "hawkfund-cloudformation"  
   BucketKey:
-    Description: "File name to save parameters in the bucket"
+    Default: "90_SiteToSiteVpn"
+    Description: "Key to find object in the bucket"
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  CloudRegion:
+    Description: "Region of the Cloud infrastructure"
     Type: String
 
 Conditions:
-  IsEuWest3: !Equals [!Ref "AWS::Region", "eu-west-3" ]
+  IsCloudInfra: !Equals [!Ref "AWS::Region", !Ref CloudRegion ]
 
 Resources:
-  GetParametersFromS3Role:
-    Type: AWS::CloudFormation::Stack
-    Condition: IsEuWest3
-    DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
-    Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/IAM/RoleGetParametersFromS3.yaml"
-      TimeoutInMinutes: 5
-      Parameters:
-        Bucket: !Ref Bucket
-
-  UpdateParametersFromS3Role:
-    Type: AWS::CloudFormation::Stack
-    Condition: IsEuWest3
-    DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
-    Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/IAM/RoleUpdateParametersFromS3.yaml"                         
-      TimeoutInMinutes: 5
-      Parameters:
-        Bucket: !Ref Bucket
-
+  # For all Regions
   GetParametersFromS3:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
@@ -51,5 +38,24 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/Lambda/UpdateParametersFromS3.yaml"                         
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/Lambda/UpdateParametersFromS3.yaml"
+      TimeoutInMinutes: 5
+
+  # Only for eu-central-1
+  CustomerGatewayParametersToS3:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsCloudInfra
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/Lambda/CustomerGatewayParametersToS3.yaml"
+      TimeoutInMinutes: 5
+
+  VpnConnectionParametersToS3:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsCloudInfra
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/Lambda/VpnConnectionParametersToS3.yaml"
       TimeoutInMinutes: 5

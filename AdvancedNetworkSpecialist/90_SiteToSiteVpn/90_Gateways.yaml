@@ -9,8 +9,13 @@ Parameters:
     Description: CloudFormation buket URL
     Type: String
   BucketKey:
-    Description: "File name to save parameters in the bucket"
+    Description: "Key to find object in the bucket"
     Type: String
+    Default: "90_SiteToSiteVpn"
+  BucketObject:
+    Description: "File to store data in the bucket"
+    Type: String
+    Default: "Data.json"
   EnvironmentName:
     AllowedValues:
       - "dev"
@@ -26,13 +31,13 @@ Parameters:
     Type: String
 
   # Stack parameters
-  CgwIpAddress:
-    Default: "Default"
-    Description: "Customer Gateway IP"
-    Type: String
   CgwName:
     Default: "Default"
     Description: "Customer Gateway name"
+    Type: String
+  CustomerInstanceName:
+    Default: "OpenSwan"
+    Description: "Name of the Customer side Instance"
     Type: String
   IgwName:
     Default: "Default"
@@ -42,6 +47,10 @@ Parameters:
     Default: ""
     Description: "Internet Gateway VPC ID"
     Type: String
+  RemoteRegion:
+    Default: ""
+    Description: "The remote Region"
+    Type: String  
   StsVpnLocalIpv4NetworkCidr:
     Default: "0.0.0.0/0"
     Description: "The IPv4 CIDR on the customer gateway (on-premises) side of the VPN connection."
@@ -78,12 +87,24 @@ Resources:
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
-        BucketKey: !Sub "${BucketKey}/Data.json"
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         Name: !Ref IgwName
         SaveInS3File: "true"
         VpcId: !Ref IgwVpcId
+
+  GetCgwIpAddress:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: IsEuCentral1
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:GetParametersFromS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Key: !Join [ ":", [ !Ref RemoteRegion, !Ref ProjectName, !Ref EnvironmentName, "EC2:Instance", !Ref CustomerInstanceName,"PublicIp"]]
 
   CustomerGatewayStack:
     Type: AWS::CloudFormation::Stack
@@ -95,10 +116,11 @@ Resources:
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
-        BucketKey: !Sub "${BucketKey}/Data.json"
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
-        IpAddress: !Ref CgwIpAddress
+        IpAddress: !GetAtt GetCgwIpAddress.Value
         Name: !Ref CgwName
         SaveInS3File: "true"
 
@@ -112,7 +134,8 @@ Resources:
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
-        BucketKey: !Sub "${BucketKey}/Data.json"
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         Name: !Ref VpgwName
@@ -126,10 +149,11 @@ Resources:
     UpdateReplacePolicy: Delete
     Properties:
       TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/SiteToSiteVpnConnection.yaml"
-      TimeoutInMinutes: 5
+      TimeoutInMinutes: 10
       Parameters:
         Bucket: !Ref Bucket
-        BucketKey: !Sub "${BucketKey}/Data.json"
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         CustomerGatewayId: !GetAtt CustomerGatewayStack.Outputs.CustomerGatewayId

@@ -1,0 +1,34 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template deploy Lambda to use
+
+Parameters:
+  # Stack parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"  
+    Description: "CloudFormation bucket URL"
+    Type: String
+  BucketKey:
+    Description: Key to find object in the bucket
+    Type: String
+    Default: "71_TransitGatewayRestrictedRouting"
+  BucketObject:
+    Description: "File to store data in the bucket"
+    Type: String
+    Default: "Data.json"
+
+Resources:
+  UpdateParametersFromS3Stack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Parameters:
+        ApplicationLogLevel: TRACE
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/Lambda/UpdateParametersFromS3.yaml"
+      TimeoutInMinutes: 5
+
+Outputs:
+  UpdateParametersFromS3Arn:
+    Description: ARN of UpdateParametersFromS3 Lambda
+    Value: !GetAtt UpdateParametersFromS3Stack.Outputs.UpdateParametersFromS3Arn

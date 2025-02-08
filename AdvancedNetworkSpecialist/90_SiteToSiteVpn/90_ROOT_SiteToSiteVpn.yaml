@@ -3,12 +3,14 @@
 # aws cloudformation delete-stack --stack-name ANS-90 --region eu-west-3
 #
 # Steps :
-# 1 - Launch Phase 1 on eu-west-3 to create lambda
-# 2 - Launch Phase 1 on eu-central-1 to create lambda
-# 3 - Re-launch Phase 2 on eu-west-3
-# 4 - Re-Launch Phase 2 on eu-central-1
-# 5 - Download VPN connection configuration on eu-central-1 with Openswan Vendor
-# 6 - Launch Phase 3 on eu-west-3
+# 1 - Launch Step 1 on eu-west-3 to create Roles
+# 2 - Launch Step 2 on eu-west-3 to create Lambda
+# 3 - Launch Step 3 on eu-west-3 to create Network
+# 4 - Launch Step 4 on eu-west-3 to create Instance
+# 5 - Launch Step 2 on eu-central-1 to create lambda
+# 6 - Launch Step 3 on eu-central-1 to create Network
+# 7 - Launch Step 4 on eu-central-1 to create Instance
+# 8 - Launch Step 5 on eu-west-3 to create VPN side
 
 AWSTemplateFormatVersion: "2010-09-09"
 Description: This template create a VPN between two accounts
@@ -21,41 +23,57 @@ Metadata:
         Parameters:
           - ProjectName
           - EnvironmentName
-          - DeployLambdaRoles
-          - DeployLambdas
       - Label:
           default: "Configuration"
         Parameters:
+          - Step
           - Bucket
           - BucketKey
-          - Phase
+          - BucketObject
       - Label:
-          default: "Customer Gateway"
+          default: "Customer side"
         Parameters:
-          - CgwIpAddress
+          - CustomerRegion
+          - CustomerVpcName
+          - CustomerVpcCidrBlock
+          - CustomerSubnetName
+          - CustomerSubnetCidrBlock
+          - CustomerInstanceName
+          - CustomerInstanceImageId
+          - CustomerInstanceType
+          - CustomerInstanceKeyName
+          - CustomerSecurityGroupName
+          - CustomerSecurityGroupDescription
+          - CustomerSecurityGroupIngressCidrIp
       - Label:
-          default: "Phase2 IPSEC configuration. Get configuration from Site to Site VPN"
+          default: "AWS side"
         Parameters:
-          - IpsecLeftId
-          - IpsecRightId
-          - IpsecSecret
-
+          - CloudRegion
+          - CloudVpcName
+          - CloudVpcCidrBlock
+          - CloudSubnetName
+          - CloudSubnetCidrBlock
+          - CloudInstanceName
+          - CloudInstanceImageId
+          - CloudInstanceType
+          - CloudInstanceKeyName
+          - CloudSecurityGroupName
+          - CloudSecurityGroupDescription
+          - CloudSecurityGroupIngressCidrIp
+    
 Parameters:
   Bucket:
-    Description: CloudFormation buket URL
+    Description: "CloudFormation buket URL"
     Type: String
     Default: "hawkfund-cloudformation"
   BucketKey:
-    Description: Key to find object in the bucket
+    Description: "Key to find object in the bucket"
     Type: String
     Default: "90_SiteToSiteVpn"
-  DeployLambdas:
-    AllowedValues:
-      - "false"
-      - "true"
-    Default: "true"
-    Description: "Set true if the common Lambdas are not deployed on AWS Account"
+  BucketObject:
+    Description: "File to store data in the bucket"
     Type: String
+    Default: "Data.json"
   EnvironmentName:
     AllowedValues:
       - "dev"
@@ -65,209 +83,295 @@ Parameters:
     Description: "Environment name that prefix all resources"
     ConstraintDescription: Must specify dev, test or prod
     Type: String
-  IpsecLeftId:
-    Description: "Id of the left IPSEC"
+  Step:
+    Description: "Deploy successively Step1 and Step2 and alternate between th two Accounts"
     Type: String
-  IpsecRightId:
-    Description: "Id of the right IPSEC"
-    Type: String
-  IpsecSecret:
-    Description: "Secret of the IPSEC"
-    Type: String
-  Phase:
-    Description: "Deploy successively Phase1 and Phase2 and alternate between th two Accounts"
-    Type: String
-    Default: Phase1
+    Default: "1-Roles"
     AllowedValues:
-      - Phase1
-      - Phase2
-      - Phase3
+      - "1-Roles"
+      - "2-Lambdas"
+      - "3-Network"
+      - "4-Instances"
+      - "5-VPN"
   ProjectName:
     Description: "Project name that prefix all resources"
     Type: String
     Default: "ANS"
 
-  # Network parameters
-  CgwIpAddress:
-    Default: ""
-    Description: "Public IP of the bastion instance for Site 2 Site VPN"
+  # Customer side infrastructure
+  CustomerInstanceKeyName:
+    Default: "dso-paris"
+    Description: "Key name to use to connect to the instance"
     Type: String
-    
-Mappings:
-  RegionMap:
-    eu-west-3:
-      VpcName: "DC"
-      VpcCidrBlock: 192.168.0.0/16
-      SubnetName: "PublicSubnet"
-      SubnetCidrBlock: 192.168.0.0/24    
-      MapPublicIpOnLaunch: true
-      InstanceName: "EC2-VPN"
-      InstanceType: t2.micro
-      InstanceImageId: ami-015875403620174eb
-      InstanceKeyName: "dso-paris"
-      RemoteVpcCidrBlock: 10.0.0.0/16
-      SecurityGroupDescription: "Security Group for EC2-VPN"
-      SecurityGroupIngressCidrIp: "0.0.0.0/0"
-      SecurityGroupName: "Customer"
-    eu-central-1:
-      VpcName: "AWS"
-      VpcCidrBlock: 10.0.0.0/16
-      SubnetName: "PrivateSubnet"
-      SubnetCidrBlock: 10.0.0.0/24
-      MapPublicIpOnLaunch: false
-      InstanceName: "EC2-A"
-      InstanceType: t2.micro
-      InstanceImageId: ami-00060fac2f8c42d30
-      InstanceKeyName: "dso-francfort"
-      RemoteVpcCidrBlock: 192.168.0.0/16
-      SecurityGroupDescription: "Security Group for EC2-A"
-      SecurityGroupIngressCidrIp: "192.168.0.0/16"
-      SecurityGroupName: "Remote"
+  CustomerInstanceImageId:
+    Default: ami-015875403620174eb
+    Description: "Instance Image Id used in this Region"
+    Type: String
+  CustomerInstanceName:
+    Default: "OpenSwan"
+    Description: "Name of the Customer side Instance"
+    Type: String
+  CustomerInstanceType:
+    Default: t2.micro
+    Description: "Type of the Customer side Instance"
+    Type: String
+  CustomerRegion:
+    Default: eu-west-3
+    Description: "The Region of the Customer side"
+    Type: String
+  CustomerSecurityGroupDescription:
+    Default: "Security Group for OpenSwan EC2"
+    Description: "Customer Instance Security Group description"
+    Type: String
+  CustomerSecurityGroupIngressCidrIp:
+    Default: "0.0.0.0/0"
+    Description: "Customer Instance Security Group Ingress Cidr"
+    Type: String
+  CustomerSecurityGroupName:
+    Default: "Customer"
+    Description: "Customer Instance Security Group name"
+    Type: String
+  CustomerSubnetCidrBlock:
+    Default: 192.168.0.0/24
+    Description: "Customer Subnet Cidr"
+    Type: String
+  CustomerSubnetName:
+    Default: "PublicSubnet"
+    Description: "Customer Subnet name"
+    Type: String
+  CustomerVpcCidrBlock:
+    Default: 192.168.0.0/16
+    Description: "Customer VPC CIDR"
+    Type: String
+  CustomerVpcName:
+    Default: "DataCenter"
+    Description: "Customer VPC name"
+    Type: String
+
+  # AWS cloud side infrastructure
+  CloudInstanceKeyName:
+    Default: "dso-francfort"
+    Description: "Key name to use to connect to the instance"
+    Type: String
+  CloudInstanceImageId:
+    Default: ami-00060fac2f8c42d30
+    Description: "Instance Image Id used in this Region"
+    Type: String
+  CloudInstanceName:
+    Default: "Cloud"
+    Description: "Name of the Customer side Instance"
+    Type: String
+  CloudInstanceType:
+    Default: t2.micro
+    Description: "Type of the AWS side Instance"
+    Type: String
+  CloudRegion:
+    Default: eu-central-1
+    Description: "The Region of the AWS side"
+    Type: String
+  CloudSecurityGroupDescription:
+    Default: "Security Group for Cloud EC2"
+    Description: "AWS Instance Security Group description"
+    Type: String
+  CloudSecurityGroupIngressCidrIp:
+    Default: "192.168.0.0/16"
+    Description: "AWS Instance Security Group Ingress Cidr"
+    Type: String
+  CloudSecurityGroupName:
+    Default: "Cloud"
+    Description: "AWs Instance Security Group name"
+    Type: String
+  CloudSubnetCidrBlock:
+    Default: 10.0.0.0/24
+    Description: "AWS Subnet Cidr"
+    Type: String
+  CloudSubnetName:
+    Default: "PrivateSubnet"
+    Description: "AWS Subnet name"
+    Type: String
+  CloudVpcCidrBlock:
+    Default: 10.0.0.0/16
+    Description: "AWS VPC Cidr"
+    Type: String
+  CloudVpcName:
+    Default: "AWS"
+    Description: "AWS VPC name"
+    Type: String
 
 Conditions:
-  IsPhase1: !And 
-    - !Equals [!Ref DeployLambdas, "true" ]
-    - !Or [ !Equals [!Ref Phase, "Phase1" ], !Equals [!Ref Phase, "Phase2" ], !Equals [!Ref Phase, "Phase3" ]]
-  IsPhase2: !Or 
-    - !Equals [!Ref Phase, "Phase2" ]
-    - !Equals [!Ref Phase, "Phase3" ]
-  IsPhase3: !And
-    - !Equals [!Ref Phase, "Phase3" ]
-    - !Equals [!Ref "AWS::Region", "eu-west-3" ]
-  IsEuWest3: !Equals [!Ref "AWS::Region", "eu-west-3" ]
+  IsStep2: !Or 
+    - !Equals [!Ref Step, "2-Lambdas" ]
+    - !Equals [!Ref Step, "3-Network" ]
+    - !Equals [!Ref Step, "4-Instances" ]
+    - !Equals [!Ref Step, "5-VPN" ]
+  IsStep3: !Or
+    - !Equals [!Ref Step, "3-Network" ]
+    - !Equals [!Ref Step, "4-Instances" ]
+    - !Equals [!Ref Step, "5-VPN" ]
+  IsStep4: !Or
+    - !Equals [!Ref Step, "4-Instances" ]
+    - !Equals [!Ref Step, "5-VPN" ]
+  IsStep5: !And
+    - !Equals [!Ref Step, "5-VPN" ]
+    - !Equals [!Ref "AWS::Region", !Ref CustomerRegion ]
+  IsCloudInfra: !Equals [!Ref "AWS::Region", !Ref CloudRegion ]
+  IsCustomerInfra: !Equals [!Ref "AWS::Region", !Ref CustomerRegion ]
 
 Resources:
-  Lambdas:
+  Roles:
     Type: AWS::CloudFormation::Stack
-    Condition: IsPhase1
+    Condition: IsCustomerInfra
     DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
+    UpdateReplacePolicy: Retain
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/90_Lambdas.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/71_Roles.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
         BucketKey: !Ref BucketKey
-       
+        BucketObject: !Ref BucketObject
+
+  Lambdas:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsStep2
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/71_Lambdas.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        CloudRegion: !Ref CloudRegion
+
   VpcAndSubnets:
     Type: AWS::CloudFormation::Stack
-    Condition: IsPhase2
+    Condition: IsStep3
     DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
+    UpdateReplacePolicy: Retain
     Properties:
       TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/90_VpcAndSubnets.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
         BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         AvailabilityZone: !Select [ 0, !GetAZs ]
-        SubnetMapPublicIpOnLaunch: !FindInMap [RegionMap, !Ref "AWS::Region", MapPublicIpOnLaunch]
-        SubnetCidrBlock: !FindInMap [RegionMap, !Ref "AWS::Region", SubnetCidrBlock]
-        SubnetName: !FindInMap [RegionMap, !Ref "AWS::Region", SubnetName]
-        VpcCidrBlock: !FindInMap [RegionMap, !Ref "AWS::Region", VpcCidrBlock]
-        VpcName: !FindInMap [RegionMap, !Ref "AWS::Region", VpcName]
-
-  Gateways:
-    Type: AWS::CloudFormation::Stack
-    Condition: IsPhase2
-    DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
-    Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/90_Gateways.yaml"
-      TimeoutInMinutes: 5
-      Parameters:
-        Bucket: !Ref Bucket
-        BucketKey: !Ref BucketKey
-        EnvironmentName: !Ref EnvironmentName
-        ProjectName: !Ref ProjectName
-        CgwIpAddress: !Ref CgwIpAddress
-        CgwName: "Customer"
-        IgwName: "Customer"
-        IgwVpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
-        StsVpnLocalIpv4NetworkCidr: !FindInMap [RegionMap, !Ref "AWS::Region", RemoteVpcCidrBlock] 
-        StsVpnRemoteIpv4NetworkCidr: !FindInMap [RegionMap, !Ref "AWS::Region", VpcCidrBlock] 
-        StsVpnName: "Site2Site"
-        VpgwName: "Remote"
-        VpgwVpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
-
-  SecurityGroups:
-    Type: AWS::CloudFormation::Stack
-    Condition: IsPhase2
-    DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
-    Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/90_SecurityGroups.yaml"
-      TimeoutInMinutes: 5
-      Parameters:
-        Bucket: !Ref Bucket
-        BucketKey: !Ref BucketKey
-        EnvironmentName: !Ref EnvironmentName
-        ProjectName: !Ref ProjectName        
-        GroupDescription: !FindInMap [RegionMap, !Ref "AWS::Region", SecurityGroupDescription] 
-        GroupName: !FindInMap [RegionMap, !Ref "AWS::Region", SecurityGroupName] 
-        IngressCidrIp: !FindInMap [RegionMap, !Ref "AWS::Region", SecurityGroupIngressCidrIp] 
-        SSHAllowed: "true"
-        VpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
+        SubnetMapPublicIpOnLaunch: !If [ IsCustomerInfra, "true", "false"]
+        SubnetCidrBlock: !If [ IsCustomerInfra, !Ref CustomerSubnetCidrBlock, !Ref CloudSubnetCidrBlock]
+        SubnetName: !If [ IsCustomerInfra, !Ref CustomerSubnetName, !Ref CloudSubnetName]
+        VpcCidrBlock: !If [ IsCustomerInfra, !Ref CustomerVpcCidrBlock, !Ref CloudVpcCidrBlock]
+        VpcName: !If [ IsCustomerInfra, !Ref CustomerVpcName, !Ref CloudVpcName]
 
   RouteTables:
     Type: AWS::CloudFormation::Stack
-    Condition: IsPhase2
+    Condition: IsStep3
     DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
+    UpdateReplacePolicy: Retain
     Properties:
       TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/90_RouteTables.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
         BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
-        DestinationCidrBlocks: !FindInMap [RegionMap, !Ref "AWS::Region", SecurityGroupIngressCidrIp] 
-        Destinationtype: !If [ IsEuWest3, "InternetGateway", "VirtualPrivateGateway" ]
-        GatewayId: !If [ IsEuWest3, !GetAtt Gateways.Outputs.InternetGatewayId, !GetAtt Gateways.Outputs.VirtualPrivateGatewayId ]
-        RouteTableNames: !If [ IsEuWest3, "Public", "Private"]
+        DestinationCidrBlocks: !If [ IsCustomerInfra, !Ref CustomerSecurityGroupIngressCidrIp, !Ref CloudSecurityGroupIngressCidrIp]
+        Destinationtype:  !If [ IsCustomerInfra, "InternetGateway", "VirtualPrivateGateway"]
+        GatewayId: !If [ IsCustomerInfra, !GetAtt Gateways.Outputs.InternetGatewayId, !GetAtt Gateways.Outputs.VirtualPrivateGatewayId ]
+        RouteTableNames: !If [ IsCustomerInfra, "Public", "Private"]
         SubnetIds: !GetAtt VpcAndSubnets.Outputs.SubnetId
         VpcIds: !GetAtt VpcAndSubnets.Outputs.VpcId
-        
+
+  Gateways:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsStep3
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/90_Gateways.yaml"
+      TimeoutInMinutes: 10
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        CgwName: "Customer"
+        IgwName: "Customer"
+        CustomerInstanceName: !Ref CustomerInstanceName
+        IgwVpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
+        RemoteRegion: !If [ IsCustomerInfra, !Ref CloudRegion, !Ref CustomerRegion]
+        StsVpnLocalIpv4NetworkCidr: !If [ IsCustomerInfra, !Ref CloudVpcCidrBlock, !Ref CustomerVpcCidrBlock]
+        StsVpnRemoteIpv4NetworkCidr: !If [ IsCustomerInfra, !Ref CustomerVpcCidrBlock, !Ref CloudVpcCidrBlock]
+        StsVpnName: "Site2Site"
+        VpgwName: "Remote"
+        VpgwVpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
+
+  SecurityGroups:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsStep4
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/90_SecurityGroups.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName        
+        GroupDescription: !If [ IsCustomerInfra, !Ref CustomerSecurityGroupDescription, !Ref CloudSecurityGroupDescription]
+        GroupName: !If [ IsCustomerInfra, !Ref CustomerSecurityGroupName, !Ref CloudSecurityGroupName]
+        IngressCidrIp: !If [ IsCustomerInfra, !Ref CustomerSecurityGroupIngressCidrIp, !Ref CloudSecurityGroupIngressCidrIp]
+        SSHAllowed: "true"
+        VpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
+
   Instances:
     Type: AWS::CloudFormation::Stack
-    Condition: IsPhase2
+    Condition: IsStep4
     DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
+    UpdateReplacePolicy: Retain
     Properties:
       TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/90_Instances.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
         BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
+        IamInstanceProfile: !Sub "${ProjectName}-${EnvironmentName}-InstanceProfile"
         ProjectName: !Ref ProjectName
         AvailabilityZone: !Select [ 0, !GetAZs ]
-        ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", InstanceImageId]
-        InstanceName: !FindInMap [RegionMap, !Ref "AWS::Region", InstanceName]
-        InstanceType: !FindInMap [RegionMap, !Ref "AWS::Region", InstanceType]
-        KeyName: !FindInMap [RegionMap, !Ref "AWS::Region", InstanceKeyName]
+        ImageId: !If [ IsCustomerInfra, !Ref CustomerInstanceImageId, !Ref CloudInstanceImageId]
+        InstanceName: !If [ IsCustomerInfra, !Ref CustomerInstanceName, !Ref CloudInstanceName]
+        InstanceType: !If [ IsCustomerInfra, !Ref CustomerInstanceType, !Ref CloudInstanceType]
+        KeyName: !If [ IsCustomerInfra, !Ref CustomerInstanceKeyName, !Ref CloudInstanceKeyName]
         SecurityGroup: !GetAtt SecurityGroups.Outputs.SecurityGroupId
         SubnetId: !GetAtt VpcAndSubnets.Outputs.SubnetId
-        
+
   SSMDocuments:
     Type: AWS::CloudFormation::Stack
-    Condition: IsPhase3
+    Condition: IsStep5
     DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
+    UpdateReplacePolicy: Retain
     Properties:
       TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/90_SSM_Documents.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
         BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        CustomerInstanceName: !Ref CustomerInstanceName
         InstanceId: !GetAtt Instances.Outputs.InstanceId
-        IpsecLeftId: !Ref IpsecLeftId
-        IpsecRightId: !Ref IpsecRightId
-        IpsecLeftCidr: !FindInMap [RegionMap, !Ref "AWS::Region", VpcCidrBlock]
-        IpsecRightCidr: !FindInMap [RegionMap, !Ref "AWS::Region", RemoteVpcCidrBlock]
-        IpsecSecret: !Ref IpsecSecret
+        IpsecLeftCidr: !Ref CustomerVpcCidrBlock
+        IpsecRightCidr: !Ref CloudVpcCidrBlock
+        RemoteRegion: !Ref CloudRegion
+        StsVpnName: "Site2Site"

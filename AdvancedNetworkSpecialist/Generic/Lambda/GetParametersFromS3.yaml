@@ -6,9 +6,10 @@ Resources:
   # Event JSON to test Lambda
   # {
   #   "Bucket": "hawkfund-cloudformation",
-  #   "BucketKey": "VPCPeeringCrossAccount/VPCPrivateConnectivityVPCPeering.json",
-  #   "Key": "VpcPeeringConnectionId",
-  #  }
+  #   "BucketKey": "hawkfund-cloudformation/90_SiteToSiteVpn",
+  #   "BucketObject": "Data.json",
+  #   "Key": "eu-central-1:ANS:dev:EC2:VPC:DC:Id"
+  # }
   GetParametersFromS3:
     Type: AWS::Lambda::Function
     Properties:
@@ -18,34 +19,42 @@ Resources:
           import cfnresponse
           import json
 
-          client = boto3.client('s3')
+          s3_client = boto3.client("s3")
+
+          def get_node(my_dict, paths) -> dict:
+            for key in paths:
+                my_dict = my_dict.setdefault(key)
+            return my_dict   
 
           def lambda_handler(event, context):
-            responseData  = {}
+            response_data  = {}
             bucket =  event["ResourceProperties"]["Bucket"]
-            bucketKey = event["ResourceProperties"]["BucketKey"]
-            parameterKey = event["ResourceProperties"]["Key"]
+            bucket_key = event["ResourceProperties"]["BucketKey"]
+            bucket_object = event["ResourceProperties"]["BucketObject"]
+            parameter_key = event["ResourceProperties"]["Key"]
+
             try:
               # Read file from s3
-              response = client.get_object(
-                  Bucket=bucket,
-                  Key=bucketKey
+              response = s3_client.get_object(
+                  Bucket = bucket,
+                  Key = bucket_key + "/" + bucket_object
               )
-              print(response)
               json_data = response["Body"].read().decode('utf-8')
-              data = json.loads(json_data)             
-              responseData["Value"] = json.loads(data)[parameterKey]
-              cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData)                            
+              data = json.loads(json_data)
+              paths = parameter_key.split(":")
+              last_index = paths.pop()
+              response_data["Value"] = get_node(data, paths)[last_index]
+              cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data, "CustomResourcePhysicalID")
             except Exception as err:
-              print("ERROR: No file present on the s3 Bucket")
-              responseData['Data'] = str(err)
-              cfnresponse.send(event, context, cfnresponse.FAILED, responseData)
+              print("ERROR: Bad key or no file present on the s3 Bucket")
+              response_data["Data"] = str(err)
+              cfnresponse.send(event, context, cfnresponse.FAILED, response_data, "CustomResourcePhysicalID")
       Description: Function to read parameter from JSON file in a S3 bucket
       FunctionName: GetParametersFromS3
       Handler: index.lambda_handler
       MemorySize: 128
-      Role: !Join [":", ["arn:aws:iam:", !Sub "${AWS::AccountId}", !Sub "role/GetParametersFromS3" ] ]
-      Runtime: python3.9
+      Role: !Join [":", ["arn:aws:iam:", !Sub "${AWS::AccountId}", "role/GetParametersFromS3Role" ] ]
+      Runtime: python3.12
 
 Outputs:
   GetParametersFromS3Arn:

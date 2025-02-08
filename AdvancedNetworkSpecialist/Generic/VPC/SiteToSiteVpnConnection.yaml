@@ -9,9 +9,13 @@ Parameters:
     Description: "CloudFormation bucket URL"
     Type: String    
   BucketKey:
-    Default: "data.json"
-    Description: File name to save parameters in the bucket
+    Description: "Key to find object in the bucket"
     Type: String
+    Default: ""
+  BucketObject:
+    Description: "File to store data in the bucket"
+    Type: String
+    Default: "Data.json"
   EnvironmentName:
     Description: "Environment name that prefix all resources"
     Type: String
@@ -51,9 +55,9 @@ Parameters:
     Type: String
   StaticRoutesOnly:
     AllowedValues:
-      - false
-      - true
-    Default: true
+      - "false"
+      - "true"
+    Default: "true"
     Description: "Indicates whether the VPN connection uses static routes only. Static routes must be used for devices that don't support BGP."
     Type: String  
   Type:
@@ -68,6 +72,7 @@ Parameters:
 
 Conditions:
   isSavedInS3File: !Equals [ !Ref SaveInS3File, "true"]
+  staticRoutesOnly: !Equals [ !Ref StaticRoutesOnly, "true"]
 
 Resources:
   VpnConnection:
@@ -78,21 +83,42 @@ Resources:
       RemoteIpv4NetworkCidr: !Ref RemoteIpv4NetworkCidr
       StaticRoutesOnly: !Ref StaticRoutesOnly
       Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
         - Key: Name
-          Value: !Sub "${ProjectName}-${EnvironmentName}-${Name}" 
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${Name}"
+        - Key: ProjectName
+          Value: !Ref ProjectName
       Type: !Ref Type
       VpnGatewayId: !Ref VpnGatewayId
 
-  VpnConnectionIdBackup:
+  VpnConnectionRouteLocal:
+    Type: AWS::EC2::VPNConnectionRoute
+    Condition: staticRoutesOnly
+    Properties:
+      DestinationCidrBlock: !Ref LocalIpv4NetworkCidr
+      VpnConnectionId: !Ref VpnConnection
+
+  VpnConnectionRouteRemote:
+    Type: AWS::EC2::VPNConnectionRoute
+    Condition: staticRoutesOnly
+    Properties:
+      DestinationCidrBlock: !Ref RemoteIpv4NetworkCidr
+      VpnConnectionId: !Ref VpnConnection
+
+  VpnConnectionParametersToS3:
     Type: AWS::CloudFormation::CustomResource
     Condition: isSavedInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
-      ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:UpdateParametersFromS3"
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:VpnConnectionParametersToS3"]]
       ServiceTimeout: 60
       Bucket: !Ref Bucket
       BucketKey: !Ref BucketKey
-      Key: !Sub "${AWS::Region}-${ProjectName}-${EnvironmentName}-${Name}-VpnConnectionId"
-      Value: !Ref VpnConnection
+      BucketObject: !Ref BucketObject
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:VPNConnection:${Name}"
+      VpnConnectionId: !Ref VpnConnection
 
 Outputs:
   VpnConnectionId:

@@ -1,0 +1,75 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template for creating Role for Lambda to read parameters in file from S3
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: "CloudFormation bucket URL"
+    Type: String    
+  BucketKey:
+    Default: "data.json"
+    Description: "File name to save parameters in the bucket"
+    Type: String
+  EnvironmentName:
+    Description: "Environment name that prefix all resources"
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+  ProjectName:
+    Description: "Project name that prefix all resources"
+    Type: String
+    Default: "ANS"
+
+  # Stack parameters
+  Actions:
+    Default: "*"
+    Description: "The list of actions allowed or denied on the resources"
+    Type: String
+  Effect:
+    AllowedValues:
+      - "Allow"
+      - "Denied"
+    Default: "Denied"
+    Description: "Allow or denied to do some actions on resources"
+    Type: String
+  Groups:
+    Default: ""
+    Description: "The name of the group to associate the policy with."
+    Type: String
+  PolicyName:
+    Default: "My policy"
+    Description: "The name of the policy document."
+    Type: String
+  Resources:
+    Default: "*"
+    Description: "The list of resources to apply the Policy on"
+    Type: String
+  Roles:
+    Default: ""
+    Description: "The name of the role to associate the policy with."
+    Type: String
+  Users:
+    Default: ""
+    Description: "The name of the user to associate the policy with."
+    Type: String
+
+Resources:
+  Policy:
+    Type: AWS::IAM::Policy
+    Properties:
+      Groups: !Split [",", !Ref Groups]
+      PolicyDocument: 
+          Version: '2012-10-17'
+          Statement:
+          - Effect: !Ref Effect
+            Action: !Split [",", !Ref Actions]
+            Resource: !Split [",", !Ref Resources]
+      PolicyName: String
+      Roles: !Split [",", !Ref Roles]
+      Users: !Split [",", !Ref Users]

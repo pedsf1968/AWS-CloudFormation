@@ -1,17 +1,21 @@
 ---
 AWSTemplateFormatVersion: "2010-09-09"
-Description:  This template for creating Role for Lambda to read parameters in file from S3
+Description:  "This template for creating a Role for UpdateParametersFromS3 Lambda Function"
 
-Parameters:
+Parameters:     
   # Global parameters
   Bucket:
     Default: "hawkfund-cloudformation"
     Description: "CloudFormation bucket URL"
     Type: String    
   BucketKey:
-    Default: "data.json"
-    Description: File name to save parameters in the bucket
+    Description: "Key to find object in the bucket"
     Type: String
+    Default: ""
+  BucketObject:
+    Description: "File to store data in the bucket"
+    Type: String
+    Default: "Data.json"
   EnvironmentName:
     Description: "Environment name that prefix all resources"
     Type: String
@@ -27,7 +31,7 @@ Parameters:
     Default: "ANS"
 
 Resources:
-  GetParametersFromS3:
+  UpdateParametersFromS3Role:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -51,20 +55,22 @@ Resources:
             - logs:CreateLogStream
             - logs:PutLogEvents
             Resource: "*"
-      - PolicyName: GetParametersFromS3Policy
+      - PolicyName: UpdateParametersFromS3Policy
         PolicyDocument:
           Version: '2012-10-17'
           Statement:
           - Effect: Allow
             Action:
             - s3:GetObject
+            - s3:PutObject
+            - s3:DeleteObject
             - s3:List*
             Resource: 
             - !Join [":", ["arn:aws:s3::", !Sub "${Bucket}/${BucketKey}"]]
             - !Join [":", ["arn:aws:s3::", !Sub "${Bucket}/${BucketKey}/*"]]
-      RoleName: GetParametersFromS3
+      RoleName: UpdateParametersFromS3Role
 
 Outputs:
-  GetParametersFromS3Arn:
-    Description: "ARN of GetParametersFromS3 Lambda"
-    Value: !GetAtt GetParametersFromS3.Arn
+  UpdateParametersFromS3RoleArn:
+    Description: "UpdateParametersFromS3 Lambda Role Arn"
+    Value: !GetAtt UpdateParametersFromS3Role.Arn
