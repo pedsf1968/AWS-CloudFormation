@@ -4,33 +4,43 @@ Description:  This template create all Security Groups
 
 Parameters:
   # Global parameters
-  EnvironmentName:
-    Description: "Environment name that prefix all resources"
-    Type: String
-    Default: "dev"
-    AllowedValues:
-      - "dev"
-      - "test"
-      - "prod"
-    ConstraintDescription: Must specify dev, test or prod
-  ProjectName:
-    Description: "Project name that prefix all resources"
-    Type: String
-    Default: "ANS"
   Bucket:
+    Default: "hawkfund-cloudformation"
     Description: CloudFormation buket URL
     Type: String
-    Default: "hawkfund-cloudformation"
+  BucketKey:
+    Default: "63_VPCPrivateLink"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: [ "dev", "test", "prod" ]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String    
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
 
   # Stack parameters
-  BastionVPCId:
-    Type: String
-  BastionCidrIp:
+  BastionIngressCidrIp:
     Type: String
     Default: "0.0.0.0/0"
-  ConsumerVPCId:
+  BastionVPCId:
     Type: String
-  ConsumerCidrIp:
+  ConsumerIngressCidrIp:
+    Type: String
+  ConsumerVPCId:
     Type: String
   WebServerVPCId:
     Type: String
@@ -43,11 +53,15 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/20_Network/20_30_PrefixList.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/ManagedPrefixList.yaml"
       TimeoutInMinutes: 5
       Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         PrefixListName: "All-VPC-pl"
         PrefixListEntries: !Ref PrefixListEntries
 
@@ -57,11 +71,11 @@ Resources:
       GroupDescription: "Security Group for Bastion"
       GroupName: "BastionSecurityGroup"
       SecurityGroupIngress:
-        - CidrIp: !Ref BastionCidrIp
+        - CidrIp: !Ref BastionIngressCidrIp
           FromPort: -1
           IpProtocol: icmp
           ToPort: -1
-        - CidrIp: !Ref BastionCidrIp
+        - CidrIp: !Ref BastionIngressCidrIp
           FromPort: 22
           IpProtocol: tcp
           ToPort: 22
@@ -76,11 +90,11 @@ Resources:
       GroupDescription: "Security Group for Consumer"
       GroupName: "ConsumerSecurityGroup"
       SecurityGroupIngress:
-        - CidrIp: !Ref ConsumerCidrIp
+        - CidrIp: !Ref ConsumerIngressCidrIp
           FromPort: -1
           IpProtocol: icmp
           ToPort: -1
-        - CidrIp: !Ref ConsumerCidrIp
+        - CidrIp: !Ref ConsumerIngressCidrIp
           FromPort: 22
           IpProtocol: tcp
           ToPort: 22

@@ -34,8 +34,11 @@ Parameters:
   DestinationCidrBlock:
     Description: "CIDR range of VPC"
     Type: String
-  VpcIds:
-    Description: "VPC IDs"
+  InternetGatewayId:
+    Description: "Internet Gateway ID"
+    Type: String
+  RouteTableNames:
+    Description: "Names of all Route Tables"
     Type: String
   SubnetPrivateIds:
     Description: "Private Subnets IDs"
@@ -43,14 +46,11 @@ Parameters:
   SubnetPublicId:
     Description: "Public Subnets ID"
     Type: String
-  RouteTableNames:
-    Description: "Names of all Route Tables"
-    Type: String
-  InternetGatewayId:
-    Description: "Internet Gateway ID"
-    Type: String
   TransitGatewayId:
     Description: "Transit Gateway ID"
+    Type: String
+  VpcIds:
+    Description: "VPC IDs"
     Type: String
 
 Resources:  

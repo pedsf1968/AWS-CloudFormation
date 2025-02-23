@@ -46,4 +46,4 @@ Resources:
 Outputs:
   UpdateParametersFromS3RoleArn:
     Description: "UpdateParametersFromS3 Lambda Role Arn"
-    Value: !GetAtt UpdateParametersFromS3RoleStack.Outputs.UpdateParametersFromS3RoleArn
+    Value: !GetAtt UpdateParametersFromS3RoleStack.Outputs.RoleArn

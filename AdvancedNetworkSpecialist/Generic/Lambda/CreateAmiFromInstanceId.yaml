@@ -1,15 +1,12 @@
 ---
 AWSTemplateFormatVersion: "2010-09-09"
-Description:  This template for creating lambda used by CloudFormation other's stacks
+Description:  This template for creating Lambda to create AMI
 # Event JSON to test Lambda
 # {
-#   "ResourceProperties": {
-#     "Bucket": "hawkfund-cloudformation",
-#     "BucketKey": "hawkfund-cloudformation/90_SiteToSiteVpn"
-#     "BucketObject": "Data.json",
-#     "Key": "eu-west-3-ANS-dev-DC-VpcId",
-#     "Value": "vpc-0a42e016ae062848d"
-#   }
+#     "ResourceProperties": {
+#         "InstanceId": "i-0c18f4f4d7038f046",
+#         "Name": "WebServer-AMI"
+#     }
 # }
 
 Parameters:
@@ -23,7 +20,7 @@ Parameters:
       where TRACE is the highest level and FATAL is the lowest.
     Type: String
   FunctionName:
-    Default: UpdateParametersFromS3
+    Default: CreateAmiFromInstanceId
     Type: String
   LogFormat:
     AllowedValues: [ Text, JSON ]
@@ -54,7 +51,7 @@ Parameters:
     Type: String
 
 Resources:
-  UpdateParametersFromS3LogGroup:
+  CreateAmiFromInstanceIdLogGroup:
     Type: AWS::Logs::LogGroup
     DeletionPolicy: Delete
     Properties:
@@ -63,7 +60,7 @@ Resources:
       RetentionInDays: !Ref RetentionInDays
     UpdateReplacePolicy: Delete
 
-  UpdateParametersFromS3Function:
+  CreateAmiFromInstanceId:
     Type: AWS::Lambda::Function
     Properties:
       Code:
@@ -71,50 +68,44 @@ Resources:
           import boto3
           import cfnresponse
           import json
-          response_data = {}
-          s3_client = boto3.client('s3')
 
-          def get_node(my_dict, paths) -> dict:
-              for key in paths:
-                  my_dict = my_dict.setdefault(key, {})
-              return my_dict
+          ec2_client = boto3.client("ec2")
 
           def lambda_handler(event, context):
-            bucket =  event["ResourceProperties"]["Bucket"]
-            bucket_key = event["ResourceProperties"]["BucketKey"]
-            bucket_object = event["ResourceProperties"]["BucketObject"]
-            parameter_key = event["ResourceProperties"]["Key"]            
-            parameter_value = event["ResourceProperties"]["Value"]
+            response_data  = {}
+            print("event:", event)
+            instanceId =  event["ResourceProperties"]["InstanceId"]
+            amiName =  event["ResourceProperties"]["Name"]
+
+            # Search AMI with the same name
+            filters = [
+                {
+                    'Name': 'name',
+                    'Values': [amiName]
+                }
+            ]
+
+            # Call EC2 to describe images with the filter applied
+            response = ec2_client.describe_images(Owners=['self'], Filters=filters)
+
+            for image in response['Images']:
+              print(f"Image ID: {image['ImageId']}, Name: {image['Name']}")
+              # Deregister Ami and delete snapshot
+              ec2_client.deregister_image(ImageId=image['ImageId'])
 
             try:
-              # Read file from s3
-              response = s3_client.get_object(
-                  Bucket = bucket,
-                  Key = bucket_key + "/" + bucket_object
-              )
-              print(response)
-              json_data = response["Body"].read().decode('utf-8')
-              data = json.loads(json_data)             
+              # Create AMI              
+              response = ec2_client.create_image(
+                InstanceId=instanceId,  
+                Name=amiName, 
+                NoReboot=True)
+              response_data["ImageId"] = response["ImageId"]
+              cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data, "CustomResourcePhysicalID")
             except Exception as err:
-              print("WARNING: No file present on the s3 Bucket")
-              data = {}
-
-            paths = parameter_key.split(":")
-            last_index = paths.pop()
-
-            # Change data value for specified key
-            get_node(data, paths)[last_index] = parameter_value
-
-            # Write file from s3
-            response = s3_client.put_object(
-                Body = bytes(json.dumps(data).encode('UTF-8')),
-                Bucket = bucket,
-                Key = bucket_key + "/" + bucket_object
-            )
-
-            response_data["Value"] = parameter_value 
-            cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data, "CustomResourcePhysicalID")
-      Description: Function to update parameter from JSON file in a S3 bucket
+              print("ERROR: ", err)
+              response_data["Data"] = str(err)
+              cfnresponse.send(event, context, cfnresponse.FAILED, response_data, "CustomResourcePhysicalID")
+      Description: Function to create AMI from created instance
       FunctionName: !Ref FunctionName
       Handler: index.lambda_handler
       LoggingConfig:
@@ -123,11 +114,10 @@ Resources:
         LogGroup: !Sub "/aws/lambda/${FunctionName}"
         SystemLogLevel: !Ref SystemLogLevel
       MemorySize: 128
-      Role: !Join [":", ["arn:aws:iam:", !Sub "${AWS::AccountId}", !Sub "role/${FunctionName}Role" ] ]
+      Role: !Join [":", ["arn:aws:iam:", !Sub "${AWS::AccountId}", "role/CreateAmiFromInstanceIdRole" ] ]
       Runtime: python3.12
-
 
 Outputs:
   LambdaFunctionArn:
-    Description: ARN of UpdateParametersFromS3 Lambda
-    Value: !GetAtt UpdateParametersFromS3Function.Arn    
+    Description: "ARN of CreateAmiFromInstanceId Lambda"
+    Value: !GetAtt CreateAmiFromInstanceId.Arn

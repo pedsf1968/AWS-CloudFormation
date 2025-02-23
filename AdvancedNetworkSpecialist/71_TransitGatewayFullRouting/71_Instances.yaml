@@ -30,9 +30,17 @@ Parameters:
     Type: String
     Default: "ANS"
 
-  # Stack parameters
+  # Application parameters
+  ApplicationImageId:
+    Default: ami-08461dc8cd9e834e0
+    Description: "Application Instance AMI"
+    Type: String
   ApplicationInstanceName:
     Description: "Application Instance name"
+    Type: String
+  ApplicationInstanceType:
+    Default: t2.micro
+    Description: "Bastion Instances type"
     Type: String
   ApplicationSubnetIds:
     Description: "Application Subnet IDs"
@@ -40,22 +48,23 @@ Parameters:
   ApplicationSecurityGroups:
     Description: "Application Security Groups"
     Type: String
+  # Bastion parameters
+  BastionImageId:
+    Default: ami-08461dc8cd9e834e0
+    Description: "Bastion Instance AMI"
+    Type: String
   BastionInstanceName:
     Description: "Bastion Instance name"
+    Type: String
+  BastionInstanceType:
+    Default: t2.micro
+    Description: "Bastion Instances type"
     Type: String
   BastionSecurityGroup:
     Description: "Bastion Security Group"
     Type: String
   BastionSubnetId:
     Description: "Bastion Subnet ID"
-    Type: String
-  ImageId:
-    Default: ami-08461dc8cd9e834e0
-    Description: "Instance AMI"
-    Type: String
-  InstanceType:
-    Default: t2.micro
-    Description: "Instances type"
     Type: String
   KeyName:
     Default: "dso-paris"
@@ -78,9 +87,9 @@ Resources:
         ProjectName: !Ref ProjectName
         AvailabilityZone: !Select [ 0, !GetAZs ]
         ElasticIP: "true"
-        ImageId: !Ref ImageId
+        ImageId: !Ref BastionImageId
         InstanceName: !Ref BastionInstanceName
-        InstanceType: !Ref InstanceType
+        InstanceType: !Ref BastionInstanceType
         KeyName: !Ref KeyName
         SaveInS3File: "true"
         SecurityGroup: !Ref BastionSecurityGroup
@@ -100,9 +109,9 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         AvailabilityZone: !Select [ 0, !GetAZs ]
-        ImageId: !Ref ImageId
+        ImageId: !Ref ApplicationImageId
         InstanceName: !Sub "${ApplicationInstanceName}-A"
-        InstanceType: !Ref InstanceType
+        InstanceType: !Ref ApplicationInstanceType
         KeyName: !Ref KeyName
         SaveInS3File: "true"
         SecurityGroup: !Select [ 0, !Split [ ",", !Ref ApplicationSecurityGroups ] ]
@@ -122,9 +131,9 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         AvailabilityZone: !Select [ 1, !GetAZs ]
-        ImageId: !Ref ImageId
+        ImageId: !Ref ApplicationImageId
         InstanceName: !Sub "${ApplicationInstanceName}-B"
-        InstanceType: !Ref InstanceType
+        InstanceType: !Ref ApplicationInstanceType
         KeyName: !Ref KeyName
         SaveInS3File: "true"
         SecurityGroup: !Select [ 1, !Split [ ",", !Ref ApplicationSecurityGroups ] ]
@@ -144,9 +153,9 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         AvailabilityZone: !Select [ 2, !GetAZs ]
-        ImageId: !Ref ImageId
+        ImageId: !Ref ApplicationImageId
         InstanceName: !Sub "${ApplicationInstanceName}-C"
-        InstanceType: !Ref InstanceType
+        InstanceType: !Ref ApplicationInstanceType
         KeyName: !Ref KeyName
         SaveInS3File: "true"
         SecurityGroup: !Select [2, !Split [",", !Ref ApplicationSecurityGroups]]

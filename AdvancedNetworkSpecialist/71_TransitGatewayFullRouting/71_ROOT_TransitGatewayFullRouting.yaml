@@ -36,8 +36,6 @@ Metadata:
           - InstanceImageId
           - InstanceKeyName
           - InstanceType
-          - ApplicationInstanceName
-          - BastionInstanceName
 
 Parameters:
   # Global parameters
@@ -94,11 +92,11 @@ Parameters:
     Description: "Instance AMI"
     Type: AWS::EC2::Image::Id
     Default: ami-08461dc8cd9e834e0
-  InstanceKeyName: 
+  InstanceKeyName:
     Description: Instance Key name
     Type: String
     Default: "dso-paris"
-  InstanceType: 
+  InstanceType:
     Description: "Instance type"
     Type: String
     Default: t2.micro
@@ -120,7 +118,7 @@ Resources:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     DependsOn:
-         - Roles
+      - Roles
     UpdateReplacePolicy: Retain
     Properties:
       TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/71_Lambdas.yaml"
@@ -134,8 +132,8 @@ Resources:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     DependsOn:
-         - Roles
-         - Lambdas
+      - Roles
+      - Lambdas
     UpdateReplacePolicy: Retain
     Properties:
       TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/71_VpcAndSubnets.yaml"
@@ -148,7 +146,7 @@ Resources:
         ProjectName: !Ref ProjectName
         SubnetPrivateCidrBlocks: !Ref SubnetPrivateCidrBlocks
         SubnetPublicCidrBlocks: !Ref SubnetPublicCidrBlocks
-        SubnetNames: !Ref SubnetNames 
+        SubnetNames: !Ref SubnetNames
         VpcCidrBlocks: !Ref VpcCidrBlocks
         VpcNames: !Ref VpcNames
 
@@ -156,8 +154,8 @@ Resources:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     DependsOn:
-         - Roles
-         - Lambdas
+      - Roles
+      - Lambdas
     UpdateReplacePolicy: Delete
     Properties:
       TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/71_SecurityGroups.yaml"
@@ -169,7 +167,8 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         BastionIngressCidrIp: "0.0.0.0/0"
-        BastionVpcId: !Select [0, !Split [",", !GetAtt VpcAndSubnets.Outputs.VpcIds]]
+        BastionVpcId:
+          !Select [0, !Split [",", !GetAtt VpcAndSubnets.Outputs.VpcIds]]
         ApplicationIngressCidrIp: "10.0.0.0/8"
         ApplicationVpcIds: !GetAtt VpcAndSubnets.Outputs.VpcIds
 
@@ -177,8 +176,8 @@ Resources:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     DependsOn:
-         - Roles
-         - Lambdas
+      - Roles
+      - Lambdas
     UpdateReplacePolicy: Delete
     Properties:
       TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/71_Gateways.yaml"
@@ -198,8 +197,8 @@ Resources:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     DependsOn:
-         - Roles
-         - Lambdas
+      - Roles
+      - Lambdas
     UpdateReplacePolicy: Delete
     Properties:
       TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/71_RouteTables.yaml"
@@ -217,12 +216,12 @@ Resources:
         RouteTableNames: "A,B,C"
         InternetGatewayId: !GetAtt Gateway.Outputs.InternetGatewayId
         TransitGatewayId: !GetAtt Gateway.Outputs.TransitGatewayId
- 
+
   Instances:
     Type: AWS::CloudFormation::Stack
     DependsOn:
-         - Roles
-         - Lambdas
+      - Roles
+      - Lambdas
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
@@ -234,12 +233,14 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
-        ImageId: !Ref InstanceImageId
-        InstanceType: !Ref InstanceType
         KeyName: !Ref InstanceKeyName
+        ApplicationImageId: !Ref InstanceImageId
         ApplicationInstanceName: "Application"
+        ApplicationInstanceType: !Ref InstanceType
         ApplicationSecurityGroups: !GetAtt SecurityGroups.Outputs.ApplicationSecurityGroupIds
         ApplicationSubnetIds: !GetAtt VpcAndSubnets.Outputs.SubnetPrivateIds
-        BastionInstanceName: "Bastion"        
+        BastionImageId: !Ref InstanceImageId
+        BastionInstanceName: "Bastion"
+        BastionInstanceType: !Ref InstanceType
         BastionSecurityGroup: !GetAtt SecurityGroups.Outputs.BastionSecurityGroupId
         BastionSubnetId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId

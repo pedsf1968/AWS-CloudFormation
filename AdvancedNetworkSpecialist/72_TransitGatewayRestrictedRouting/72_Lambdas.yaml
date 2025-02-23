@@ -31,4 +31,4 @@ Resources:
 Outputs:
   UpdateParametersFromS3Arn:
     Description: ARN of UpdateParametersFromS3 Lambda
-    Value: !GetAtt UpdateParametersFromS3Stack.Outputs.UpdateParametersFromS3Arn
+    Value: !GetAtt UpdateParametersFromS3Stack.Outputs.LambdaFunctionArn

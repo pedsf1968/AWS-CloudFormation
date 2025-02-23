@@ -57,6 +57,6 @@ Resources:
       Runtime: python3.12
 
 Outputs:
-  GetParametersFromS3Arn:
+  LambdaFunctionArn:
     Description: "ARN of GetParametersFromS3 Lambda"
     Value: !GetAtt GetParametersFromS3.Arn

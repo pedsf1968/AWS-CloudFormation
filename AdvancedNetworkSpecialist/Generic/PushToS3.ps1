@@ -12,6 +12,7 @@ param (
 
 $resources = @(
     "EC2"
+    "ElasticLoadBalancingV2"
     "IAM"
     "Lambda"
     "VPC"

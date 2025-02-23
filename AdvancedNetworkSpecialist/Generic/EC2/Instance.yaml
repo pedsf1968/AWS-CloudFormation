@@ -5,35 +5,30 @@ Parameters:
   # Global parameters
   Bucket:
     Default: "hawkfund-cloudformation"
-    Description: "CloudFormation bucket URL"
-    Type: String    
-  BucketKey:
-    Description: "Key to find object in the bucket"
+    Description: CloudFormation buket URL
     Type: String
-    Default: ""
+  BucketKey:
+    Default: "63_VPCPrivateLink"
+    Description: Key to find object in the bucket
+    Type: String
   BucketObject:
+    Default: "Data.json"
     Description: "File to store data in the bucket"
     Type: String
-    Default: "Data.json"
   EnvironmentName:
-    Description: "Environment name that prefix all resources"
-    Type: String
+    AllowedValues: [ "dev", "test", "prod" ]
+    ConstraintDescription: "Must specify dev, test or prod"
     Default: "dev"
-    AllowedValues:
-      - "dev"
-      - "test"
-      - "prod"
-    ConstraintDescription: Must specify dev, test or prod
+    Description: "Environment name that prefix all resources"
+    Type: String    
   ProjectName:
+    Default: "ANS"
     Description: "Project name that prefix all resources"
     Type: String
-    Default: "ANS"
   SaveInS3File:
-    AllowedValues:
-      - "false"
-      - "true"
+    AllowedValues: [ "false", "true" ]
     Default: "false"
-    Description: "Backup values in file specified by Bucket and BucketKey"
+    Description: "Save resources information in s3 file"
     Type: String
 
   # Stack parameters
@@ -109,8 +104,12 @@ Resources:
       SubnetId: !Ref SubnetId
       SourceDestCheck: !Ref SourceDestCheck
       Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
         - Key: Name
           Value: !Sub "${ProjectName}-${EnvironmentName}-${InstanceName}"
+        - Key: ProjectName
+          Value: !Ref ProjectName
       UserData: !Ref UserData
 
   EIP:
@@ -119,12 +118,18 @@ Resources:
     Properties:
       InstanceId: !Ref Instance
       Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
         - Key: Name
           Value: !Sub "${ProjectName}-${EnvironmentName}-${InstanceName}-EIP"
+        - Key: ProjectName
+          Value: !Ref ProjectName
 
   InstanceIdBackup:
     Type: AWS::CloudFormation::CustomResource
     Condition: isSavedInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:UpdateParametersFromS3"]]
       ServiceTimeout: 60
@@ -137,6 +142,8 @@ Resources:
   InstancePrivateIPBackup:
     Type: AWS::CloudFormation::CustomResource
     Condition: isSavedInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:UpdateParametersFromS3"]]
       ServiceTimeout: 60
@@ -149,6 +156,8 @@ Resources:
   InstancePublicIPBackup:
     Type: AWS::CloudFormation::CustomResource
     Condition: elasticIPSavedInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:UpdateParametersFromS3"]]
       ServiceTimeout: 60
@@ -161,6 +170,8 @@ Resources:
   EIPBackup:
     Type: AWS::CloudFormation::CustomResource
     Condition: elasticIPSavedInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:UpdateParametersFromS3"]]
       ServiceTimeout: 60

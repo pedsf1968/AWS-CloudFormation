@@ -1,0 +1,258 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: This template deploy a target group
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "63_VPCPrivateLink"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: [ "dev", "test", "prod" ]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String    
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+  # Stack parameters
+  HealthCheckEnabled:
+    AllowedValues: [ "true", "false" ]
+    Default: "true"
+    Description: |
+      Indicates whether health checks are enabled. If the target type is
+      lambda, health checks are disabled by default but can be enabled. If the
+      target type is instance, ip, or alb, health checks are always enabled and
+      can't be disabled.
+    Type: String
+  HealthCheckIntervalSeconds:
+    Description: |
+      The approximate amount of time, in seconds, between health checks of an
+      individual target. The range is 5-300. If the target group protocol is
+      TCP, TLS, UDP, TCP_UDP, HTTP or HTTPS, the default is 30 seconds. If the
+      target group protocol is GENEVE, the default is 10 seconds. If the target
+      type is lambda, the default is 35 seconds.
+    Default: 35
+    MaxValue: 300
+    MinValue: 5
+    Type: Number
+  HealthCheckPath:
+    Default: "/"
+    Description: |
+      [HTTP/HTTPS health checks] The destination for health checks on the
+      targets. [HTTP1 or HTTP2 protocol version] The ping path. The default is
+      /. [GRPC protocol version] The path of a custom health check method with
+      the format /package.service/method. The default is /AWS.ALB/healthcheck.
+    MaxLength: 1024
+    MinLength: 1
+    Type: String
+  HealthCheckPort:
+    Default: 80
+    Description: |
+      The port the load balancer uses when performing health checks on targets.
+      If the protocol is HTTP, HTTPS, TCP, TLS, UDP, or TCP_UDP, the default is
+      traffic-port, which is the port on which each target receives traffic
+      from the load balancer. If the protocol is GENEVE, the default is port 80.
+    Type: String  
+  HealthCheckProtocol:
+    AllowedValues: [ HTTP, HTTPS, TCP, TLS, UDP, TCP_UDP, GENEVE ]
+    Default: TCP
+    Description: |
+      Indicates whether health checks are enabled. If the target type is
+      lambda, health checks are disabled by default but can be enabled. If the
+      target type is instance, ip, or alb, health checks are always enabled and
+      can't be disabled.
+    Type: String
+  HealthCheckTimeoutSeconds:
+    Default: 15
+    Description: |
+      The amount of time, in seconds, during which no response from a target
+      means a failed health check. The range is 2–120 seconds. For target
+      groups with a protocol of HTTP, the default is 6 seconds. For target
+      groups with a protocol of TCP, TLS or HTTPS, the default is 10 seconds.
+      For target groups with a protocol of GENEVE, the default is 5 seconds. If
+      the target type is lambda, the default is 30 seconds.
+    MaxValue: 120
+    MinValue: 2
+    Type: Number
+  HealthyThresholdCount:
+    Default: 5
+    Description: |
+      The number of consecutive health check successes required before
+      considering a target healthy. The range is 2-10. If the target group
+      protocol is TCP, TCP_UDP, UDP, TLS, HTTP or HTTPS, the default is 5. For
+      target groups with a protocol of GENEVE, the default is 5. If the target
+      type is lambda, the default is 5.
+    MaxValue: 10
+    MinValue: 2
+    Type: Number
+  # Instance target type
+  InstanceIds:
+    Default: ""
+    Description: The list of Instance IDs
+    Type: CommaDelimitedList
+  InstancePort:
+    Default: 80
+    Description: The Port used by Instances
+    Type: Number
+  IpAddressType:
+    AllowedValues: [ ipv4, ipv6 ]
+    Default: ipv4
+    Description: The IP address type. The default value is ipv4.
+    Type: String
+  Name:
+    Default: "Default"
+    Description: |
+      The name of the target group. This name must be unique per region per
+      account, can have a maximum of 32 characters, must contain only
+      alphanumeric characters or hyphens, and must not begin or end with a
+      hyphen.
+    MaxLength: 32
+    Type: String
+  Port:
+    Default: 80
+    Description: |
+      The port on which the targets receive traffic. This port is used unless
+      you specify a port override when registering the target. If the target is
+      a Lambda function, this parameter does not apply. If the protocol is
+      GENEVE, the supported port is 6081.
+    MaxValue: 65535
+    MinValue: 1
+    Type: Number
+  Protocol:
+    AllowedValues: [ HTTP, HTTPS, TCP, TLS, UDP, TCP_UDP, GENEVE ]
+    Default: TCP
+    Description: |
+      The protocol to use for routing traffic to the targets. For Application
+      Load Balancers, the supported protocols are HTTP and HTTPS. For Network
+      Load Balancers, the supported protocols are TCP, TLS, UDP, or TCP_UDP.
+      For Gateway Load Balancers, the supported protocol is GENEVE. A TCP_UDP
+      listener must be associated with a TCP_UDP target group. If the target is
+      a Lambda function, this parameter does not apply.
+    Type: String
+  ProtocolVersion:
+    Default: ""
+    Description: |
+      [HTTP/HTTPS protocol] The protocol version. The possible values are GRPC,
+      HTTP1, and HTTP2.
+    Type: String
+  TargetGroupAttributes:
+    Default: ""
+    Description: The target group attributes.
+    Type: String
+  Targets:
+    Default: ""
+    Description: The targets.
+    Type: String
+  TargetType:
+    AllowedValues: [ instance, ip, lambda, alb ]
+    Description: |
+      The type of target that you must specify when registering targets with
+      this target group. You can't specify targets for a target group using
+      more than one target type.
+      instance - Register targets by instance ID. This is the default value.
+      ip - Register targets by IP address. You can specify IP addresses from
+      the subnets of the virtual private cloud (VPC) for the target group, the
+      RFC 1918 range (10.0.0.0/8, 172.16.0.0/12, and 192.168.0.0/16), and the
+      RFC 6598 range (100.64.0.0/10). You can't specify publicly routable IP
+      addresses.
+      lambda - Register a single Lambda function as a target.
+      alb - Register a single Application Load Balancer as a target.
+    Type: String
+  UnhealthyThresholdCount:
+    Default: 5
+    Description: |
+      The number of consecutive health check failures required before
+      considering a target unhealthy. The range is 2-10. If the target group
+      protocol is TCP, TCP_UDP, UDP, TLS, HTTP or HTTPS, the default is 2. For
+      target groups with a protocol of GENEVE, the default is 2. If the target
+      type is lambda, the default is 5.
+    MinValue: 2
+    MaxValue: 10
+    Type: Number
+  VpcId:
+    Description: |
+      The identifier of the virtual private cloud (VPC). If the target is a
+      Lambda function, this parameter does not apply. Otherwise, this parameter
+      is required.
+    Type: String
+
+Conditions:
+  isSavedInS3File: !Equals [ !Ref SaveInS3File, "true"]
+  isAlbTargetGroup: !Equals [ !Ref TargetType , "alb" ]
+  isInstanceTargetGroup: !Equals [ !Ref TargetType , "instance" ]
+  isIpTargetGroup: !Equals [ !Ref TargetType , "ip" ]
+  isLambdaTargetGroup: !Equals [ !Ref TargetType , "lambda" ]
+
+Resources:
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Condition: isInstanceTargetGroup
+    Properties:
+      HealthCheckEnabled: !Ref HealthCheckEnabled
+      HealthCheckIntervalSeconds: !Ref HealthCheckIntervalSeconds
+      HealthCheckPort: !Ref HealthCheckPort
+      HealthCheckProtocol: !Ref HealthCheckProtocol
+      HealthCheckTimeoutSeconds: !Ref HealthCheckTimeoutSeconds
+      HealthyThresholdCount: !Ref HealthyThresholdCount
+      IpAddressType: !Ref IpAddressType
+      Name: !Sub "${ProjectName}-${EnvironmentName}-${Name}-TG"
+      Port: !Ref Port
+      Protocol: !Ref Protocol
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: "30"
+      Targets:
+        - Id: !Select [0, !Ref InstanceIds ]
+          Port: !Ref InstancePort
+        - Id: !Select [1, !Ref InstanceIds ]
+          Port: !Ref InstancePort
+      TargetType: instance
+      UnhealthyThresholdCount: !Ref UnhealthyThresholdCount
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${Name}-TG"
+        - Key: ProjectName
+          Value: !Ref ProjectName
+  
+  TargetGroupToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: isSavedInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:UpdateParametersFromS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:ElasticLoadBalancingV2:Listener:${TargetGroup}:Id"
+      Value: !Ref TargetGroup
+
+Outputs:
+  TargetGroupArn:
+    Description: "The Amazon Resource Name (ARN) of the target group."
+    Value: !If
+      - isInstanceTargetGroup
+      - !GetAtt TargetGroup.TargetGroupArn
+      - ""

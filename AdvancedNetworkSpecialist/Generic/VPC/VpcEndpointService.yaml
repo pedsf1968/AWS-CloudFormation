@@ -6,60 +6,50 @@ Parameters:
   # Global parameters
   Bucket:
     Default: "hawkfund-cloudformation"
-    Description: "CloudFormation bucket URL"
-    Type: String    
-  BucketKey:
-    Description: "Key to find object in the bucket"
+    Description: CloudFormation buket URL
     Type: String
-    Default: ""
+  BucketKey:
+    Default: "63_VPCPrivateLink"
+    Description: Key to find object in the bucket
+    Type: String
   BucketObject:
+    Default: "Data.json"
     Description: "File to store data in the bucket"
     Type: String
-    Default: "Data.json"
   EnvironmentName:
-    Description: "Environment name that prefix all resources"
-    Type: String
+    AllowedValues: [ "dev", "test", "prod" ]
+    ConstraintDescription: "Must specify dev, test or prod"
     Default: "dev"
-    AllowedValues:
-      - "dev"
-      - "test"
-      - "prod"
-    ConstraintDescription: Must specify dev, test or prod
+    Description: "Environment name that prefix all resources"
+    Type: String    
   ProjectName:
+    Default: "ANS"
     Description: "Project name that prefix all resources"
     Type: String
-    Default: "ANS"
   SaveInS3File:
-    AllowedValues:
-      - "false"
-      - "true"
+    AllowedValues: [ "false", "true" ]
     Default: "false"
-    Description: "Backup values in file specified by Bucket and BucketKey"
+    Description: "Save resources information in s3 file"
     Type: String
 
   # Stack parameters
   AcceptanceRequired:
+    AllowedValues: [ "true", "false" ]
+    Default: "false"
     Description: "Indicates whether requests from service consumers to create an endpoint to your service must be accepted."
     Type: String
-    Default: false
-    AllowedValues:
-      - true
-      - false
   GatewayLoadBalancerArn:
+    Default: ""
     Description: "The Amazon Resource Names (ARNs) of the Gateway Load Balancers."
     Type: String
-    Default: ""
   NetworkLoadBalancerArn:
+    Default: ""
     Description: "The Amazon Resource Names (ARNs) of the Network Load Balancers."
     Type: String
-    Default: ""
   VpcESType:
-    Type: String
+    AllowedValues: [ "network", "gateway" ]
     Default: "network"
-    AllowedValues:
-      - "network"
-      - "gateway"
-
+    Type: String
 Conditions:
   isNetworkType: !Equals [ !Ref VpcESType, "network" ]
   isGatewayType: !Equals [ !Ref VpcESType, "gateway" ]
@@ -74,6 +64,13 @@ Resources:
       AcceptanceRequired: !Ref AcceptanceRequired
       NetworkLoadBalancerArns: 
         - !Ref NetworkLoadBalancerArn
+      Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-NLB-VPCE-SVC"
+        - Key: ProjectName
+          Value: !Ref ProjectName
 
   GLBEndpointService:
     Type: AWS::EC2::VPCEndpointService
@@ -82,6 +79,13 @@ Resources:
       AcceptanceRequired: !Ref AcceptanceRequired
       NetworkLoadBalancerArns: 
         - !Ref GatewayLoadBalancerArn
+      Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-GLB-VPCE-SVC"
+        - Key: ProjectName
+          Value: !Ref ProjectName
 
   NLBEndpointServiceIdToS3:
     Type: AWS::CloudFormation::CustomResource

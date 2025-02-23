@@ -1,0 +1,66 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template deploy Roles
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "63_VPCPrivateLink"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: [ "dev", "test", "prod" ]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String    
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+Resources:
+  UpdateParametersFromS3RoleStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/IAM/UpdateParametersFromS3Role.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+
+  CreateAmiFromInstanceIdRoleStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/IAM/CreateAmiFromInstanceIdRole.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+
+Outputs:
+  CreateAmiFromInstanceIdRoleArn:
+    Description: "CreateAmiFromInstanceIdRole Lambda Role Arn"
+    Value: !GetAtt CreateAmiFromInstanceIdRoleStack.Outputs.RoleArn
+  UpdateParametersFromS3RoleArn:
+    Description: "UpdateParametersFromS3 Lambda Role Arn"
+    Value: !GetAtt UpdateParametersFromS3RoleStack.Outputs.RoleArn

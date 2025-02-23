@@ -1,113 +1,63 @@
+---
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "Create an AMI from an EC2 instance."
+Description:  This template for creating Lambda to create AMI
 
 Parameters:
-  # Global parameters
-  Bucket:
-    Default: "hawkfund-cloudformation"
-    Description: CloudFormation buket URL
+  # Stack parameters
+  ApplicationLogLevel:
+    AllowedValues: [ TRACE, DEBUG, INFO, WARN, ERROR, FATAL ]
+    Default: ERROR
+    Description: |
+      Set this property to filter the application logs for your function that Lambda sends to CloudWatch. 
+      Lambda only sends application logs at the selected level of detail and lower, 
+      where TRACE is the highest level and FATAL is the lowest.
     Type: String
-  BucketKey:
-    Default: "63_VPCPrivateLink"
-    Description: Key to find object in the bucket
+  FunctionName:
+    Default: CreateAmiFromInstanceId
     Type: String
-  BucketObject:
-    Default: "Data.json"
-    Description: "File to store data in the bucket"
+  LogFormat:
+    AllowedValues: [ Text, JSON ]
+    Default: JSON
+    Description: |
+      The format in which Lambda sends your function's application and system logs to CloudWatch.
+      Select between plain text and structured JSON.
     Type: String
-  EnvironmentName:
-    AllowedValues: [ "dev", "test", "prod" ]
-    ConstraintDescription: "Must specify dev, test or prod"
-    Default: "dev"
-    Description: "Environment name that prefix all resources"
-    Type: String    
-  ProjectName:
-    Default: "ANS"
-    Description: "Project name that prefix all resources"
+  LogGroupClass:
+    AllowedValues: [ STANDARD, INFREQUENT_ACCESS ]
+    Default: STANDARD
+    Description: Specifies the log group class for this log group. 
     Type: String
-  SaveInS3File:
-    AllowedValues: [ "false", "true" ]
-    Default: "false"
-    Description: "Save resources information in s3 file"
+  RetentionInDays:
+    AllowedValues: [ 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557, 2922, 3288, 3653 ]
+    Default: 1
+    Description: |
+      The number of days to retain the log events in the specified log group.
+      Possible values are: 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557, 2922, 3288, and 3653.
     Type: String
-
-# Stack parameters
-  AvailabilityZone:
-    Description: "Instance AZ"
+  SystemLogLevel:
+    AllowedValues: [ DEBUG, INFO, WARN ]
+    Default: WARN
+    Description: |
+      Set this property to filter the system logs for your function that Lambda sends to CloudWatch.
+      Lambda only sends system logs at the selected level of detail and lower,
+      where DEBUG is the highest level and WARN is the lowest.
     Type: String
-  ImageId:
-    Description: "Instance AMI"
-    Type: AWS::EC2::Image::Id
-    Default: ami-0d3f86bfba5ee6472
-  InstanceType: 
-    Description: "Type of Instance"
-    Type: String
-    Default: t2.micro
-    AllowedValues:
-         - t2.micro
-         - t2.small
-         - t2.large
-  KeyName: 
-    Description: "Instance Key name"
-    Type: String
-  SecurityGroup:
-    Description: "Instance Security Group ID"
-    Type: String
-  SubnetId:
-    Description: "Instance Subnet ID"
-    Type: String
-  UserData:
-    Description: "Script to launch on the first start"
-    Type: String
-    Default: ""
 
 Resources:
-  # Completes when the instance is fully provisioned and ready for AMI creation.
-  AMICreate:
-    Type: AWS::CloudFormation::WaitCondition
-    CreationPolicy:
-      ResourceSignal:
-        Timeout: PT10M
-
-  Instance:
-    Type: AWS::EC2::Instance
+  CreateAmiFromInstanceIdLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
     Properties:
-      AvailabilityZone:  !Ref AvailabilityZone
-      ImageId: !Ref ImageId
-      InstanceType: !Ref InstanceType
-      KeyName: !Ref KeyName
-      SecurityGroupIds: 
-        - !Ref SecurityGroup
-      SubnetId: !Ref SubnetId
-      UserData:
-        "Fn::Base64": !Sub |
-          #!/bin/bash -x
-          yum update -y
-          yum install -y httpd
-          systemctl start httpd
-          systemctl enable httpd
-          echo "This is a service hosted behind AWS private link" > /var/www/html/index.html
-          /opt/aws/bin/cfn-signal \
-            -e $? \
-            --stack ${AWS::StackName} \
-            --region ${AWS::Region} \
-            --resource AMICreate
-          shutdown -h now
+      LogGroupClass: !Ref LogGroupClass
+      LogGroupName: !Sub "/aws/lambda/${FunctionName}"
+      RetentionInDays: !Ref RetentionInDays
+    UpdateReplacePolicy: Delete
 
-  AMI:
-    Type: Custom::AMI
-    DependsOn: AMICreate
-    Properties:
-      ServiceToken: !GetAtt AMIFunction.Arn
-      InstanceId: !Ref Instance
-
-  AMIFunction:
+  CreateAmiFromInstanceId:
     Type: AWS::Lambda::Function
     Properties:
-      Handler: index.handler
-      Role: !GetAtt LambdaExecutionRole.Arn
       Code:
-        ZipFile: !Sub |
+        ZipFile: |
           var response = require('cfn-response');
           var AWS = require('aws-sdk');
           exports.handler = function(event, context) {
@@ -176,36 +126,19 @@ Resources:
               ).then((data)=>success({})).catch((err)=>failed(err));
             }
           };
+      Description: Function to create AMI from created instance
+      FunctionName: !Ref FunctionName
+      Handler: index.lambda_handler
+      LoggingConfig:
+        ApplicationLogLevel: !Ref ApplicationLogLevel
+        LogFormat: !Ref LogFormat
+        LogGroup: !Sub "/aws/lambda/${FunctionName}"
+        SystemLogLevel: !Ref SystemLogLevel
+      MemorySize: 128
+      Role: !Join [":", ["arn:aws:iam:", !Sub "${AWS::AccountId}", "role/CreateAmiFromInstanceIdRole" ] ]
       Runtime: nodejs20.x
-      Timeout: 300
-  
-  LambdaExecutionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-        - Effect: Allow
-          Principal: {Service: [lambda.amazonaws.com]}
-          Action: ['sts:AssumeRole']
-      Path: /
-      ManagedPolicyArns:
-      - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-      - arn:aws:iam::aws:policy/service-role/AWSLambdaRole
-      Policies:
-      - PolicyName: EC2Policy
-        PolicyDocument:
-          Version: '2012-10-17'
-          Statement:
-            - Effect: Allow
-              Action:
-              - 'ec2:DescribeInstances'
-              - 'ec2:DescribeImages'
-              - 'ec2:CreateImage'
-              - 'ec2:DeregisterImage'
-              - 'ec2:DescribeSnapshots'
-              - 'ec2:DeleteSnapshot'
-              Resource: ['*']
+
 Outputs:
-  AmiId:
-    Value: !Ref AMI
+  LambdaFunctionArn:
+    Description: "ARN of CreateAmiFromInstanceId Lambda"
+    Value: !GetAtt CreateAmiFromInstanceId.Arn

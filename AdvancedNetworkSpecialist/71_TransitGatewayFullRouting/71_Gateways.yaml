@@ -142,90 +142,6 @@ Resources:
         SubnetId: !Select [2, !Split [",", !Ref SubnetIds]]
         VpcId: !Select [2, !Split [",", !Ref VpcIds]]
 
-  # TransitGatewayAttachmentRouteTableStackA:
-  #   Type: AWS::CloudFormation::Stack
-  #   DeletionPolicy: Delete
-  #   UpdateReplacePolicy: Delete
-  #   Properties:
-  #     TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/TransitGatewayRouteTable.yaml"
-  #     TimeoutInMinutes: 5
-  #     Parameters:
-  #       Bucket: !Ref Bucket
-  #       BucketKey: !Ref BucketKey
-  #       BucketObject: !Ref BucketObject
-  #       EnvironmentName: !Ref EnvironmentName
-  #       ProjectName: !Ref ProjectName
-  #       Name: "A"
-  #       TgwName: !Ref TgwName
-  #       TransitGatewayAttachmentId: !GetAtt TransitGatewayAttachmentStackA.Outputs.TransitGatewayAttachmentId
-  #       TransitGatewayId: !GetAtt TransitGatewayStack.Outputs.TransitGatewayId
-  #       SaveInS3File: "true"
-  
-  # TransitGatewayAttachmentRouteTableStackB:
-  #   Type: AWS::CloudFormation::Stack
-  #   DeletionPolicy: Delete
-  #   UpdateReplacePolicy: Delete
-  #   Properties:
-  #     TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/TransitGatewayRouteTable.yaml"
-  #     TimeoutInMinutes: 5
-  #     Parameters:
-  #       Bucket: !Ref Bucket
-  #       BucketKey: !Ref BucketKey
-  #       BucketObject: !Ref BucketObject
-  #       EnvironmentName: !Ref EnvironmentName
-  #       ProjectName: !Ref ProjectName
-  #       Name: "B"
-  #       TgwName: !Ref TgwName
-  #       TransitGatewayAttachmentId: !GetAtt TransitGatewayAttachmentStackB.Outputs.TransitGatewayAttachmentId
-  #       TransitGatewayId: !GetAtt TransitGatewayStack.Outputs.TransitGatewayId
-  #       SaveInS3File: "true"
-  
-  # TransitGatewayAttachmentRouteTableStackC:
-  #   Type: AWS::CloudFormation::Stack
-  #   DeletionPolicy: Delete
-  #   UpdateReplacePolicy: Delete
-  #   Properties:
-  #     TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/TransitGatewayRouteTable.yaml"
-  #     TimeoutInMinutes: 5
-  #     Parameters:
-  #       Bucket: !Ref Bucket
-  #       BucketKey: !Ref BucketKey
-  #       BucketObject: !Ref BucketObject
-  #       EnvironmentName: !Ref EnvironmentName
-  #       ProjectName: !Ref ProjectName
-  #       Name: "C"
-  #       TgwName: !Ref TgwName
-  #       TransitGatewayAttachmentId: !GetAtt TransitGatewayAttachmentStackC.Outputs.TransitGatewayAttachmentId
-  #       TransitGatewayId: !GetAtt TransitGatewayStack.Outputs.TransitGatewayId
-  #       SaveInS3File: "true"
-
-  # # From A you can only go to B
-  # TransitGatewayRouteTablePropagationA:
-  #   Type: AWS::EC2::TransitGatewayRouteTablePropagation
-  #   Properties:
-  #     TransitGatewayAttachmentId: !GetAtt TransitGatewayAttachmentStack.Outputs.TransitGatewayAttachmentBId
-  #     TransitGatewayRouteTableId: !GetAtt TransitGatewayAttachmentStack.Outputs.TransitGatewayRouteTableAId
-
-  # # From B you can go to A and C
-  # TransitGatewayRouteTablePropagationB1:
-  #   Type: AWS::EC2::TransitGatewayRouteTablePropagation
-  #   Properties:
-  #     TransitGatewayAttachmentId: !GetAtt TransitGatewayAttachmentStack.Outputs.TransitGatewayAttachmentAId
-  #     TransitGatewayRouteTableId: !GetAtt TransitGatewayAttachmentStack.Outputs.TransitGatewayRouteTableBId
-
-  # TransitGatewayRouteTablePropagationB2:
-  #   Type: AWS::EC2::TransitGatewayRouteTablePropagation
-  #   Properties:
-  #     TransitGatewayAttachmentId: !GetAtt TransitGatewayAttachmentStack.Outputs.TransitGatewayAttachmentCId
-  #     TransitGatewayRouteTableId: !GetAtt TransitGatewayAttachmentStack.Outputs.TransitGatewayRouteTableBId
-
-  # # From C you can only go to B
-  # TransitGatewayRouteTablePropagationC:
-  #   Type: AWS::EC2::TransitGatewayRouteTablePropagation
-  #   Properties:
-  #     TransitGatewayAttachmentId: !GetAtt TransitGatewayAttachmentStack.Outputs.TransitGatewayAttachmentBId
-  #     TransitGatewayRouteTableId: !GetAtt TransitGatewayAttachmentStack.Outputs.TransitGatewayRouteTableCId
-
 Outputs:
   InternetGatewayAttachmentId:
     Description: "Internet Gateway Attachment ID"
@@ -234,13 +150,6 @@ Outputs:
     Description: "Internet Gateway ID"
     Value: !GetAtt InternetGatewayStack.Outputs.InternetGatewayId
 
-  # TransitGatewayAttachmentIds:
-  #   Description: "Transit Gateway Attachment IDs"
-  #   Value: !Join
-  #     - ","
-  #     - - !GetAtt TransitGatewayAttachmentStack.Outputs.TransitGatewayAttachmentAId
-  #       - !GetAtt TransitGatewayAttachmentStack.Outputs.TransitGatewayAttachmentBId 
-  #       - !GetAtt TransitGatewayAttachmentStack.Outputs.TransitGatewayAttachmentCId
   TransitGatewayId:
     Description: "Transit Gateway ID"
     Value: !GetAtt TransitGatewayStack.Outputs.TransitGatewayId

@@ -25,7 +25,7 @@ Conditions:
 
 Resources:
   # For all Regions
-  GetParametersFromS3:
+  GetParametersFromS3Stack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -33,7 +33,7 @@ Resources:
       TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/Lambda/GetParametersFromS3.yaml"
       TimeoutInMinutes: 5
 
-  UpdateParametersFromS3:
+  UpdateParametersFromS3Stack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -42,7 +42,7 @@ Resources:
       TimeoutInMinutes: 5
 
   # Only for eu-central-1
-  CustomerGatewayParametersToS3:
+  CustomerGatewayParametersToS3Stack:
     Type: AWS::CloudFormation::Stack
     Condition: IsCloudInfra
     DeletionPolicy: Delete
@@ -51,7 +51,7 @@ Resources:
       TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/Lambda/CustomerGatewayParametersToS3.yaml"
       TimeoutInMinutes: 5
 
-  VpnConnectionParametersToS3:
+  VpnConnectionParametersToS3Stack:
     Type: AWS::CloudFormation::Stack
     Condition: IsCloudInfra
     DeletionPolicy: Delete
@@ -59,3 +59,23 @@ Resources:
     Properties:
       TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/Lambda/VpnConnectionParametersToS3.yaml"
       TimeoutInMinutes: 5
+
+Outputs:
+  GetParametersFromS3Arn:
+    Description: ARN of GetParametersFromS3 Lambda
+    Value: !GetAtt GetParametersFromS3Stack.Outputs.LambdaFunctionArn
+  UpdateParametersFromS3Arn:
+    Description: ARN of UpdateParametersFromS3 Lambda
+    Value: !GetAtt UpdateParametersFromS3Stack.Outputs.LambdaFunctionArn
+  CustomerGatewayParametersToS3Arn:
+    Description: ARN of CustomerGatewayParametersToS3 Lambda
+    Value: !If
+      - IsCloudInfra
+      - !GetAtt CustomerGatewayParametersToS3Stack.Outputs.LambdaFunctionArn
+      - ""
+  VpnConnectionParametersToS3Arn:
+    Description: ARN of VpnConnectionParametersToS3 Lambda
+    Value: !If
+      - IsCloudInfra
+      - !GetAtt VpnConnectionParametersToS3Stack.Outputs.LambdaFunctionArn
+      - ""

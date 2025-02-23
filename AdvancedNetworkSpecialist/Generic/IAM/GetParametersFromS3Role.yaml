@@ -6,29 +6,31 @@ Parameters:
   # Global parameters
   Bucket:
     Default: "hawkfund-cloudformation"
-    Description: "CloudFormation bucket URL"
-    Type: String    
-  BucketKey:
-    Description: "Key to find object in the bucket"
+    Description: CloudFormation buket URL
     Type: String
-    Default: ""
+  BucketKey:
+    Default: "63_VPCPrivateLink"
+    Description: Key to find object in the bucket
+    Type: String
   BucketObject:
+    Default: "Data.json"
     Description: "File to store data in the bucket"
     Type: String
-    Default: "Data.json"
   EnvironmentName:
-    Description: "Environment name that prefix all resources"
-    Type: String
+    AllowedValues: [ "dev", "test", "prod" ]
+    ConstraintDescription: "Must specify dev, test or prod"
     Default: "dev"
-    AllowedValues:
-      - "dev"
-      - "test"
-      - "prod"
-    ConstraintDescription: Must specify dev, test or prod
+    Description: "Environment name that prefix all resources"
+    Type: String    
   ProjectName:
+    Default: "ANS"
     Description: "Project name that prefix all resources"
     Type: String
-    Default: "ANS"
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
 
 Resources:
   GetParametersFromS3Role:
@@ -43,18 +45,11 @@ Resources:
             - lambda.amazonaws.com
           Action:
           - sts:AssumeRole
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaRole
       Path: "/"
       Policies:
-      - PolicyName: AppendToLogsPolicy
-        PolicyDocument:
-          Version: '2012-10-17'
-          Statement:
-          - Effect: Allow
-            Action:
-            - logs:CreateLogGroup
-            - logs:CreateLogStream
-            - logs:PutLogEvents
-            Resource: "*"
       - PolicyName: GetParametersFromS3Policy
         PolicyDocument:
           Version: '2012-10-17'

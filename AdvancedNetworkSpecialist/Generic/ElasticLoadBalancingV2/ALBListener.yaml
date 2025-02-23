@@ -1,0 +1,104 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: This template deploy a target group
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "63_VPCPrivateLink"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: [ "dev", "test", "prod" ]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String    
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+  # Stack parameters
+  ActionTargetGroupArn:
+    Description: |
+      The Amazon Resource Name (ARN) of the target group. Specify only when
+      Type is forward and you want to route to a single target group. To route
+      to one or more target groups, use ForwardConfig instead.
+    Type: String
+  ActionType:
+    AllowedValues: [ forward, authenticate-oidc, authenticate-cognito, redirect, fixed-response ]
+    Default: forward
+    Description: The type of action.
+    Type: String
+  Name:
+    Default: "Default"
+    Description: |
+      The name of the target group. This name must be unique per region per
+      account, can have a maximum of 32 characters, must contain only
+      alphanumeric characters or hyphens, and must not begin or end with a
+      hyphen.
+    MaxLength: 32
+    Type: String
+  LoadBalancerArn:
+    Description: The Amazon Resource Name (ARN) of the load balancer.
+    Type: String
+  Port:
+    Default: 80
+    Description: |
+      The port on which the load balancer is listening. You can't specify a port for a Gateway Load Balancer.
+    MaxValue: 65535
+    MinValue: 1
+    Type: Number
+  Protocol:
+    AllowedValues: [ HTTP, HTTPS, TCP, TLS, UDP, TCP_UDP, GENEVE ]
+    Default: TCP
+    Description: |
+      The protocol for connections from clients to the load balancer. For Application Load Balancers, the supported protocols are HTTP and HTTPS. For Network Load Balancers, the supported protocols are TCP, TLS, UDP, and TCP_UDP. You can’t specify the UDP or TCP_UDP protocol if dual-stack mode is enabled. You can't specify a protocol for a Gateway Load Balancer.
+    Type: String
+
+Conditions:
+  isSavedInS3File: !Equals [ !Ref SaveInS3File, "true"]
+
+Resources:
+  Listener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: !Ref ActionType
+          TargetGroupArn: !Ref ActionTargetGroupArn
+      LoadBalancerArn: !Ref LoadBalancerArn
+      Port: !Ref Port
+      Protocol: !Ref Protocol
+
+  ListenerToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: isSavedInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:UpdateParametersFromS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:ElasticLoadBalancingV2:Listener:${Name}:Id"
+      Value: !Ref Listener
+
+Outputs:
+  ListenerId:
+    Description: "The Listener ID"
+    Value: !Ref Listener

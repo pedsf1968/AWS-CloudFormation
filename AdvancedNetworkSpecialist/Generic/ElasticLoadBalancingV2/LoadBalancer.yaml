@@ -1,0 +1,161 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: This template deploy load balancer
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "63_VPCPrivateLink"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: [ "dev", "test", "prod" ]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String    
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+  # Stack parameters
+  AccessLogsS3Enabled:
+    AllowedValues: [ "true", "false" ]
+    Default: "false"
+    Description: |
+      Indicates whether access logs are enabled. The value is true or false.
+      The default is false.
+    Type: String
+  DeletionProtectionEnabled:
+    AllowedValues: [ "true", "false" ]
+    Default: "false"
+    Description: |
+      Indicates whether deletion protection is enabled. The value is true or
+      false. The default is false.
+    Type: String
+  IpAddressType:
+    AllowedValues: [ ipv4, ipv6 ]
+    Default: ipv4
+    Description: The IP address type. The default value is ipv4.
+    Type: String
+  LoadBalancingCrossZoneEnabled:
+    AllowedValues: [ "true", "false" ]
+    Default: "false"
+    Description: |
+      Indicates whether cross-zone load balancing is enabled. The possible
+      values are true and false. The default for Network Load Balancers and
+      Gateway Load Balancers is false. The default for Application Load
+      Balancers is true, and can't be changed.
+    Type: String
+  Name:
+    Default: "Default"
+    Description: |
+      The name of the target group. This name must be unique per region per
+      account, can have a maximum of 32 characters, must contain only
+      alphanumeric characters or hyphens, and must not begin or end with a
+      hyphen.
+    MaxLength: 32
+    Type: String
+  Scheme:
+    AllowedValues: [ internet-facing, internal ]
+    Default: internet-facing
+    Description: |
+      The nodes of an Internet-facing load balancer have public IP addresses.
+      The DNS name of an Internet-facing load balancer is publicly resolvable
+      to the public IP addresses of the nodes. Therefore, Internet-facing load
+      balancers can route requests from clients over the internet.
+      The nodes of an internal load balancer have only private IP addresses.
+      The DNS name of an internal load balancer is publicly resolvable to the
+      private IP addresses of the nodes. Therefore, internal load balancers can
+      route requests only from clients with access to the VPC for the load
+      balancer. The default is an Internet-facing load balancer. 
+      You can't specify a scheme for a Gateway Load Balancer.
+    Type: String
+  SecurityGroups:
+    Default: ""
+    Description: The IDs of the security groups for the load balancer.
+    Type: CommaDelimitedList
+  Subnets:
+    Default: ""
+    Description: |
+      The IDs of the subnets. You can specify only one subnet per Availability
+      Zone. You must specify either subnets or subnet mappings, but not both.
+      To specify an Elastic IP address, specify subnet mappings instead of
+      subnets. [Application Load Balancers] You must specify subnets from at
+      least two Availability Zones. [Application Load Balancers on Outposts]
+      You must specify one Outpost subnet. [Application Load Balancers on Local
+      Zones] You can specify subnets from one or more Local Zones. [Network
+      Load Balancers and Gateway Load Balancers] You can specify subnets from
+      one or more Availability Zones.
+    Type: CommaDelimitedList
+  Type:
+    AllowedValues: [ application, network, gateway ]
+    Default: application
+    Description: The type of load balancer. The default is application.
+    Type: String
+
+Conditions:
+  isSavedInS3File: !Equals [ !Ref SaveInS3File, "true"]
+
+Resources:     
+  NetworkLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      IpAddressType: !Ref IpAddressType
+      LoadBalancerAttributes:
+        - Key: deletion_protection.enabled
+          Value: !Ref DeletionProtectionEnabled
+        - Key: access_logs.s3.enabled
+          Value: !Ref AccessLogsS3Enabled
+        - Key: load_balancing.cross_zone.enabled
+          Value: !Ref LoadBalancingCrossZoneEnabled
+      Name: !Sub "${ProjectName}-${EnvironmentName}-${Name}-NLB"
+      Scheme: !Ref Scheme
+      SecurityGroups:
+        - !Select [ 0, !Ref SecurityGroups ]
+      Subnets:
+        - !Select [ 0, !Ref Subnets ]
+      Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${Name}-NLB"
+        - Key: ProjectName
+          Value: !Ref ProjectName
+      Type: network
+
+  NetworkLoadBalancerToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: isSavedInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:UpdateParametersFromS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:ElasticLoadBalancingV2:LoadBalancer:${Name}:Id"
+      Value: !Ref NetworkLoadBalancer
+
+Outputs:
+  NetworkLoadBalancerArn:
+    Description: "ARN of the Network Load Balancer"
+    Value: !Ref NetworkLoadBalancer
+  NetworkLoadBalancerDnsName:
+    Description: "DNS name of the Network Load Balancer"
+    Value: !GetAtt NetworkLoadBalancer.DNSName

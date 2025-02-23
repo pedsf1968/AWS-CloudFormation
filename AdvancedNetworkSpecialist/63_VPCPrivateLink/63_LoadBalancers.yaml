@@ -1,0 +1,137 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template deploys load balancers
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "63_VPCPrivateLink"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: [ "dev", "test", "prod" ]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String    
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+  # Stack parameters
+  VpcId:
+    Type: String
+  NLBSubnetId:
+    Type: String
+  NLBSourceCidr:
+    Type: String
+  NLBName:
+    Type: String
+  NLBTargetIds:
+    Description: "The list of Application Instance IDs"
+    Type: CommaDelimitedList
+
+Resources:
+  # Target Group
+  TargetGroupStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/ElasticLoadBalancingV2/TargetGroup.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        InstanceIds: !Join [ ",", !Ref NLBTargetIds ]
+        InstancePort: 80
+        Name: !Ref NLBName
+        Port: 80
+        TargetType: "instance"
+        VpcId: !Ref VpcId
+
+  NLBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "Security group for ${NLBName}"
+      GroupName: !Sub "${ProjectName}-${EnvironmentName}-${NLBName}-SG"
+      SecurityGroupIngress:
+        - CidrIp: !Ref NLBSourceCidr
+          FromPort: 80
+          IpProtocol: TCP
+          ToPort: 80
+      Tags:
+        - Key: Name
+          Value: !Ref NLBName
+      VpcId: !Ref VpcId
+
+  NetworkLoadBalancerStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/ElasticLoadBalancingV2/LoadBalancer.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        Name: !Ref NLBName
+        Scheme: internal
+        Subnets: !Ref NLBSubnetId
+        Type: network
+  
+  ALBListener:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/ElasticLoadBalancingV2/ALBListener.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        ActionTargetGroupArn: !GetAtt TargetGroupStack.Outputs.TargetGroupArn
+        ActionType: forward
+        LoadBalancerArn: !GetAtt NetworkLoadBalancerStack.Outputs.NetworkLoadBalancerArn
+        Port: 80
+        Protocol: TCP
+
+Outputs:
+  TargetGroupArn:
+    Description: "The Amazon Resource Name (ARN) of the target group."
+    Value: !GetAtt TargetGroupStack.Outputs.TargetGroupArn
+  NLBSecurityGroupId:
+    Description: "Id of the NLB SecurityGroup"
+    Value: !Ref NLBSecurityGroup
+  NetworkLoadBalancerArn:
+    Description: "ARN of the Network Load Balancer"
+    Value: !GetAtt NetworkLoadBalancerStack.Outputs.NetworkLoadBalancerArn
+  NetworkLoadBalancerDns:
+    Description: "Network Load Balancer DNS"
+    Value: !GetAtt NetworkLoadBalancerStack.Outputs.NetworkLoadBalancerDnsName

@@ -6,35 +6,30 @@ Parameters:
   # Global parameters
   Bucket:
     Default: "hawkfund-cloudformation"
-    Description: "CloudFormation bucket URL"
-    Type: String    
-  BucketKey:
-    Description: "Key to find object in the bucket"
+    Description: CloudFormation buket URL
     Type: String
-    Default: ""
+  BucketKey:
+    Default: "63_VPCPrivateLink"
+    Description: Key to find object in the bucket
+    Type: String
   BucketObject:
+    Default: "Data.json"
     Description: "File to store data in the bucket"
     Type: String
-    Default: "Data.json"
   EnvironmentName:
-    Description: "Environment name that prefix all resources"
-    Type: String
+    AllowedValues: [ "dev", "test", "prod" ]
+    ConstraintDescription: "Must specify dev, test or prod"
     Default: "dev"
-    AllowedValues:
-      - "dev"
-      - "test"
-      - "prod"
-    ConstraintDescription: Must specify dev, test or prod
+    Description: "Environment name that prefix all resources"
+    Type: String    
   ProjectName:
+    Default: "ANS"
     Description: "Project name that prefix all resources"
     Type: String
-    Default: "ANS"
   SaveInS3File:
-    AllowedValues:
-      - "false"
-      - "true"
+    AllowedValues: [ "false", "true" ]
     Default: "false"
-    Description: "Backup values in file specified by Bucket and BucketKey"
+    Description: "Save resources information in s3 file"
     Type: String
 
   # Stack parameters

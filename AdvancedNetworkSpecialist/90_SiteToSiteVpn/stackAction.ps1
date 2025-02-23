@@ -7,11 +7,11 @@ param (
     [String]
     $bucket = "hawkfund-cloudformation",
     [String]
-    $bucketKey = "71_TransitGatewayFullRouting",
+    $bucketKey = "90_SiteToSiteVpn",
     [String]
-    $templateName = "71_ROOT_TransitGatewayFullRouting.yaml",
+    $templateName = "90_ROOT_SiteToSiteVpn.yaml",
     [String]
-    $stackName = "ANS-71",
+    $stackName = "ANS-90",
     [String]
     $region = "eu-west-3",
     [String]

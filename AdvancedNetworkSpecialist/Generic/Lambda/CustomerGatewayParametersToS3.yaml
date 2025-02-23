@@ -146,6 +146,6 @@ Resources:
       Runtime: python3.12
 
 Outputs:
-  UpdateParametersFromS3Arn:
+  LambdaFunctionArn:
     Description: ARN of CustomerGatewayParametersToS3 Lambda
     Value: !GetAtt CustomerGatewayParametersToS3Function.Arn    

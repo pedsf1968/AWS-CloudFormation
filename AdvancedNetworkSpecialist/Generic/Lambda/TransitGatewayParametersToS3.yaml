@@ -170,6 +170,6 @@ Resources:
       Runtime: python3.12
 
 Outputs:
-  UpdateParametersFromS3Arn:
+  LambdaFunctionArn:
     Description: "ARN of TransitGatewayParametersToS3 Lambda"
     Value: !GetAtt TransitGatewayParametersToS3Function.Arn    
