@@ -65,6 +65,6 @@ Resources:
       RoleName: GetParametersFromS3Role
 
 Outputs:
-  GetParametersFromS3RoleArn:
+  RoleArn:
     Description: "GetParametersFromS3 Lambda Role Arn"
     Value: !GetAtt GetParametersFromS3Role.Arn

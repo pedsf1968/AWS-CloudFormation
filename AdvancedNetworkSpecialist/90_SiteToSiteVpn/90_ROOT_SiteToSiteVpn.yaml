@@ -224,7 +224,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Retain
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/71_Roles.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/90_Roles.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -237,7 +237,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Retain
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/71_Lambdas.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/90_Lambdas.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -281,7 +281,7 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         DestinationCidrBlocks: !If [ IsCustomerInfra, !Ref CustomerSecurityGroupIngressCidrIp, !Ref CloudSecurityGroupIngressCidrIp]
-        Destinationtype:  !If [ IsCustomerInfra, "InternetGateway", "VirtualPrivateGateway"]
+        DestinationType:  !If [ IsCustomerInfra, "InternetGateway", "VirtualPrivateGateway"]
         GatewayId: !If [ IsCustomerInfra, !GetAtt Gateways.Outputs.InternetGatewayId, !GetAtt Gateways.Outputs.VirtualPrivateGatewayId ]
         RouteTableNames: !If [ IsCustomerInfra, "Public", "Private"]
         SubnetIds: !GetAtt VpcAndSubnets.Outputs.SubnetId

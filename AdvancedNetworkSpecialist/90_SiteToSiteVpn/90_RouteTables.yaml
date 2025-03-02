@@ -34,7 +34,7 @@ Parameters:
   DestinationCidrBlocks:
     Description: "C"
     Type: String
-  Destinationtype:
+  DestinationType:
     AllowedValues:
          - "InternetGateway"
          - "VirtualPrivateGateway"
@@ -81,8 +81,8 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
-        RouteTableId: !GetAtt SubnetRouteTableStack.Outputs.RouteTableId
         DestinationCidrBlock: !Select [ 0, !Split [ ",", !Ref DestinationCidrBlocks ] ]
-        Destinationtype: !Ref Destinationtype
+        DestinationType: !Ref DestinationType
         GatewayId: !Ref GatewayId
+        RouteTableId: !GetAtt SubnetRouteTableStack.Outputs.RouteTableId
         SaveInS3File: "true"

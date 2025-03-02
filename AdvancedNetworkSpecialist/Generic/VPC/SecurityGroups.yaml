@@ -9,7 +9,7 @@ Parameters:
     Description: CloudFormation buket URL
     Type: String
   BucketKey:
-    Default: "63_VPCPrivateLink"
+    Default: ""
     Description: Key to find object in the bucket
     Type: String
   BucketObject:
@@ -64,7 +64,7 @@ Parameters:
       Type: String
 
 Conditions:
-  isSavedInS3File: !Equals [ !Ref SaveInS3File, "true"]
+  saveInS3File: !Equals [ !Ref SaveInS3File, "true"]
 
 Resources:
   SecurityGroup:
@@ -93,7 +93,7 @@ Resources:
 
   SecurityGroupIdToS3:
     Type: AWS::CloudFormation::CustomResource
-    Condition: isSavedInS3File
+    Condition: saveInS3File
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:

@@ -75,6 +75,6 @@ Resources:
       RoleName: VpnConnectionParametersToS3Role
 
 Outputs:
-  VpnConnectionParametersToS3RoleArn:
+  RoleArn:
     Description: "VpnConnectionParametersToS3 Lambda Role Arn"
     Value: !GetAtt VpnConnectionParametersToS3Role.Arn

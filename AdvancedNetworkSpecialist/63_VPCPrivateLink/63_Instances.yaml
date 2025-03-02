@@ -79,10 +79,6 @@ Parameters:
     Type: String
 
   # WebServer parameters
-  WebServerImageId:
-    Default: ami-01dfa1f2708b3ec57
-    Description: "Instance AMI with httpd server"
-    Type: String
   WebServerInstanceName:
     Default: "WebServer"
     Description: "WebServer Instances name"
@@ -141,7 +137,7 @@ Resources:
               -e $? \
               --stack ${AWS::StackName} \
               --region ${AWS::Region} \
-              --resource AMICreate
+              --resource WaitCondition
             shutdown -h now
 
   # Create AMI from the previous Instance
@@ -162,8 +158,8 @@ Resources:
     DependsOn: CreateAmi
     Properties:
       Count: 1
-      Handle: !Ref 'WaitHandle'
-      Timeout: '150'
+      Handle: !Ref WaitHandle
+      Timeout: 150
 
   BastionInstance:
     Type: AWS::CloudFormation::Stack

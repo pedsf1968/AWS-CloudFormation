@@ -75,6 +75,6 @@ Resources:
       RoleName: CustomerTransitParametersToS3Role
 
 Outputs:
-  TransitGatewayParametersToS3RoleArn:
+  RoleArn:
     Description: "TransitGatewayParametersToS3 Lambda Role Arn"
     Value: !GetAtt TransitGatewayParametersToS3Role.Arn

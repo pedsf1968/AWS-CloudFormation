@@ -50,7 +50,7 @@ Parameters:
     Type: String    
 
 Conditions:
-  isSavedInS3File: !Equals [ !Ref SaveInS3File, "true"]
+  saveInS3File: !Equals [ !Ref SaveInS3File, "true"]
 
 Resources:
   # Virtual Private Gateway and Attachment
@@ -70,7 +70,7 @@ Resources:
 
   CustomerGatewayParametersToS3:
     Type: AWS::CloudFormation::CustomResource
-    Condition: isSavedInS3File
+    Condition: saveInS3File
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:

@@ -62,6 +62,7 @@ Resources:
 
   CreateAmiFromInstanceId:
     Type: AWS::Lambda::Function
+    DeletionPolicy: Delete
     Properties:
       Code:
         ZipFile: |
@@ -76,6 +77,7 @@ Resources:
             print("event:", event)
             instanceId =  event["ResourceProperties"]["InstanceId"]
             amiName =  event["ResourceProperties"]["Name"]
+            waitHandleUrl = event['WaitHandleUrl']
 
             # Search AMI with the same name
             filters = [
@@ -94,9 +96,9 @@ Resources:
               ec2_client.deregister_image(ImageId=image['ImageId'])
 
             try:
-              # Create AMI              
+              # Create AMI
               response = ec2_client.create_image(
-                InstanceId=instanceId,  
+                InstanceId=instanceId,
                 Name=amiName, 
                 NoReboot=True)
               response_data["ImageId"] = response["ImageId"]
@@ -116,6 +118,7 @@ Resources:
       MemorySize: 128
       Role: !Join [":", ["arn:aws:iam:", !Sub "${AWS::AccountId}", "role/CreateAmiFromInstanceIdRole" ] ]
       Runtime: python3.12
+    UpdateReplacePolicy: Delete
 
 Outputs:
   LambdaFunctionArn:

@@ -49,7 +49,6 @@ Metadata:
       - Label:
           default: "WebServer"
         Parameters:
-          - WebServerImageId
           - WebServerInstanceName
           - WebServerInstanceType
 
@@ -125,10 +124,6 @@ Parameters:
     Description: "Instance Key name"
     Type: String
     Default: "dso-paris"
-  WebServerImageId:
-    Description: "WebServer AMI with Httpd server"
-    Type: AWS::EC2::Image::Id
-    Default: ami-01dfa1f2708b3ec57
   WebServerInstanceName:
     Default: "WebServer"
     Description: "WebServer Instance name"
@@ -293,7 +288,6 @@ Resources:
         ConsumerSubnetId: !Select
           - 0
           - !Split [",", !GetAtt VpcAndSubnets.Outputs.SubnetPrivateIds]
-        WebServerImageId: !Ref WebServerImageId
         WebServerInstanceName: !Ref WebServerInstanceName
         WebServerInstanceType: !Ref WebServerInstanceType
         WebServerSecurityGroup: !GetAtt SecurityGroups.Outputs.WebServerSecurityGroupId

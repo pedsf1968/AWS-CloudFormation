@@ -66,6 +66,7 @@ Resources:
 
   TransitGatewayParametersToS3Function:
     Type: AWS::Lambda::Function
+    DeletionPolicy: Delete
     Properties:
       Code:
         ZipFile: |
@@ -168,6 +169,7 @@ Resources:
       MemorySize: 128
       Role: !Join [":", ["arn:aws:iam:", !Sub "${AWS::AccountId}", "role/TransitGatewayParametersToS3Role" ] ]
       Runtime: python3.12
+    UpdateReplacePolicy: Delete
 
 Outputs:
   LambdaFunctionArn:

@@ -9,7 +9,7 @@ Parameters:
     Description: CloudFormation buket URL
     Type: String
   BucketKey:
-    Default: "63_VPCPrivateLink"
+    Default: ""
     Description: Key to find object in the bucket
     Type: String
   BucketObject:
@@ -34,66 +34,76 @@ Parameters:
 
   # Stack parameters
   DestinationCidrBlock:
+    Default: ""
     Description: "The IPv4 CIDR address block used for the destination match."
     Type: String
+  DestinationPrefixListId:
     Default: ""
-  Destinationtype:
-    Description: "The destination type of the route"
+    Description: "The ID of a prefix list used for the destination match."
     Type: String
-    Default: "InternetGateway"
+  DestinationType:
     AllowedValues:
+         - "Instance"
          - "InternetGateway"
          - "TransitGateway"
          - "VirtualPrivateGateway"
+    Default: "InternetGateway"
+    Description: "The destination type of the route"
+    Type: String
   GatewayId:
+    Default: ""
     Description: "The ID of an internet gateway or virtual private gateway attached to your VPC."
     Type: String
+  InstanceId:
     Default: ""
+    Description: "The ID of a NAT instance in your VPC. The operation fails if you specify an instance ID unless exactly one network interface is attached."
+    Type: String
   RouteTableId:
     Description: "The ID of the route table for the route."
     Type: String
   TransitGatewayId:
+    Default: ""
     Description: "The ID of a transit gateway."
     Type: String
-    Default: ""
-  
+
 Conditions:
-  
-  isInternetOrVirtualPrivateGatewayType: !Or
-    - !Equals [ !Ref Destinationtype, "InternetGateway" ]
-    - !Equals [ !Ref Destinationtype, "VirtualPrivateGateway" ]
-  isSavedInS3File: !Equals [ !Ref SaveInS3File, "true"]    
-  isTransitGatewayType: !Equals [ !Ref Destinationtype, "TransitGateway" ]
-  isVirtualPrivateGatewayType: !Equals [ !Ref Destinationtype, "VirtualPrivateGateway" ]
+  isInstanceType: !Equals [ !Ref DestinationType, "Instance" ]
+  isGatewayType: !Or
+    - !Equals [ !Ref DestinationType, "InternetGateway" ]
+    - !Equals [ !Ref DestinationType, "VirtualPrivateGateway" ]
+  isTransitGatewayType: !Equals [ !Ref DestinationType, "TransitGateway" ]
+  isVirtualPrivateGatewayType: !Equals [ !Ref DestinationType, "VirtualPrivateGateway" ]
+  saveGatewayTypeInS3File: !And
+    - !Or
+      - !Equals [ !Ref DestinationType, "InternetGateway" ]
+      - !Equals [ !Ref DestinationType, "VirtualPrivateGateway" ]
+    - !Equals [ !Ref SaveInS3File, "true"]
+  saveTransitGatewayTypeInS3File: !And
+    - !Equals [ !Ref DestinationType, "TransitGateway" ]
+    - !Equals [ !Ref SaveInS3File, "true"]
+  saveInstanceTypeInS3File: !And
+    - !Equals [ !Ref DestinationType, "Instance" ]
+    - !Equals [ !Ref SaveInS3File, "true"]
+  useDestinationPrefixListId:
+    !Not [ !Equals [ !Ref DestinationPrefixListId, "" ] ]
 
-Resources:  
-  InternetOrVirtualPrivateGatewayRoute:
+Resources:
+  # Route to Instance
+  InstanceRoute:
     Type: AWS::EC2::Route
-    Condition: isInternetOrVirtualPrivateGatewayType
+    Condition: isInstanceType
     Properties:
       DestinationCidrBlock: !Ref DestinationCidrBlock
-      GatewayId: !Ref GatewayId
+      DestinationPrefixListId: !If 
+        - useDestinationPrefixListId
+        - !Ref DestinationPrefixListId
+        - !Ref AWS::NoValue
+      InstanceId: !Ref InstanceId
       RouteTableId: !Ref RouteTableId
 
-  InternetOrVirtualPrivateGatewayRoutePropagation:
-    Type: AWS::EC2::VPNGatewayRoutePropagation
-    Condition: isVirtualPrivateGatewayType
-    Properties:
-      RouteTableIds: 
-        - !Ref RouteTableId
-      VpnGatewayId: !Ref InternetOrVirtualPrivateGatewayRoute
-
-  TransitGatewayRoute:
-    Type: AWS::EC2::Route
-    Condition: isTransitGatewayType
-    Properties:
-      DestinationCidrBlock: !Ref DestinationCidrBlock
-      RouteTableId: !Ref RouteTableId
-      TransitGatewayId: !Ref TransitGatewayId
-      
-  GatewayIdToS3:
+  InstanceRouteIdToS3:
     Type: AWS::CloudFormation::CustomResource
-    Condition: isSavedInS3File
+    Condition: saveInstanceTypeInS3File 
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
@@ -102,10 +112,78 @@ Resources:
       Bucket: !Ref Bucket
       BucketKey: !Ref BucketKey
       BucketObject: !Ref BucketObject
-      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:Route:${Destinationtype}:Id"
-      Value: !If [  isInternetOrVirtualPrivateGatewayType, !Ref InternetOrVirtualPrivateGatewayRoute, !Ref TransitGatewayRoute ]
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:Route:${DestinationType}:Id"
+      Value: !Ref InstanceRoute
+
+  # Route to Internet Gateway or Private Gateway
+  GatewayRoute:
+    Type: AWS::EC2::Route
+    Condition: isGatewayType
+    Properties:
+      DestinationCidrBlock: !Ref DestinationCidrBlock
+      DestinationPrefixListId: !If 
+        - useDestinationPrefixListId
+        - !Ref DestinationPrefixListId
+        - !Ref AWS::NoValue
+      GatewayId: !Ref GatewayId
+      RouteTableId: !Ref RouteTableId
+
+  GatewayRoutePropagation:
+    Type: AWS::EC2::VPNGatewayRoutePropagation
+    Condition: isVirtualPrivateGatewayType
+    Properties:
+      RouteTableIds: 
+        - !Ref RouteTableId
+      VpnGatewayId: !Ref GatewayId
+
+  GatewayRouteIdToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: saveGatewayTypeInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:UpdateParametersFromS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:Route:${DestinationType}:Id"
+      Value: !Ref GatewayRoute
+
+# Route to Transit Gateway
+  TransitGatewayRoute:
+    Type: AWS::EC2::Route
+    Condition: isTransitGatewayType
+    Properties:
+      DestinationCidrBlock: !Ref DestinationCidrBlock
+      DestinationPrefixListId: !If 
+        - useDestinationPrefixListId
+        - !Ref DestinationPrefixListId
+        - !Ref AWS::NoValue
+      RouteTableId: !Ref RouteTableId
+      TransitGatewayId: !Ref TransitGatewayId
+
+  TransitGatewayRouteIdToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: saveTransitGatewayTypeInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:UpdateParametersFromS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:Route:${DestinationType}:Id"
+      Value: !Ref TransitGatewayRoute
 
 Outputs:
-  RouteId:
-    Description: "ID of the Route"
-    Value: !If [  isInternetOrVirtualPrivateGatewayType, !Ref InternetOrVirtualPrivateGatewayRoute, !Ref TransitGatewayRoute ]
+  InstanceRouteId:
+    Description: "ID of the Instance Route"
+    Value: !If [ isInstanceType, !Ref InstanceRoute, ""]
+  GatewayRouteId:
+    Description: "ID of the Instance Route"
+    Value: !If [ isGatewayType, !Ref GatewayRoute, ""]
+  TransitGatewayRouteId:
+    Description: "ID of the Transit Gateway Route"
+    Value: !If [ isTransitGatewayType, !Ref TransitGatewayRoute, ""]

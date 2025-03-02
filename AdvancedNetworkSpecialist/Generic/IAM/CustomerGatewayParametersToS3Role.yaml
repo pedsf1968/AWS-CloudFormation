@@ -75,6 +75,6 @@ Resources:
       RoleName: CustomerGatewayParametersToS3Role
 
 Outputs:
-  CustomerGatewayParametersToS3Arn:
+  RoleArn:
     Description: "CustomerGatewayParametersToS3 Lambda Role Arn"
     Value: !GetAtt CustomerGatewayParametersToS3Role.Arn
