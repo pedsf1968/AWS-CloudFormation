@@ -87,7 +87,7 @@ Resources:
         ProjectName: !Ref ProjectName
         RouteTableId: !GetAtt SubnetAPublicRouteTableStack.Outputs.RouteTableId
         DestinationCidrBlock: "0.0.0.0/0"
-        Destinationtype: "InternetGateway"
+        DestinationType: "InternetGateway"
         GatewayId: !Ref InternetGatewayId
         SaveInS3File: "true"
 
@@ -124,7 +124,7 @@ Resources:
         ProjectName: !Ref ProjectName
         RouteTableId: !GetAtt SubnetAPrivateRouteTableStack.Outputs.RouteTableId
         DestinationCidrBlock: !Ref DestinationCidrBlock
-        Destinationtype: "TransitGateway"
+        DestinationType: "TransitGateway"
         SaveInS3File: "true"
         TransitGatewayId: !Ref TransitGatewayId
 
@@ -161,7 +161,7 @@ Resources:
         ProjectName: !Ref ProjectName
         RouteTableId: !GetAtt SubnetBPrivateRouteTableStack.Outputs.RouteTableId
         DestinationCidrBlock: !Ref DestinationCidrBlock
-        Destinationtype: "TransitGateway"
+        DestinationType: "TransitGateway"
         SaveInS3File: "true"
         TransitGatewayId: !Ref TransitGatewayId
 
@@ -198,18 +198,18 @@ Resources:
         ProjectName: !Ref ProjectName
         RouteTableId: !GetAtt SubnetCPrivateRouteTableStack.Outputs.RouteTableId
         DestinationCidrBlock: !Ref DestinationCidrBlock
-        Destinationtype: "TransitGateway"
+        DestinationType: "TransitGateway"
         SaveInS3File: "true"
         TransitGatewayId: !Ref TransitGatewayId
 
 Outputs:
-  SubnetPrivateRouteIds:
-    Description: "Private Subnet Route IDs"
+  SubnetPrivateRouteTableIds:
+    Description: "Private Subnet Route Table IDs"
     Value: !Join
       - ","
-      - - !GetAtt SubnetAPrivateRouteStack.Outputs.RouteId
-        - !GetAtt SubnetBPrivateRouteStack.Outputs.RouteId
-        - !GetAtt SubnetCPrivateRouteStack.Outputs.RouteId
+      - - !GetAtt SubnetAPrivateRouteTableStack.Outputs.RouteTableId
+        - !GetAtt SubnetBPrivateRouteTableStack.Outputs.RouteTableId
+        - !GetAtt SubnetCPrivateRouteTableStack.Outputs.RouteTableId
 
   SubnetPrivateRouteTableAssociationIds:
     Description: "Private Route Table Association IDs"
@@ -219,22 +219,22 @@ Outputs:
         - !GetAtt SubnetBPrivateRouteTableStack.Outputs.SubnetRouteTableAssociationId
         - !GetAtt SubnetCPrivateRouteTableStack.Outputs.SubnetRouteTableAssociationId
 
-  SubnetPrivateRouteTableIds:
-    Description: "Private Subnet Route Table IDs"
-    Value: !Join
-      - ","
-      - - !GetAtt SubnetAPrivateRouteTableStack.Outputs.RouteTableId
-        - !GetAtt SubnetBPrivateRouteTableStack.Outputs.RouteTableId
-        - !GetAtt SubnetCPrivateRouteTableStack.Outputs.RouteTableId
-
-  SubnetPublicRouteIds:
-    Description: "Public Subnet Route IDs"
-    Value: !GetAtt SubnetAPublicRouteStack.Outputs.RouteId
-
   SubnetPublicRouteTableIds:
-    Description: "Public Subnet Route Table IDs"
+    Description: "Public Subnet Route IDs"
     Value: !GetAtt SubnetAPublicRouteTableStack.Outputs.RouteTableId
 
   SubnetPublicRouteTableAssociationIds:
     Description: "Public Route Table Association IDs"
     Value: !GetAtt SubnetAPublicRouteTableStack.Outputs.SubnetRouteTableAssociationId
+
+  GatewayRouteIds:
+    Description: "Gateway Route IDs"
+    Value: !GetAtt SubnetAPublicRouteStack.Outputs.GatewayRouteId
+
+  TransitGatewayRouteIds:
+    Description: "Transit Gateway Route IDs"
+    Value: !Join
+      - ","
+      - - !GetAtt SubnetAPrivateRouteStack.Outputs.TransitGatewayRouteId
+        - !GetAtt SubnetBPrivateRouteStack.Outputs.TransitGatewayRouteId
+        - !GetAtt SubnetCPrivateRouteStack.Outputs.TransitGatewayRouteId
