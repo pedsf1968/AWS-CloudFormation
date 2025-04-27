@@ -1,0 +1,166 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  "This template for creating a Role and Profile for instance"
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "Datas"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: [ "dev", "test", "prod" ]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String    
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+  
+  # Stack parameters
+  InstanceProfileName:
+    Default: "Instance-Profile"
+    Description: |
+      "The name of the instance profile to create."
+    Type: String
+  InstanceProfilePath:
+    Default: "/"
+    Description: |
+      "The path to the instance profile. For more information about paths, see IAM Identifiers in the IAM User Guide."
+    Type: String
+  RoleName:
+    Default: "Instance-Role"
+    Description: |
+      "The name of the instance profile to create."
+    Type: String
+  RolePath:
+    Default: "/"
+    Description: |
+      "The path to the instance profile. For more information about paths, see IAM Identifiers in the IAM User Guide."
+    Type: String
+
+Conditions:
+  saveInS3File: !Equals [ !Ref SaveInS3File, "true"]
+
+Resources:
+  SSMInstanceRole: 
+    Type : AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Effect: "Allow"
+          Principal:
+            Service:
+            - "ec2.amazonaws.com"
+            - "ssm.amazonaws.com"
+          Action: "sts:AssumeRole"
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore'
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/CloudWatchAgentServerPolicy'
+      Path: !Ref RolePath
+      Policies:
+        - PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                  - s3:GetObject
+                Resource: 
+                  - !Sub 'arn:aws:s3:::aws-ssm-${AWS::Region}/*'
+                  - !Sub 'arn:aws:s3:::aws-windows-downloads-${AWS::Region}/*'
+                  - !Sub 'arn:aws:s3:::amazon-ssm-${AWS::Region}/*'
+                  - !Sub 'arn:aws:s3:::amazon-ssm-packages-${AWS::Region}/*'
+                  - !Sub 'arn:aws:s3:::${AWS::Region}-birdwatcher-prod/*'
+                  - !Sub 'arn:aws:s3:::patch-baseline-snapshot-${AWS::Region}/*'
+                Effect: Allow
+          PolicyName: ssm-custom-s3-policy
+        - PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:PutObjectAcl
+                  - s3:ListBucket
+                Resource: 
+                  - !Sub 'arn:${AWS::Partition}:s3:::${Bucket}/*'
+                  - !Sub 'arn:${AWS::Partition}:s3:::${Bucket}'
+                Effect: Allow
+          PolicyName: s3-instance-bucket-policy
+      RoleName: !Ref RoleName
+      Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value:  !Sub "${ProjectName}-${EnvironmentName}-${RoleName}-Role"
+        - Key: ProjectName
+          Value: !Ref ProjectName
+
+  InstanceRoleToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: saveInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:IAMResourceToS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Region: !Ref AWS::Region
+      ResourceType: "Role"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:IAM:Role:${RoleName}"
+      Value: !Ref SSMInstanceRole
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties: 
+      InstanceProfileName: !Ref InstanceProfileName
+      Path: !Ref InstanceProfilePath
+      Roles: 
+       - !Ref SSMInstanceRole
+
+  InstanceProfileToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: saveInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:IAMResourceToS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Region: !Ref AWS::Region
+      ResourceType: "InstanceProfile"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:IAM:InstanceProfile:${InstanceProfileName}"
+      Value: !Ref InstanceProfile
+
+Outputs:
+  RoleArn:
+    Description: "SSM Instance Role ARN"
+    Value: !GetAtt SSMInstanceRole.Arn
+  RoleId:
+    Description: "SSM Instance Role ID"
+    Value: !Ref SSMInstanceRole
+  InstanceProfileArn:
+    Description: "Instance Profile ARN"
+    Value: !GetAtt InstanceProfile.Arn
+  InstanceProfileId:
+    Description: "Instance Profile ID"
+    Value: !Ref InstanceProfile

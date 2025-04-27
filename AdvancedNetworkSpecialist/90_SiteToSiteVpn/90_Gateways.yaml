@@ -29,6 +29,11 @@ Parameters:
     Default: "ANS"
     Description: "Project name that prefix all resources"
     Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
 
   # Stack parameters
   CgwName:
@@ -91,20 +96,22 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         Name: !Ref IgwName
-        SaveInS3File: "true"
         VpcId: !Ref IgwVpcId
 
   GetCgwIpAddress:
     Type: AWS::CloudFormation::CustomResource
     Condition: IsEuCentral1
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:GetParametersFromS3"]]
       ServiceTimeout: 60
       Bucket: !Ref Bucket
       BucketKey: !Ref BucketKey
       BucketObject: !Ref BucketObject
-      Key: !Join [ ":", [ !Ref RemoteRegion, !Ref ProjectName, !Ref EnvironmentName, "EC2:Instance", !Ref CustomerInstanceName,"PublicIp"]]
+      Key: !Join [ ":", [ !Ref RemoteRegion, !Ref ProjectName, !Ref EnvironmentName, "EC2:Instance", !Ref CustomerInstanceName,"NetworkInterfaces:0:Association:PublicIp"]]
 
   CustomerGatewayStack:
     Type: AWS::CloudFormation::Stack
@@ -120,9 +127,9 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         IpAddress: !GetAtt GetCgwIpAddress.Value
         Name: !Ref CgwName
-        SaveInS3File: "true"
 
   VirtualPrivateGatewayStack:
     Type: AWS::CloudFormation::Stack
@@ -138,8 +145,8 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         Name: !Ref VpgwName
-        SaveInS3File: "true"
         VpcId: !Ref VpgwVpcId
 
   SiteToSiteVpnConnection:
@@ -156,11 +163,11 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         CustomerGatewayId: !GetAtt CustomerGatewayStack.Outputs.CustomerGatewayId
         Name: !Ref StsVpnName
         LocalIpv4NetworkCidr: !Ref StsVpnLocalIpv4NetworkCidr
         RemoteIpv4NetworkCidr: !Ref StsVpnRemoteIpv4NetworkCidr
-        SaveInS3File: "true"
         VpnGatewayId: !GetAtt VirtualPrivateGatewayStack.Outputs.VirtualPrivateGatewayId
 
 Outputs:

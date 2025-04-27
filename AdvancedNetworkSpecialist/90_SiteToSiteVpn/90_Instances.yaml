@@ -29,14 +29,15 @@ Parameters:
     Description: "Project name that prefix all resources"
     Type: String
     Default: "ANS"
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
 
   # Stack parameters
   AvailabilityZone:
     Description: "AZ of the Instance"
-    Type: String
-  IamInstanceProfile:
-    Default: ""
-    Description: "Instance Profile ARN"
     Type: String
   ImageId:
     Description: "Instance AMI"
@@ -44,6 +45,10 @@ Parameters:
   InstanceName:
     Description: "Instance name"
     Type: String
+  IamInstanceProfile: 
+    Default: ""
+    Description: "Instance Profile"
+    Type: String   
   InstanceType:
     Description: "Instance type"
     Type: String
@@ -74,6 +79,7 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Ref AvailabilityZone
         ElasticIP: !If 
           - IsEuWest3
@@ -84,45 +90,30 @@ Resources:
         IamInstanceProfile: !Ref IamInstanceProfile
         InstanceType: !Ref InstanceType
         KeyName: !Ref KeyName
-        SaveInS3File: "true"
         SecurityGroup: !Ref SecurityGroup
         SourceDestCheck:  !If 
           - IsEuWest3
           - "false"
           - "true"
         SubnetId: !Ref SubnetId
-        UserData: !If 
-          - IsEuWest3
-          - Fn::Base64: |
-              #!/bin/bash
-              # Configure fedora repository
-              cat << EOF > /etc/yum.repos.d/fedora.repo
-              [fedora] 
-              name=Fedora 36 - $basearch
-              #baseurl=http://download.example/pub/fedora/linux/releases/36/Everything/$basearch/os/ 
-              metalink=https://mirrors.fedoraproject.org/metalink?repo=fedora-36&arch=$basearch 
-              enabled=0 
-              countme=1 
-              metadata_expire=7d 
-              repo_gpgcheck=0 
-              type=rpm 
-              gpgcheck=1 
-              gpgkey=https://getfedora.org/static/fedora.gpg 
-              skip_if_unavailable=False
-              EOF
-              
-              # Install libreswan
-              dnf install libreswan -y
+        UserData: 
+          !Base64 |
+            #!/bin/bash
 
-              # Configure ip filters
-              cat << EOF > /etc/sysctl.conf
-              net.ipv4.ip_forward = 1 
-              net.ipv4.conf.default.rp_filter = 0 
-              net.ipv4.conf.default.accept_source_route = 0
-              EOF
-              sysctl -p
-          - ""
+            # Install SSM Agent based on OS (you might need logic to detect OS)
+            if grep -q "amzn" /etc/os-release; then
+              yum update -y
+              amazon-linux-extras install -y aws-ssm-agent
+            elif grep -q "Ubuntu" /etc/os-release; then
+              apt update -y
+              apt install -y aws-ssm-agent
+            elif grep -q "CentOS" /etc/os-release || grep -q "Red Hat" /etc/os-release; then
+              yum update -y
+              yum install -y amazon-ssm-agent
+            fi
 
+            systemctl enable amazon-ssm-agent
+            systemctl start amazon-ssm-agent
 
 Outputs:
   InstanceId:

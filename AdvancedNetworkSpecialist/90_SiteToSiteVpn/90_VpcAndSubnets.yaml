@@ -29,6 +29,11 @@ Parameters:
     Default: "ANS"
     Description: "Project name that prefix all resources"
     Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
   
 # Stack parameters
   AvailabilityZone:
@@ -68,8 +73,8 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         CidrBlock: !Ref VpcCidrBlock
-        SaveInS3File: "true"
         VpcName: !Ref VpcName
 
   SubnetStack:
@@ -85,10 +90,10 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Ref AvailabilityZone
         CidrBlock: !Ref SubnetCidrBlock
         MapPublicIpOnLaunch: !Ref SubnetMapPublicIpOnLaunch
-        SaveInS3File: "true"
         SubnetName: !Ref SubnetName
         VpcId: !GetAtt VpcStack.Outputs.VpcId
 

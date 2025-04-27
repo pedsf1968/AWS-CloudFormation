@@ -29,102 +29,40 @@ Parameters:
     Description: "Project name that prefix all resources"
     Type: String
     Default: "ANS"
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
 
 Resources:
-  CustomerGatewayParametersToS3RoleStack:
+  InstanceRoleStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/IAM/CustomerGatewayParametersToS3Role.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/IAM/InstanceRole.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
         BucketKey: !Ref BucketKey
         BucketObject: !Ref BucketObject
-
-  GetParametersFromS3RoleStack:
-    Type: AWS::CloudFormation::Stack
-    DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
-    Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/IAM/GetParametersFromS3Role.yaml"
-      TimeoutInMinutes: 5
-      Parameters:
-        Bucket: !Ref Bucket
-        BucketKey: !Ref BucketKey
-        BucketObject: !Ref BucketObject
-
-  UpdateParametersFromS3RoleStack:
-    Type: AWS::CloudFormation::Stack
-    DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
-    Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/IAM/UpdateParametersFromS3Role.yaml"
-      TimeoutInMinutes: 5
-      Parameters:
-        Bucket: !Ref Bucket
-        BucketKey: !Ref BucketKey
-        BucketObject: !Ref BucketObject
-
-  VpnConnectionParametersToS3RoleStack:
-    Type: AWS::CloudFormation::Stack
-    DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
-    Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/IAM/VpnConnectionParametersToS3Role.yaml"
-      TimeoutInMinutes: 5
-      Parameters:
-        Bucket: !Ref Bucket
-        BucketKey: !Ref BucketKey
-        BucketObject: !Ref BucketObject
-
-  InstanceProfile:
-    Type: AWS::IAM::InstanceProfile
-    DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
-    Properties:
-      InstanceProfileName: !Sub "${ProjectName}-${EnvironmentName}-InstanceProfile"
-      Path: "/"
-      Roles: 
-        - Ref: AmazonSSMManagedInstanceCoreRole
-
-  AmazonSSMManagedInstanceCoreRole:
-    Type: AWS::IAM::Role
-    DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - ec2.amazonaws.com
-            Action:
-              - "sts:AssumeRole"
-      Path: "/"
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
-      RoleName: "AmazonSSMManagedInstanceCore-Role"
-      Tags:
-        - Key: Name
-          Value: "AmazonSSMManagedInstanceCore-Role"
+        InstanceProfileName: Private-Instance-Profile
+        RoleName: Private-Instance-Role
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
 
 Outputs:
+  InstanceRoleArn:
+    Description: "Instance Role ARN"
+    Value: !GetAtt InstanceRoleStack.Outputs.RoleArn
+  InstanceRoleId:
+    Description: "Instance Role ID"
+    Value: !GetAtt InstanceRoleStack.Outputs.RoleId
+  InstanceProfileArn:
+    Description: "Instance Profile ARN"
+    Value: !GetAtt InstanceRoleStack.Outputs.InstanceProfileArn
   InstanceProfileId:
-    Description: "Instance Profile Id"
-    Value: !Ref InstanceProfile
-
-  CustomerGatewayParametersToS3RoleArn:
-    Description: "CustomerGatewayParametersToS3Role Lambda Role Arn"
-    Value: !GetAtt CustomerGatewayParametersToS3RoleStack.Outputs.RoleArn
-  GetParametersFromS3RoleArn:
-    Description: "GetParametersFromS3Role Lambda Role Arn"
-    Value: !GetAtt GetParametersFromS3RoleStack.Outputs.RoleArn
-  UpdateParametersFromS3RoleArn:
-    Description: "UpdateParametersFromS3 Lambda Role Arn"
-    Value: !GetAtt UpdateParametersFromS3RoleStack.Outputs.RoleArn
-  VpnConnectionParametersToS3RoleArn:
-    Description: "VpnConnectionParametersToS3Role Lambda Role Arn"
-    Value: !GetAtt VpnConnectionParametersToS3RoleStack.Outputs.RoleArn
+    Description: "Instance Profile ID"
+    Value: !GetAtt InstanceRoleStack.Outputs.InstanceProfileId

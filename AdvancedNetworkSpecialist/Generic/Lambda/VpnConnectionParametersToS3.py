@@ -13,7 +13,7 @@ ec2_client = boto3.client('ec2', region_name='eu-central-1')
 def get_node(my_dict, paths) -> dict:
   for key in paths:
       my_dict = my_dict.setdefault(key)
-  return my_dict   
+  return my_dict
 
 value = None
 

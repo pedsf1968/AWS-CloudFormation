@@ -68,33 +68,21 @@ Resources:
       VpcId: !Ref VpcId
       VpnGatewayId: !Ref VirtualPrivateGateway
 
-  VirtualPrivateGatewayIdToS3:
+  VirtualPrivateGatewayToS3:
     Type: AWS::CloudFormation::CustomResource
     Condition: saveInS3File
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:UpdateParametersFromS3"
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:EC2ResourceToS3"]]
       ServiceTimeout: 60
       Bucket: !Ref Bucket
       BucketKey: !Ref BucketKey
       BucketObject: !Ref BucketObject
-      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:VPNGateway:${Name}:Id"
+      Region: !Ref AWS::Region
+      ResourceType: "VpnGateway"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:VpnGateway:${Name}"
       Value: !Ref VirtualPrivateGateway
-
-  VirtualPrivateGatewayAttachmentIdToS3:
-    Type: AWS::CloudFormation::CustomResource
-    Condition: saveInS3File
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
-    Properties:
-      ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:UpdateParametersFromS3"
-      ServiceTimeout: 60
-      Bucket: !Ref Bucket
-      BucketKey: !Ref BucketKey
-      BucketObject: !Ref BucketObject
-      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:VPCGatewayAttachment:${Name}:Id"
-      Value: !Ref VirtualPrivateGatewayAttachment
 
 Outputs:
   VirtualPrivateGatewayId:

@@ -29,6 +29,11 @@ Parameters:
     Description: "Project name that prefix all resources"
     Type: String
     Default: "ANS"
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
 
   # Stack parameters
   CustomerInstanceName:
@@ -52,11 +57,34 @@ Parameters:
     Default: "Site2Site"
     Description: "The VPN Site to Site name"
     Type: String
+  OutputS3BucketName:
+    Description: "The Bucket name for logs"
+    Type: String
+  OutputS3KeyPrefix:
+    Default: "logs/"
+    Description: "Logs prefix"
+    Type: String
 
 Conditions:
   IsEuWest3: !Equals [!Ref "AWS::Region", "eu-west-3" ]
 
 Resources:
+  LibreswanInstallSSMDocument:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/SSM/LibreswanInstallSSMDocument.yaml"
+      TimeoutInMinutes: 10
+
+  LibreswanConfigureSSMDocument:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/SSM/LibreswanConfigureSSMDocument.yaml"
+      TimeoutInMinutes: 10 
+
   GetIpsecLeftId:
     Type: AWS::CloudFormation::CustomResource
     Condition: IsEuWest3
@@ -66,7 +94,7 @@ Resources:
       Bucket: !Ref Bucket
       BucketKey: !Ref BucketKey
       BucketObject: !Ref BucketObject
-      Key: !Join [ ":", [ !Sub "${AWS::Region}", !Ref ProjectName, !Ref EnvironmentName, "EC2:Instance", !Ref CustomerInstanceName,"PublicIp"]]
+      Key: !Join [ ":", [ !Sub "${AWS::Region}", !Ref ProjectName, !Ref EnvironmentName, "EC2:Instance", !Ref CustomerInstanceName,"PublicIpAddress"]]
 
   GetIpsecRightId:
     Type: AWS::CloudFormation::CustomResource
@@ -77,7 +105,7 @@ Resources:
       Bucket: !Ref Bucket
       BucketKey: !Ref BucketKey
       BucketObject: !Ref BucketObject
-      Key: !Join [ ":", [ !Ref RemoteRegion, !Ref ProjectName, !Ref EnvironmentName, "EC2:VPNConnection", !Ref StsVpnName, "OutsideIpAddress1"]]
+      Key: !Join [ ":", [ !Ref RemoteRegion, !Ref ProjectName, !Ref EnvironmentName, "EC2:VpnConnection", !Ref StsVpnName, "Options:TunnelOptions:0:OutsideIpAddress"]]
 
   GetIpsecSecret:
     Type: AWS::CloudFormation::CustomResource
@@ -88,94 +116,45 @@ Resources:
       Bucket: !Ref Bucket
       BucketKey: !Ref BucketKey
       BucketObject: !Ref BucketObject
-      Key: !Join [ ":", [ !Ref RemoteRegion, !Ref ProjectName, !Ref EnvironmentName, "EC2:VPNConnection", !Ref StsVpnName, "PreSharedKey1"]]
+      Key: !Join [ ":", [ !Ref RemoteRegion, !Ref ProjectName, !Ref EnvironmentName, "EC2:VpnConnection", !Ref StsVpnName, "Options:TunnelOptions:0:PreSharedKey"]]
 
-  document: 
-    Type: AWS::SSM::Document
-    Condition: IsEuWest3
-    Properties:
-      Content:
-        schemaVersion: "2.2"
-        description: "Configure IPSEC connection on instance."
-        parameters:
-          IpsecLeftId:
-            type: String
-            description: "Id of the left IPSEC"
-            default: ''
-          IpsecRightId:
-            type: String
-            description: "Id of the right IPSEC"
-            default: ''
-          IpsecLeftCidr:
-            type: String
-            description: "CIDR of the left IPSEC"
-            default: ''
-          IpsecRightCidr:
-            type: String
-            description: "CIDR of the right IPSEC"
-            default: ''
-          IpsecSecret:
-            type: String
-            description: "Secret of the IPSEC"
-            default: ''
-        mainSteps:
-        - name: IpsecConfiguration
-          action: aws:runShellScript
-          inputs:
-            timeoutSeconds: '60'
-            runCommand:
-              - |
-                  cat << EOF > /etc/ipsec.d/aws.conf
-                  conn Tunnel1
-                    authby=secret
-                    auto=start
-                    left=%defaultroute
-                    leftid={{IpsecLeftId}}
-                    right={{IpsecRightId}}
-                    type=tunnel
-                    ikelifetime=8h
-                    keylife=1h
-                    phase2alg=aes256-sha1;modp2048
-                    ike=aes256-sha1;modp2048
-                    keyingtries=%forever
-                    keyexchange=ike
-                    leftsubnet={{IpsecLeftCidr}}
-                    rightsubnet={{IpsecRightCidr}}
-                    dpddelay=10
-                    dpdtimeout=30
-                    dpdaction=restart_by_peer
-                    encapsulation=yes
-                  EOF
-        - name: IpsecSecret
-          action: aws:runShellScript          
-          inputs:
-            timeoutSeconds: '60'
-            runCommand:
-              - |
-                  cat << EOF > /etc/ipsec.d/aws.secrets
-                  {{IpsecLeftId}} {{IpsecRightId}}: PSK "{{IpsecSecret}}"
-                  EOF
-        - name: IpsecStart
-          action: aws:runShellScript          
-          inputs:
-            timeoutSeconds: '60'
-            runCommand:
-              - systemctl start ipsec.service
-      DocumentFormat: YAML
-      DocumentType: Command
-      Name: ConfigureIpsecDocument
-      TargetType: "/AWS::EC2::Instance"
 
-  SpecificInstanceIdAssociation:
+  LibreswanInstallSSMAssociation:
     Type: AWS::SSM::Association
     Condition: IsEuWest3
+    DependsOn:
+      - LibreswanInstallSSMDocument
     Properties:
-      Name: ConfigureIpsecDocument
+      AssociationName: LibreswanInstallSSMAssociation
+      Name: LibreswanInstallSSMDocument
       Targets:
       - Key: InstanceIds
         Values:
         - !Ref InstanceId
-      Parameters:           
+      OutputLocation:
+        S3Location: 
+          OutputS3BucketName: !Ref OutputS3BucketName
+          OutputS3KeyPrefix: !Ref OutputS3KeyPrefix
+
+  LibreswanConfigureSSMAssociation:
+    Type: AWS::SSM::Association
+    Condition: IsEuWest3
+    DependsOn:
+      - LibreswanInstallSSMDocument
+      - LibreswanInstallSSMAssociation
+      - LibreswanConfigureSSMDocument
+    Properties:
+      AssociationName: LibreswanConfigureSSMAssociation
+      Name: LibreswanConfigureSSMDocument
+      Targets:
+      - Key: InstanceIds
+        Values:
+        - !Ref InstanceId
+      OutputLocation:
+        S3Location: 
+          OutputS3BucketName: !Ref OutputS3BucketName
+          OutputS3KeyPrefix: !Ref OutputS3KeyPrefix
+      Parameters:
         IpsecLeftId: 
           - !GetAtt GetIpsecLeftId.Value
         IpsecRightId: 
@@ -187,5 +166,33 @@ Resources:
         IpsecSecret: 
           - !GetAtt GetIpsecSecret.Value
 
-            
-
+Outputs:
+  IpsecLeftId:
+    Description: "Id of the left IPSEC"
+    Value: !If 
+      - IsEuWest3
+      - !GetAtt GetIpsecLeftId.Value
+      - ""
+    Export:
+      Name: !Join [ ":", [ !Sub "${AWS::Region}", !Ref ProjectName, !Ref EnvironmentName, "EC2:Instance", !Ref CustomerInstanceName,"NetworkInterfaces:PublicIp"]]
+  IpsecRightId:
+    Description: "Id of the right IPSEC"
+    Value: !If 
+      - IsEuWest3
+      - !GetAtt GetIpsecRightId.Value
+      - ""
+    Export:
+      Name: !Join [ ":", [ !Ref RemoteRegion, !Ref ProjectName, !Ref EnvironmentName, "EC2:VPNConnection", !Ref StsVpnName, "Options:TunnelOptions:0:OutsideIpAddress"]]
+  IpsecRightCidr:
+    Description: "CIDR of the right IPSEC"
+    Value: !Ref IpsecRightCidr
+    Export:
+      Name: !Join [ ":", [ !Ref RemoteRegion, !Ref ProjectName, !Ref EnvironmentName, "EC2:Instance", !Ref CustomerInstanceName,"NetworkInterfaces:PublicIp"]]
+  IpsecSecret:
+    Description: "Secret of the IPSEC"
+    Value: !If 
+      - IsEuWest3
+      - !GetAtt GetIpsecSecret.Value
+      - ""
+    Export:
+      Name: !Join [ ":", [ !Ref RemoteRegion, !Ref ProjectName, !Ref EnvironmentName, "EC2:VPNConnection", !Ref StsVpnName, "Options:TunnelOptions:0:PreSharedKey"]]

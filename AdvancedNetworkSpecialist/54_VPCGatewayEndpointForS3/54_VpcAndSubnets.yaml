@@ -1,0 +1,147 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template deploys a VPC, Public and Private Subnets
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "54_VPCGatewayEndpointForS3"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: [ "dev", "test", "prod" ]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String    
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+  
+  # Stack parameters
+  SubnetName:
+    Default: "Subnet"
+    Description: Subnet name
+    Type: String
+  SubnetPrivateCidrBlock:
+    Default: 10.10.1.0/24
+    Description: "Private Subnet CIDR"
+    Type: String
+  SubnetPublicCidrBlock:
+    Default: 10.10.0.0/24
+    Description: "Public Subnet CIDR"
+    Type: String
+  VpcName:
+    Default: "My-VPC"
+    Description: VPC name
+    Type: String
+  VpcCidrBlock:
+    Default: 10.10.0.0/16
+    Description: "The IPv4 network range for the VPC, in CIDR notation."
+    Type: String
+
+Conditions:
+  saveInS3File: !Equals [ !Ref SaveInS3File, "true"]
+
+Resources:
+  # VPC, DHCPOptions, Association and App and DB Subnets
+  VpcStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/Vpc.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        CidrBlock: !Ref VpcCidrBlock
+        EnableDnsSupport: "true"
+        EnableDnsHostnames: "true"
+        InstanceTenancy: default
+        VpcName: !Ref VpcName
+
+  SubnetPrivateStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/Subnet.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        AvailabilityZone: !Select [ 0, !GetAZs ]
+        CidrBlock: !Ref   SubnetPrivateCidrBlock
+        MapPublicIpOnLaunch: "false"
+        SaveInS3File: !Ref SaveInS3File
+        SubnetName: !Sub "${SubnetName}-Private"
+        VpcId: !GetAtt VpcStack.Outputs.VpcId
+
+  SubnetPublicStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/Subnet.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        AvailabilityZone: !Select [ 0, !GetAZs ]
+        CidrBlock: !Ref SubnetPublicCidrBlock
+        MapPublicIpOnLaunch: "true"
+        SaveInS3File: !Ref SaveInS3File
+        SubnetName: !Sub "${SubnetName}-Public"
+        VpcId: !GetAtt VpcStack.Outputs.VpcId
+
+  VpcToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: saveInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:EC2ResourceToS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Region: !Ref AWS::Region
+      ResourceType: "Vpc"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:VPC:${VpcName}"
+      Value: !GetAtt VpcStack.Outputs.VpcId
+
+Outputs:
+  VpcId:
+    Description: "VPC Id"
+    Value: !GetAtt VpcStack.Outputs.VpcId
+  SubnetPrivateId:
+    Description: "Private Subnet Id"
+    Value: !GetAtt SubnetPrivateStack.Outputs.SubnetId
+  SubnetPublicId:
+    Description: "Public Subnets Id"
+    Value: !GetAtt SubnetPublicStack.Outputs.SubnetId

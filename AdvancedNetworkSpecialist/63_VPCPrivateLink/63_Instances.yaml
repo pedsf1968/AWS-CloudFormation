@@ -42,7 +42,7 @@ Parameters:
   BastionImageId:
     Default: ami-08461dc8cd9e834e0
     Description: "Bastion Instance AMI"
-    Type: String
+    Type: AWS::EC2::Image::Id
   BastionInstanceName:
     Default: "Bastion"
     Description: "Bastion Instances name"
@@ -62,7 +62,7 @@ Parameters:
   ConsumerImageId:
     Default: ami-08461dc8cd9e834e0
     Description: "Consumer Instance AMI"
-    Type: String
+    Type: AWS::EC2::Image::Id
   ConsumerInstanceName:
     Default: "Consumer"
     Description: "Consumer Instances name"
@@ -159,7 +159,7 @@ Resources:
     Properties:
       Count: 1
       Handle: !Ref WaitHandle
-      Timeout: 150
+      Timeout: 300
 
   BastionInstance:
     Type: AWS::CloudFormation::Stack

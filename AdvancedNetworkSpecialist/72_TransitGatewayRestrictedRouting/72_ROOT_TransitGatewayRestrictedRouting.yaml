@@ -19,6 +19,7 @@ Metadata:
           - Bucket
           - BucketKey
           - BucketObject
+          - SaveInS3File
       - Label:
           default: "VPC configuration"
         Parameters:
@@ -41,6 +42,18 @@ Metadata:
 
 Parameters:
   # Global parameters
+  Bucket:
+    Description: CloudFormation buket URL
+    Type: String
+    Default: "hawkfund-cloudformation"
+  BucketKey:
+    Description: Key to find object in the bucket
+    Type: String
+    Default: "72_TransitGatewayRestrictedRouting"
+  BucketObject:
+    Description: "File to store data in the bucket"
+    Type: String
+    Default: "Data.json"
   EnvironmentName:
     Description: "Environment name that prefix all resources"
     Type: String
@@ -54,18 +67,11 @@ Parameters:
     Description: "Project name that prefix all resources"
     Type: String
     Default: "ANS"
-  Bucket:
-    Description: CloudFormation buket URL
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "true"
+    Description: "Save resources information in s3 file"
     Type: String
-    Default: "hawkfund-cloudformation"
-  BucketKey:
-    Description: Key to find object in the bucket
-    Type: String
-    Default: "72_TransitGatewayRestrictedRouting"
-  BucketObject:
-    Description: "File to store data in the bucket"
-    Type: String
-    Default: "Data.json"
 
   # Network parameters
   SubnetNames:
@@ -94,33 +100,19 @@ Parameters:
     Description: "Instance AMI"
     Type: AWS::EC2::Image::Id
     Default: ami-08461dc8cd9e834e0
-  InstanceKeyName: 
+  InstanceKeyName:
     Description: Instance Key name
     Type: String
     Default: "dso-paris"
-  InstanceType: 
+  InstanceType:
     Description: "Instance type"
     Type: String
     Default: t2.micro
 
 Resources:
-  Roles:
-    Type: AWS::CloudFormation::Stack
-    DeletionPolicy: Delete
-    UpdateReplacePolicy: Retain
-    Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/72_Roles.yaml"
-      TimeoutInMinutes: 5
-      Parameters:
-        Bucket: !Ref Bucket
-        BucketKey: !Ref BucketKey
-        BucketObject: !Ref BucketObject
-
   Lambdas:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
-    DependsOn:
-         - Roles
     UpdateReplacePolicy: Retain
     Properties:
       TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/72_Lambdas.yaml"
@@ -129,13 +121,15 @@ Resources:
         Bucket: !Ref Bucket
         BucketKey: !Ref BucketKey
         BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
 
   VpcAndSubnets:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     DependsOn:
-         - Roles
-         - Lambdas
+      - Lambdas
     UpdateReplacePolicy: Retain
     Properties:
       TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/72_VpcAndSubnets.yaml"
@@ -146,9 +140,10 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         SubnetPrivateCidrBlocks: !Ref SubnetPrivateCidrBlocks
         SubnetPublicCidrBlocks: !Ref SubnetPublicCidrBlocks
-        SubnetNames: !Ref SubnetNames 
+        SubnetNames: !Ref SubnetNames
         VpcCidrBlocks: !Ref VpcCidrBlocks
         VpcNames: !Ref VpcNames
 
@@ -156,8 +151,7 @@ Resources:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     DependsOn:
-         - Roles
-         - Lambdas
+      - Lambdas
     UpdateReplacePolicy: Delete
     Properties:
       TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/72_SecurityGroups.yaml"
@@ -168,8 +162,10 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         BastionIngressCidrIp: "0.0.0.0/0"
-        BastionVpcId: !Select [0, !Split [",", !GetAtt VpcAndSubnets.Outputs.VpcIds]]
+        BastionVpcId:
+          !Select [0, !Split [",", !GetAtt VpcAndSubnets.Outputs.VpcIds]]
         ApplicationIngressCidrIp: "10.0.0.0/8"
         ApplicationVpcIds: !GetAtt VpcAndSubnets.Outputs.VpcIds
 
@@ -177,8 +173,7 @@ Resources:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     DependsOn:
-         - Roles
-         - Lambdas
+      - Lambdas
     UpdateReplacePolicy: Delete
     Properties:
       TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/72_Gateways.yaml"
@@ -189,6 +184,7 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         IgwName: "Default"
         TgwName: "Default"
         SubnetIds: !GetAtt VpcAndSubnets.Outputs.SubnetPrivateIds
@@ -198,9 +194,7 @@ Resources:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     DependsOn:
-         - Roles
-         - Lambdas
-         - VpcAndSubnets
+      - Lambdas
     UpdateReplacePolicy: Delete
     Properties:
       TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/72_RouteTables.yaml"
@@ -211,6 +205,7 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         DestinationCidrBlock: "10.0.0.0/8"
         VpcIds: !GetAtt VpcAndSubnets.Outputs.VpcIds
         SubnetPrivateIds: !GetAtt VpcAndSubnets.Outputs.SubnetPrivateIds
@@ -218,12 +213,11 @@ Resources:
         RouteTableNames: "A,B,C"
         InternetGatewayId: !GetAtt Gateway.Outputs.InternetGatewayId
         TransitGatewayId: !GetAtt Gateway.Outputs.TransitGatewayId
- 
+
   Instances:
     Type: AWS::CloudFormation::Stack
     DependsOn:
-         - Roles
-         - Lambdas
+      - Lambdas
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
@@ -235,6 +229,7 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         ImageId: !Ref InstanceImageId
         InstanceType: !Ref InstanceType
         KeyName: !Ref InstanceKeyName

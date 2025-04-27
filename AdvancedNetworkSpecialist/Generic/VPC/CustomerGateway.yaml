@@ -74,13 +74,15 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:CustomerGatewayParametersToS3"]]
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:EC2ResourceToS3"]]
       ServiceTimeout: 60
       Bucket: !Ref Bucket
       BucketKey: !Ref BucketKey
       BucketObject: !Ref BucketObject
+      Region: !Ref AWS::Region
+      ResourceType: "CustomerGateway"
       Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:CustomerGateway:${Name}"
-      CustomerGatewayId: !Ref CustomerGateway
+      Value: !Ref CustomerGateway
 
 Outputs:
   CustomerGatewayId:

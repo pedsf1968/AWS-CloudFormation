@@ -10,6 +10,35 @@ Description:  This template for creating Lambda to create AMI
 # }
 
 Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "Datas"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: [ "dev", "test", "prod" ]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String    
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+
   # Stack parameters
   ApplicationLogLevel:
     AllowedValues: [ TRACE, DEBUG, INFO, WARN, ERROR, FATAL ]
@@ -18,6 +47,11 @@ Parameters:
       Set this property to filter the application logs for your function that Lambda sends to CloudWatch. 
       Lambda only sends application logs at the selected level of detail and lower, 
       where TRACE is the highest level and FATAL is the lowest.
+    Type: String
+  CreateRole:
+    AllowedValues: [ "false", "true" ]
+    Default: "true"
+    Description: "Save resources information in s3 file"
     Type: String
   FunctionName:
     Default: CreateAmiFromInstanceId
@@ -50,8 +84,54 @@ Parameters:
       where DEBUG is the highest level and WARN is the lowest.
     Type: String
 
+Conditions:
+  CreateRole: !Equals [!Ref CreateRole, "true" ]
+  saveInS3File: !And 
+    - !Equals [!Ref CreateRole, "true" ]
+    - !Equals [ !Ref SaveInS3File, "true"]
+
 Resources:
-  CreateAmiFromInstanceIdLogGroup:
+  LambdaFunctionRole:
+    Type: AWS::IAM::Role
+    Condition: CreateRole
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaRole
+      Path: "/"
+      Policies:
+      - PolicyName: CreateAmiFromInstanceIdPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+              - 'ec2:DescribeInstances'
+              - 'ec2:DescribeImages'
+              - 'ec2:CreateImage'
+              - 'ec2:DeregisterImage'
+              - 'ec2:DescribeSnapshots'
+              - 'ec2:DeleteSnapshot'
+            Resource: ['*']
+      RoleName: !Sub "${FunctionName}Role"
+      Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${FunctionName}Role"
+        - Key: ProjectName
+          Value: !Ref ProjectName
+
+  LambdaFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     DeletionPolicy: Delete
     Properties:
@@ -60,7 +140,7 @@ Resources:
       RetentionInDays: !Ref RetentionInDays
     UpdateReplacePolicy: Delete
 
-  CreateAmiFromInstanceId:
+  LambdaFunction:
     Type: AWS::Lambda::Function
     DeletionPolicy: Delete
     Properties:
@@ -115,12 +195,37 @@ Resources:
         LogFormat: !Ref LogFormat
         LogGroup: !Sub "/aws/lambda/${FunctionName}"
         SystemLogLevel: !Ref SystemLogLevel
-      MemorySize: 128
-      Role: !Join [":", ["arn:aws:iam:", !Sub "${AWS::AccountId}", "role/CreateAmiFromInstanceIdRole" ] ]
+      MemorySize: 128      
+      Role: !If 
+      - CreateRole
+      - !GetAtt LambdaFunctionRole.Arn
+      - !Join [ ":", [ "arn:aws:iam:", !Ref "AWS::AccountId", !Sub "role/${FunctionName}Role" ] ]
       Runtime: python3.12
     UpdateReplacePolicy: Delete
 
+  LambdaFunctionRoleToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: saveInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:IAMResourceToS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Region: !Ref AWS::Region
+      ResourceType: "Role"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:IAM:Role:${FunctionName}Role"
+      Value: !Ref LambdaFunctionRole
+
 Outputs:
   LambdaFunctionArn:
-    Description: "ARN of CreateAmiFromInstanceId Lambda"
-    Value: !GetAtt CreateAmiFromInstanceId.Arn
+    Description: ARN of the Lambda Function
+    Value: !GetAtt LambdaFunction.Arn
+  LogGroupId:
+    Description: Lambda Function Log Group Id
+    Value: !Ref LambdaFunctionLogGroup
+  RoleArn:
+    Description: Lambda Function Role Arn
+    Value: !If [ CreateRole, !GetAtt LambdaFunctionRole.Arn, "" ]

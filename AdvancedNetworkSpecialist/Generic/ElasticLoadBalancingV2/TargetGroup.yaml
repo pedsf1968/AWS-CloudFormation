@@ -216,6 +216,13 @@ Resources:
       Name: !Sub "${ProjectName}-${EnvironmentName}-${Name}-TG"
       Port: !Ref Port
       Protocol: !Ref Protocol
+      Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${Name}-TG"
+        - Key: ProjectName
+          Value: !Ref ProjectName
       TargetGroupAttributes:
         - Key: deregistration_delay.timeout_seconds
           Value: "30"
@@ -227,13 +234,6 @@ Resources:
       TargetType: instance
       UnhealthyThresholdCount: !Ref UnhealthyThresholdCount
       VpcId: !Ref VpcId
-      Tags:
-        - Key: EnvironmentName
-          Value: !Ref EnvironmentName
-        - Key: Name
-          Value: !Sub "${ProjectName}-${EnvironmentName}-${Name}-TG"
-        - Key: ProjectName
-          Value: !Ref ProjectName
   
   TargetGroupToS3:
     Type: AWS::CloudFormation::CustomResource

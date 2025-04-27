@@ -64,7 +64,7 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
-        VPCId: !Select [ 0, !Ref VpcIds ]
+        VpcId: !Select [ 0, !Ref VpcIds ]
         RouteTableName: !Join [ "-", [ !Select [ 0, !Ref RouteTableNames ], "Bastion" ] ]
         SubnetId: !Ref SubnetPublicId
 
@@ -83,7 +83,7 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         DestinationCidrBlock: "0.0.0.0/0"
-        Destinationtype: "InternetGateway"
+        DestinationType: "InternetGateway"
         GatewayId: !Ref InternetGatewayId
         RouteTableId: !GetAtt SubnetAPublicRouteTableStack.Outputs.RouteTableId
 
@@ -100,10 +100,10 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
-        SaveInS3File: "true"
+        SaveInS3File: !Ref SaveInS3File
         RouteTableName: !Join [ "-", [ !Select [ 0, !Ref RouteTableNames ], "Consumer" ] ]
         SubnetId: !Select [ 0, !Ref SubnetPrivateIds ]
-        VPCId: !Select [ 0, !Ref VpcIds ]
+        VpcId: !Select [ 0, !Ref VpcIds ]
 
   SubnetBPrivateRouteTable1Stack:
     Type: AWS::CloudFormation::Stack
@@ -118,10 +118,10 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
-        SaveInS3File: "true"
+        SaveInS3File: !Ref SaveInS3File
         RouteTableName: !Join [ "-", [ !Select [ 1, !Ref RouteTableNames ], "NLB" ] ]
         SubnetId: !Select [ 1, !Ref SubnetPrivateIds ]
-        VPCId: !Select [ 1, !Ref VpcIds ]
+        VpcId: !Select [ 1, !Ref VpcIds ]
     
   SubnetBPrivateRouteTable2Stack:
     Type: AWS::CloudFormation::Stack
@@ -136,12 +136,16 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
-        SaveInS3File: "true"
+        SaveInS3File: !Ref SaveInS3File
         RouteTableName: !Join [ "-", [ !Select [ 1, !Ref RouteTableNames ], "Service" ] ]
         SubnetId: !Select [ 2, !Ref SubnetPrivateIds ]
-        VPCId: !Select [ 1, !Ref VpcIds ]
+        VpcId: !Select [ 1, !Ref VpcIds ]
 
 Outputs:
+  SubnetPublicRouteIds:
+    Description: "Public Subnet Route IDs"
+    Value: !GetAtt SubnetAPublicRouteStack.Outputs.GatewayRouteId
+
   SubnetPrivateRouteTableAssociationIds:
     Description: "Private Route Table Association IDs"
     Value: !Join
@@ -149,19 +153,14 @@ Outputs:
       - - !GetAtt SubnetAPrivateRouteTableStack.Outputs.SubnetRouteTableAssociationId
         - !GetAtt SubnetBPrivateRouteTable1Stack.Outputs.SubnetRouteTableAssociationId
         - !GetAtt SubnetBPrivateRouteTable2Stack.Outputs.SubnetRouteTableAssociationId
-
   SubnetPrivateRouteTableIds:
     Description: "Private Subnet Route Table IDs"
     Value: !GetAtt SubnetAPrivateRouteTableStack.Outputs.RouteTableId
 
-  SubnetPublicRouteIds:
-    Description: "Public Subnet Route IDs"
-    Value: !GetAtt SubnetAPublicRouteStack.Outputs.RouteId
-
+  SubnetPublicRouteTableAssociationIds:
+    Description: "Public Route Table Association IDs"
+    Value: !GetAtt SubnetAPublicRouteTableStack.Outputs.SubnetRouteTableAssociationId
   SubnetPublicRouteTableIds:
     Description: "Public Subnet Route Table IDs"
     Value: !GetAtt SubnetAPublicRouteTableStack.Outputs.RouteTableId
 
-  SubnetPublicRouteTableAssociationIds:
-    Description: "Public Route Table Association IDs"
-    Value: !GetAtt SubnetAPublicRouteTableStack.Outputs.SubnetRouteTableAssociationId

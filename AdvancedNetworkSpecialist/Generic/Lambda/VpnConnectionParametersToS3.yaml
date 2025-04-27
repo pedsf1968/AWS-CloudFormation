@@ -9,11 +9,40 @@ Description:  This template for creating lambda used by CloudFormation other's s
   #     "BucketKey": "hawkfund-cloudformation/90_SiteToSiteVpn",
   #     "BucketObject": "Data.json",
   #     "Key": "eu-central-1:ANS:dev:EC2:VPNConnection:MyVpnConnection",
-  #     "VpnConnectionId": "vpn-04655dafec24a0188"
+  #     "Value": "vpn-04655dafec24a0188"
   #   }
   # }
 
 Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "Datas"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: [ "dev", "test", "prod" ]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String    
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+
   # Stack parameters
   ApplicationLogLevel:
     AllowedValues: [ TRACE, DEBUG, INFO, WARN, ERROR, FATAL ]
@@ -22,6 +51,11 @@ Parameters:
       Set this property to filter the application logs for your function that Lambda sends to CloudWatch. 
       Lambda only sends application logs at the selected level of detail and lower, 
       where TRACE is the highest level and FATAL is the lowest.
+    Type: String
+  CreateRole:
+    AllowedValues: [ "false", "true" ]
+    Default: "true"
+    Description: "Save resources information in s3 file"
     Type: String
   FunctionName:
     Default: VpnConnectionParametersToS3
@@ -54,8 +88,63 @@ Parameters:
       where DEBUG is the highest level and WARN is the lowest.
     Type: String
 
+Conditions:
+  CreateRole: !Equals [!Ref CreateRole, "true" ]
+  saveInS3File: !And 
+    - !Equals [!Ref CreateRole, "true" ]
+    - !Equals [ !Ref SaveInS3File, "true"]
+
 Resources:
-  VpnConnectionParametersToS3LogGroup:
+  LambdaFunctionRole:
+    Type: AWS::IAM::Role
+    Condition: CreateRole
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaRole
+      Path: "/"
+      Policies:
+      - PolicyName: UpdateParametersFromS3Policy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - s3:GetObject
+            - s3:PutObject
+            - s3:DeleteObject
+            - s3:List*
+            Resource: 
+            - !Join [":", ["arn:aws:s3::", !Sub "${Bucket}/${BucketKey}"]]
+            - !Join [":", ["arn:aws:s3::", !Sub "${Bucket}/${BucketKey}/*"]]
+      - PolicyName: VpnConnectionParametersToS3Policy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - ec2:DescribeVpnConnections
+            Resource: 
+            - "*"
+      RoleName: VpnConnectionParametersToS3Role
+      Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-VpnConnectionParametersToS3Role"
+        - Key: ProjectName
+          Value: !Ref ProjectName
+          
+  LambdaFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     DeletionPolicy: Delete
     Properties:
@@ -64,7 +153,7 @@ Resources:
       RetentionInDays: !Ref RetentionInDays
     UpdateReplacePolicy: Delete
 
-  VpnConnectionParametersToS3Function:
+  LambdaFunction:
     Type: AWS::Lambda::Function
     DeletionPolicy: Delete
     Properties:
@@ -86,7 +175,7 @@ Resources:
             bucket_key = event["ResourceProperties"]["BucketKey"]
             bucket_object = event["ResourceProperties"]["BucketObject"]
             parameter_key = event["ResourceProperties"]["Key"]
-            vpn_connection_id = event["ResourceProperties"]["VpnConnectionId"]
+            vpn_connection_id = event["ResourceProperties"]["Value"]
             key = bucket_key + "/" + bucket_object
             data = {}
             response_data = {}
@@ -111,26 +200,8 @@ Resources:
               print("WARNING: No file present on the s3 Bucket, starting a new file!")
 
             paths = parameter_key.split(":")
-            get_node(data, paths)['Category'] = vpn_connection_data['VpnConnections'][0]['Category']
-            get_node(data, paths)['CustomerGatewayId'] = vpn_connection_data['VpnConnections'][0]['CustomerGatewayId']
-            get_node(data, paths)['GatewayAssociationState'] = vpn_connection_data['VpnConnections'][0]['GatewayAssociationState']
-            get_node(data, paths)['State'] = vpn_connection_data['VpnConnections'][0]['State']
-            get_node(data, paths)['Type'] = vpn_connection_data['VpnConnections'][0]['Type']
-            get_node(data, paths)['Type'] = vpn_connection_data['VpnConnections'][0]['Type']
-            get_node(data, paths)['VpnConnectionId'] = vpn_connection_data['VpnConnections'][0]['VpnConnectionId']
-            get_node(data, paths)['VpnGatewayId'] = vpn_connection_data['VpnConnections'][0]['VpnGatewayId']
-            get_node(data, paths)['EnableAcceleration'] = vpn_connection_data['VpnConnections'][0]['Options']['EnableAcceleration']
-            get_node(data, paths)['StaticRoutesOnly'] = vpn_connection_data['VpnConnections'][0]['Options']['StaticRoutesOnly']
-            get_node(data, paths)['LocalIpv4NetworkCidr'] = vpn_connection_data['VpnConnections'][0]['Options']['LocalIpv4NetworkCidr']
-            get_node(data, paths)['RemoteIpv4NetworkCidr'] = vpn_connection_data['VpnConnections'][0]['Options']['RemoteIpv4NetworkCidr']
-            get_node(data, paths)['OutsideIpAddressType'] = vpn_connection_data['VpnConnections'][0]['Options']['OutsideIpAddressType']
-            get_node(data, paths)['TunnelInsideIpVersion'] = vpn_connection_data['VpnConnections'][0]['Options']['TunnelInsideIpVersion']
-            get_node(data, paths)['OutsideIpAddress1'] = vpn_connection_data['VpnConnections'][0]['Options']['TunnelOptions'][0]['OutsideIpAddress']
-            get_node(data, paths)['TunnelInsideCidr1'] = vpn_connection_data['VpnConnections'][0]['Options']['TunnelOptions'][0]['TunnelInsideCidr']
-            get_node(data, paths)['PreSharedKey1'] = vpn_connection_data['VpnConnections'][0]['Options']['TunnelOptions'][0]['PreSharedKey']
-            get_node(data, paths)['OutsideIpAddress2'] = vpn_connection_data['VpnConnections'][0]['Options']['TunnelOptions'][1]['OutsideIpAddress']
-            get_node(data, paths)['TunnelInsideCidr2'] = vpn_connection_data['VpnConnections'][0]['Options']['TunnelOptions'][1]['TunnelInsideCidr']
-            get_node(data, paths)['PreSharedKey2'] = vpn_connection_data['VpnConnections'][0]['Options']['TunnelOptions'][1]['PreSharedKey']
+            last_index = paths.pop()
+            get_node(data, paths)[last_index] = vpn_connection_data['VpnConnections'][0]
 
             try:
               # Wrote data file from s3
@@ -139,26 +210,7 @@ Resources:
                   Bucket=bucket,
                   Key=key
               )
-              response_data['Category'] = vpn_connection_data['VpnConnections'][0]['Category']
-              response_data['CustomerGatewayId'] = vpn_connection_data['VpnConnections'][0]['CustomerGatewayId']
-              response_data['GatewayAssociationState'] = vpn_connection_data['VpnConnections'][0]['GatewayAssociationState']
-              response_data['State'] = vpn_connection_data['VpnConnections'][0]['State']
-              response_data['Type'] = vpn_connection_data['VpnConnections'][0]['Type']
-              response_data['Type'] = vpn_connection_data['VpnConnections'][0]['Type']
-              response_data['VpnConnectionId'] = vpn_connection_data['VpnConnections'][0]['VpnConnectionId']
-              response_data['VpnGatewayId'] = vpn_connection_data['VpnConnections'][0]['VpnGatewayId']
-              response_data['EnableAcceleration'] = vpn_connection_data['VpnConnections'][0]['Options']['EnableAcceleration']
-              response_data['StaticRoutesOnly'] = vpn_connection_data['VpnConnections'][0]['Options']['StaticRoutesOnly']
-              response_data['LocalIpv4NetworkCidr'] = vpn_connection_data['VpnConnections'][0]['Options']['LocalIpv4NetworkCidr']
-              response_data['RemoteIpv4NetworkCidr'] = vpn_connection_data['VpnConnections'][0]['Options']['RemoteIpv4NetworkCidr']
-              response_data['OutsideIpAddressType'] = vpn_connection_data['VpnConnections'][0]['Options']['OutsideIpAddressType']
-              response_data['TunnelInsideIpVersion'] = vpn_connection_data['VpnConnections'][0]['Options']['TunnelInsideIpVersion']
-              response_data['OutsideIpAddress1'] = vpn_connection_data['VpnConnections'][0]['Options']['TunnelOptions'][0]['OutsideIpAddress']
-              response_data['TunnelInsideCidr1'] = vpn_connection_data['VpnConnections'][0]['Options']['TunnelOptions'][0]['TunnelInsideCidr']
-              response_data['PreSharedKey1'] = vpn_connection_data['VpnConnections'][0]['Options']['TunnelOptions'][0]['PreSharedKey']
-              response_data['OutsideIpAddress2'] = vpn_connection_data['VpnConnections'][0]['Options']['TunnelOptions'][1]['OutsideIpAddress']
-              response_data['TunnelInsideCidr2'] = vpn_connection_data['VpnConnections'][0]['Options']['TunnelOptions'][1]['TunnelInsideCidr']
-              response_data['PreSharedKey2'] = vpn_connection_data['VpnConnections'][0]['Options']['TunnelOptions'][1]['PreSharedKey']
+              response_data[last_index] = vpn_connection_data['VpnConnections'][0]
               cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data, "CustomResourcePhysicalID")
             except Exception as err:
               print("ERROR: Can't save to s3 Bucket")
@@ -173,11 +225,37 @@ Resources:
         LogGroup: !Sub "/aws/lambda/${FunctionName}"
         SystemLogLevel: !Ref SystemLogLevel
       MemorySize: 128
-      Role: !Join [":", ["arn:aws:iam:", !Sub "${AWS::AccountId}", "role/VpnConnectionParametersToS3Role" ] ]
+      Role: !If 
+      - CreateRole
+      - !GetAtt LambdaFunctionRole.Arn
+      - !Join [ ":", [ "arn:aws:iam:", !Ref "AWS::AccountId", !Sub "role/${FunctionName}Role" ] ]
       Runtime: python3.12
+      Timeout: 30
     UpdateReplacePolicy: Delete
+
+  LambdaFunctionRoleToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: saveInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:IAMResourceToS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Region: !Ref AWS::Region
+      ResourceType: "Role"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:IAM:Role:${FunctionName}Role"
+      Value: !Ref LambdaFunctionRole
 
 Outputs:
   LambdaFunctionArn:
-    Description: ARN of VpnConnectionParametersToS3 Lambda
-    Value: !GetAtt VpnConnectionParametersToS3Function.Arn    
+    Description: ARN of the Lambda Function
+    Value: !GetAtt LambdaFunction.Arn
+  LogGroupId:
+    Description: Lambda Function Log Group Id
+    Value: !Ref LambdaFunctionLogGroup
+  RoleArn:
+    Description: Lambda Function Role Arn
+    Value: !If [ CreateRole, !GetAtt LambdaFunctionRole.Arn, "" ]

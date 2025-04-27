@@ -3,32 +3,34 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description:  This template create Tables and Route Tables
 
 Parameters:
-  # Global parameters
+# Global parameters
   Bucket:
-    Description: "CloudFormation bucket URL"
-    Type: String
     Default: "hawkfund-cloudformation"
-  BucketKey:
-    Description: "Key to find object in the bucket"
+    Description: CloudFormation buket URL
     Type: String
+  BucketKey:
     Default: "90_SiteToSiteVpn"
+    Description: Key to find object in the bucket
+    Type: String
   BucketObject:
+    Default: "Data.json"
     Description: "File to store data in the bucket"
     Type: String
-    Default: "Data.json"
   EnvironmentName:
-    Description: "Environment name that prefix all resources"
-    Type: String
+    AllowedValues: [ "dev", "test", "prod" ]
+    ConstraintDescription: "Must specify dev, test or prod"
     Default: "dev"
-    AllowedValues:
-      - "dev"
-      - "test"
-      - "prod"
-    ConstraintDescription: Must specify dev, test or prod
+    Description: "Environment name that prefix all resources"
+    Type: String    
   ProjectName:
+    Default: "ANS"
     Description: "Project name that prefix all resources"
     Type: String
-    Default: "ANS"
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
 
   # Stack parameters
   DestinationCidrBlocks:
@@ -63,10 +65,10 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
-        VPCId: !Select [ 0 , !Split [",", !Ref VpcIds ] ] 
+        SaveInS3File: !Ref SaveInS3File
         RouteTableName: !Select [ 0 , !Split [",", !Ref RouteTableNames ] ] 
-        SaveInS3File: "true"
         SubnetId:  !Select [ 0, !Split [ ",", !Ref SubnetIds ] ]
+        VpcId: !Select [ 0 , !Split [",", !Ref VpcIds ] ] 
 
   SubnetRouteStack:
     Type: AWS::CloudFormation::Stack
@@ -81,8 +83,21 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         DestinationCidrBlock: !Select [ 0, !Split [ ",", !Ref DestinationCidrBlocks ] ]
         DestinationType: !Ref DestinationType
         GatewayId: !Ref GatewayId
         RouteTableId: !GetAtt SubnetRouteTableStack.Outputs.RouteTableId
-        SaveInS3File: "true"
+
+Outputs:
+  SubnetRouteTableStackId:
+    Description: "Subnet Route Table ID"
+    Value: !GetAtt SubnetRouteTableStack.Outputs.RouteTableId
+  
+  SubnetRouteTableAssociationIds:
+    Description: "Route Table Association ID"
+    Value: !GetAtt SubnetRouteTableStack.Outputs.SubnetRouteTableAssociationId
+
+  GatewayRouteIds:
+    Description: "Gateway Route ID"
+    Value: !GetAtt SubnetRouteStack.Outputs.GatewayRouteId

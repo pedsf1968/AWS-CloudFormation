@@ -11,7 +11,7 @@ Parameters:
   BucketKey:
     Description: Key to find object in the bucket
     Type: String
-    Default: "71_TransitGatewayRestrictedRouting"
+    Default: "72_TransitGatewayRestrictedRouting"
   BucketObject:
     Description: "File to store data in the bucket"
     Type: String
@@ -28,6 +28,11 @@ Parameters:
   ProjectName:
     Default: "ANS"
     Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
     Type: String
   
 # Stack parameters
@@ -66,8 +71,8 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         CidrBlock: !Select [ 0, !Split [ ",", !Ref VpcCidrBlocks ] ]
-        SaveInS3File: "true"
         VpcName: !Select [ 0, !Split [ ",",!Ref VpcNames ] ]
 
   VpcBStack:
@@ -83,8 +88,8 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         CidrBlock: !Select [ 1, !Split [ ",", !Ref VpcCidrBlocks ] ]
-        SaveInS3File: "true"
         VpcName: !Select [ 1, !Split [ ",",!Ref VpcNames ] ]
 
   VpcCStack:
@@ -100,8 +105,8 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         CidrBlock: !Select [ 2, !Split [ ",", !Ref VpcCidrBlocks ] ]
-        SaveInS3File: "true"
         VpcName: !Select [ 2, !Split [ ",",!Ref VpcNames ] ]
 
   SubnetPrivateAStack:
@@ -117,10 +122,10 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Select [ 0, !GetAZs ]
         CidrBlock: !Select [ 0, !Split [ ",", !Ref SubnetPrivateCidrBlocks]]
         MapPublicIpOnLaunch: "false"
-        SaveInS3File: "true"
         SubnetName: !Join [ "", [!Select [ 0, !Split [ ",", !Ref SubnetNames]], "-Private"] ]
         VpcId: !GetAtt VpcAStack.Outputs.VpcId
 
@@ -137,10 +142,10 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Select [ 0, !GetAZs ]
         CidrBlock: !Select [ 0, !Split [ ",", !Ref SubnetPublicCidrBlocks]]
         MapPublicIpOnLaunch: "true"
-        SaveInS3File: "true"
         SubnetName: !Join [ "", [ !Select [ 0, !Split [ ",", !Ref SubnetNames]], "-Public"]]
         VpcId: !GetAtt VpcAStack.Outputs.VpcId
 
@@ -157,10 +162,10 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Select [ 1, !GetAZs ]
         CidrBlock: !Select [ 1, !Split [ ",", !Ref SubnetPrivateCidrBlocks]]
         MapPublicIpOnLaunch: "false"
-        SaveInS3File: "true"
         SubnetName: !Join [ "", [!Select [ 1, !Split [ ",", !Ref SubnetNames]], "-Private"] ]
         VpcId: !GetAtt VpcBStack.Outputs.VpcId
 
@@ -177,10 +182,10 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Select [ 2, !GetAZs ]
         CidrBlock: !Select [ 2, !Split [ ",", !Ref SubnetPrivateCidrBlocks]]
         MapPublicIpOnLaunch: "false"
-        SaveInS3File: "true"
         SubnetName: !Join [ "", [!Select [ 2, !Split [ ",", !Ref SubnetNames]], "-Private"] ]
         VpcId: !GetAtt VpcCStack.Outputs.VpcId
 

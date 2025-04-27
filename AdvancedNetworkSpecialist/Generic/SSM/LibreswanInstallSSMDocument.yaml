@@ -1,0 +1,77 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CloudFormation template to create an SSM Document for installing Libreswan"
+
+Resources:
+  LibreswanInstallSSMDocument:
+    Type: "AWS::SSM::Document"
+    Properties:
+      Content:
+        schemaVersion: "2.2"
+        description: "Install Libreswan"
+        mainSteps:
+        - name: "InstallLibreswan"
+          action: "aws:runShellScript"
+          inputs:
+            runCommand:
+            - |
+              #!/bin/bash
+              set -eux # Exit on error, print commands
+
+              # Configure fedora repository
+              cat << EOF > /etc/yum.repos.d/fedora.repo
+              [fedora] 
+              name=Fedora 36 - $basearch
+              #baseurl=http://download.example/pub/fedora/linux/releases/36/Everything/$basearch/os/ 
+              metalink=https://mirrors.fedoraproject.org/metalink?repo=fedora-36&arch=$basearch 
+              enabled=0 
+              countme=1 
+              metadata_expire=7d 
+              repo_gpgcheck=0 
+              type=rpm 
+              gpgcheck=1 
+              gpgkey=https://getfedora.org/static/fedora.gpg 
+              skip_if_unavailable=False
+              EOF
+
+              # Determine the OS and install Libreswan accordingly
+              if [[ $(command -v yum) ]]; then
+                # For Amazon Linux, CentOS, Red Hat
+                yum update -y
+                yum install -y libreswan
+              elif [[ $(command -v apt-get) ]]; then
+                # For Ubuntu, Debian
+                apt update -y
+                apt install -y libreswan
+              elif [[ -f /etc/os-release ]]; then
+                # Fallback using /etc/os-release
+                source /etc/os-release
+                if [[ "$ID" == "amzn" ]]; then
+                  yum update -y
+                  amazon-linux-extras install -y libreswan # For newer Amazon Linux
+                  yum install -y libreswan
+                elif [[ "$ID" == "ubuntu" || "$ID" == "debian" ]]; then
+                  apt update -y
+                  apt install -y libreswan
+                elif [[ "$ID" == "centos" || "$ID" == "rhel" ]]; then
+                  yum update -y
+                  yum install -y libreswan
+                else
+                  echo "Unsupported OS: $ID"
+                  exit 1
+                fi
+              else
+                echo "Unsupported OS: Cannot determine package manager"
+                exit 1
+              fi
+              # Configure ip filters
+              cat << EOF > /etc/sysctl.conf
+              net.ipv4.ip_forward = 1 
+              net.ipv4.conf.default.rp_filter = 0 
+              net.ipv4.conf.default.accept_source_route = 0
+              EOF
+              sysctl -p
+      DocumentFormat: YAML
+      DocumentType: Command
+      Name: LibreswanInstallSSMDocument
+      TargetType: "/AWS::EC2::Instance"

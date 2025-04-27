@@ -3,14 +3,9 @@
 # aws cloudformation delete-stack --stack-name ANS-90 --region eu-west-3
 #
 # Steps :
-# 1 - Launch Step 1 on eu-west-3 to create Roles
-# 2 - Launch Step 2 on eu-west-3 to create Lambda
-# 3 - Launch Step 3 on eu-west-3 to create Network
-# 4 - Launch Step 4 on eu-west-3 to create Instance
-# 5 - Launch Step 2 on eu-central-1 to create lambda
-# 6 - Launch Step 3 on eu-central-1 to create Network
-# 7 - Launch Step 4 on eu-central-1 to create Instance
-# 8 - Launch Step 5 on eu-west-3 to create VPN side
+# 1 - Launch Step 1 on eu-west-3 to create infrastructure
+# 2 - Launch Step 1 on eu-central-1 to create infrastructure
+# 3 - Launch Step 2 on eu-west-3 to create VPN side
 
 AWSTemplateFormatVersion: "2010-09-09"
 Description: This template create a VPN between two accounts
@@ -30,6 +25,7 @@ Metadata:
           - Bucket
           - BucketKey
           - BucketObject
+          - SaveInS3File
       - Label:
           default: "Customer side"
         Parameters:
@@ -86,17 +82,19 @@ Parameters:
   Step:
     Description: "Deploy successively Step1 and Step2 and alternate between th two Accounts"
     Type: String
-    Default: "1-Roles"
+    Default: "1-Infrastructure"
     AllowedValues:
-      - "1-Roles"
-      - "2-Lambdas"
-      - "3-Network"
-      - "4-Instances"
-      - "5-VPN"
+      - "1-Infrastructure"
+      - "2-VPN"
   ProjectName:
     Description: "Project name that prefix all resources"
     Type: String
     Default: "ANS"
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "true"
+    Description: "Save resources information in s3 file"
+    Type: String
 
   # Customer side infrastructure
   CustomerInstanceKeyName:
@@ -199,41 +197,18 @@ Parameters:
     Type: String
 
 Conditions:
-  IsStep2: !Or 
-    - !Equals [!Ref Step, "2-Lambdas" ]
-    - !Equals [!Ref Step, "3-Network" ]
-    - !Equals [!Ref Step, "4-Instances" ]
-    - !Equals [!Ref Step, "5-VPN" ]
-  IsStep3: !Or
-    - !Equals [!Ref Step, "3-Network" ]
-    - !Equals [!Ref Step, "4-Instances" ]
-    - !Equals [!Ref Step, "5-VPN" ]
-  IsStep4: !Or
-    - !Equals [!Ref Step, "4-Instances" ]
-    - !Equals [!Ref Step, "5-VPN" ]
-  IsStep5: !And
-    - !Equals [!Ref Step, "5-VPN" ]
+  IsStep1: !Or
+    - !Equals [!Ref Step, "1-Infrastructure" ]
+    - !Equals [!Ref Step, "2-VPN" ]
+  IsStep2: !And
+    - !Equals [!Ref Step, "2-VPN" ]
     - !Equals [!Ref "AWS::Region", !Ref CustomerRegion ]
   IsCloudInfra: !Equals [!Ref "AWS::Region", !Ref CloudRegion ]
   IsCustomerInfra: !Equals [!Ref "AWS::Region", !Ref CustomerRegion ]
 
 Resources:
-  Roles:
-    Type: AWS::CloudFormation::Stack
-    Condition: IsCustomerInfra
-    DeletionPolicy: Delete
-    UpdateReplacePolicy: Retain
-    Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/90_Roles.yaml"
-      TimeoutInMinutes: 5
-      Parameters:
-        Bucket: !Ref Bucket
-        BucketKey: !Ref BucketKey
-        BucketObject: !Ref BucketObject
-
   Lambdas:
     Type: AWS::CloudFormation::Stack
-    Condition: IsStep2
     DeletionPolicy: Delete
     UpdateReplacePolicy: Retain
     Properties:
@@ -243,12 +218,34 @@ Resources:
         Bucket: !Ref Bucket
         BucketKey: !Ref BucketKey
         BucketObject: !Ref BucketObject
-        CloudRegion: !Ref CloudRegion
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        ApplicationLogLevel: INFO
+
+  Roles:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsCustomerInfra
+    DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/90_Roles.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
 
   VpcAndSubnets:
     Type: AWS::CloudFormation::Stack
-    Condition: IsStep3
     DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
     UpdateReplacePolicy: Retain
     Properties:
       TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/90_VpcAndSubnets.yaml"
@@ -259,6 +256,7 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Select [ 0, !GetAZs ]
         SubnetMapPublicIpOnLaunch: !If [ IsCustomerInfra, "true", "false"]
         SubnetCidrBlock: !If [ IsCustomerInfra, !Ref CustomerSubnetCidrBlock, !Ref CloudSubnetCidrBlock]
@@ -268,8 +266,9 @@ Resources:
 
   RouteTables:
     Type: AWS::CloudFormation::Stack
-    Condition: IsStep3
     DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
     UpdateReplacePolicy: Retain
     Properties:
       TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/90_RouteTables.yaml"
@@ -280,6 +279,7 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         DestinationCidrBlocks: !If [ IsCustomerInfra, !Ref CustomerSecurityGroupIngressCidrIp, !Ref CloudSecurityGroupIngressCidrIp]
         DestinationType:  !If [ IsCustomerInfra, "InternetGateway", "VirtualPrivateGateway"]
         GatewayId: !If [ IsCustomerInfra, !GetAtt Gateways.Outputs.InternetGatewayId, !GetAtt Gateways.Outputs.VirtualPrivateGatewayId ]
@@ -289,8 +289,9 @@ Resources:
 
   Gateways:
     Type: AWS::CloudFormation::Stack
-    Condition: IsStep3
     DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
     UpdateReplacePolicy: Retain
     Properties:
       TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/90_Gateways.yaml"
@@ -301,6 +302,7 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         CgwName: "Customer"
         IgwName: "Customer"
         CustomerInstanceName: !Ref CustomerInstanceName
@@ -314,8 +316,9 @@ Resources:
 
   SecurityGroups:
     Type: AWS::CloudFormation::Stack
-    Condition: IsStep4
     DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
     UpdateReplacePolicy: Retain
     Properties:
       TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/90_SecurityGroups.yaml"
@@ -325,7 +328,8 @@ Resources:
         BucketKey: !Ref BucketKey
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
-        ProjectName: !Ref ProjectName        
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         GroupDescription: !If [ IsCustomerInfra, !Ref CustomerSecurityGroupDescription, !Ref CloudSecurityGroupDescription]
         GroupName: !If [ IsCustomerInfra, !Ref CustomerSecurityGroupName, !Ref CloudSecurityGroupName]
         IngressCidrIp: !If [ IsCustomerInfra, !Ref CustomerSecurityGroupIngressCidrIp, !Ref CloudSecurityGroupIngressCidrIp]
@@ -334,8 +338,9 @@ Resources:
 
   Instances:
     Type: AWS::CloudFormation::Stack
-    Condition: IsStep4
     DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
     UpdateReplacePolicy: Retain
     Properties:
       TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/90_Instances.yaml"
@@ -345,11 +350,15 @@ Resources:
         BucketKey: !Ref BucketKey
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
-        IamInstanceProfile: !Sub "${ProjectName}-${EnvironmentName}-InstanceProfile"
         ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Select [ 0, !GetAZs ]
         ImageId: !If [ IsCustomerInfra, !Ref CustomerInstanceImageId, !Ref CloudInstanceImageId]
         InstanceName: !If [ IsCustomerInfra, !Ref CustomerInstanceName, !Ref CloudInstanceName]
+        IamInstanceProfile: !If
+          - IsCustomerInfra
+          - !GetAtt Roles.Outputs.InstanceProfileId
+          - ""
         InstanceType: !If [ IsCustomerInfra, !Ref CustomerInstanceType, !Ref CloudInstanceType]
         KeyName: !If [ IsCustomerInfra, !Ref CustomerInstanceKeyName, !Ref CloudInstanceKeyName]
         SecurityGroup: !GetAtt SecurityGroups.Outputs.SecurityGroupId
@@ -357,8 +366,10 @@ Resources:
 
   SSMDocuments:
     Type: AWS::CloudFormation::Stack
-    Condition: IsStep5
+    Condition: IsStep2
     DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
     UpdateReplacePolicy: Retain
     Properties:
       TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/90_SSM_Documents.yaml"
@@ -369,9 +380,11 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         CustomerInstanceName: !Ref CustomerInstanceName
         InstanceId: !GetAtt Instances.Outputs.InstanceId
         IpsecLeftCidr: !Ref CustomerVpcCidrBlock
         IpsecRightCidr: !Ref CloudVpcCidrBlock
+        OutputS3BucketName: !Ref Bucket
         RemoteRegion: !Ref CloudRegion
         StsVpnName: "Site2Site"

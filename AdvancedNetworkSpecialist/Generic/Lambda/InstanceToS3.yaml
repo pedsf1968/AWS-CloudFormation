@@ -1,0 +1,306 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:
+  This template for creating lambda used by CloudFormation other's stacks
+  # aws ec2 describe-security-groups --region <Region>  --group-id <Security Group Id>
+  # aws cloudformation create-stack --stack-name your-stack-name --template-body file://template.yaml --capabilities CAPABILITY_IAM
+  # aws cloudformation update-stack --stack-name your-stack-name --template-body file://template.yaml --capabilities CAPABILITY_IAM
+  # Event JSON to test Lambda
+  # {
+  #   "ResourceProperties": {
+  #     "Bucket": "hawkfund-cloudformation",
+  #     "BucketKey": "hawkfund-cloudformation/54_VPCGatewayEndpointForS3",
+  #     "BucketObject": "Data.json",
+  #     "Key": "eu-west-3:ANS:dev:EC2:Instance:MyInstance",
+  #     "Value": "i-02e4e2dd113397d4e"
+  #   }
+  # }
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "Datas"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: ["dev", "test", "prod"]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: ["false", "true"]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+  # Stack parameters
+  ApplicationLogLevel:
+    AllowedValues: [TRACE,DEBUG,INFO,WARN,ERROR,FATAL]
+    Default: TRACE
+    Description: |
+      Set this property to filter the application logs for your function that Lambda sends to CloudWatch. 
+      Lambda only sends application logs at the selected level of detail and lower, 
+      where TRACE is the highest level and FATAL is the lowest.
+    Type: String
+  CreateRole:
+    AllowedValues: [ "false", "true" ]
+    Default: "true"
+    Description: "Save resources information in s3 file"
+    Type: String
+  FunctionName:
+    Default: InstanceToS3
+    Type: String
+  LogFormat:
+    AllowedValues: [Text, JSON]
+    Default: JSON
+    Description: |
+      The format in which Lambda sends your function's application and system logs to CloudWatch.
+      Select between plain text and structured JSON.
+    Type: String
+  LogGroupClass:
+    AllowedValues: [STANDARD, INFREQUENT_ACCESS]
+    Default: STANDARD
+    Description: Specifies the log group class for this log group.
+    Type: String
+  RetentionInDays:
+    AllowedValues:
+      [1,3,5,7,14,30,60,90,120,150,180,365,400,545,731,1096,1827,2192,2557,2922,3288,3653]
+    Default: 1
+    Description: |
+      The number of days to retain the log events in the specified log group.
+      Possible values are: 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557, 2922, 3288, and 3653.
+    Type: String
+  SystemLogLevel:
+    AllowedValues: [DEBUG, INFO, WARN]
+    Default: WARN
+    Description: |
+      Set this property to filter the system logs for your function that Lambda sends to CloudWatch.
+      Lambda only sends system logs at the selected level of detail and lower,
+      where DEBUG is the highest level and WARN is the lowest.
+    Type: String
+
+Conditions:
+  CreateRole: !Equals [!Ref CreateRole, "true" ]
+  saveInS3File: !And 
+    - !Equals [!Ref CreateRole, "true" ]
+    - !Equals [ !Ref SaveInS3File, "true"]
+
+Resources:
+  LambdaFunctionRole:
+    Type: AWS::IAM::Role
+    Condition: CreateRole
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaRole
+      Path: "/"
+      Policies:
+        - PolicyName: UpdateObjectFromS3Policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - s3:DeleteObject
+                  - s3:GetObject
+                  - s3:List*
+                  - s3:ListBucket
+                  - s3:PutObject
+                Effect: Allow
+                Resource:
+                  - !Join [":", ["arn:aws:s3::", !Sub "${Bucket}/${BucketKey}"]]
+                  - !Join [":", ["arn:aws:s3::", !Sub "${Bucket}/${BucketKey}/*"]]
+        - PolicyName: !Sub "${FunctionName}Policy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:DescribeInstances
+                Resource:
+                  - "*"
+      RoleName: !Sub "${FunctionName}Role"
+      Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${FunctionName}Role"
+        - Key: ProjectName
+          Value: !Ref ProjectName
+
+  LambdaFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupClass: !Ref LogGroupClass
+      LogGroupName: !Sub "/aws/lambda/${FunctionName}"
+      RetentionInDays: !Ref RetentionInDays
+    UpdateReplacePolicy: Delete
+
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    DeletionPolicy: Delete
+    Properties:
+      Code:
+        ZipFile: |
+          import boto3
+          import cfnresponse
+          import json
+          import os
+          import logging
+          from botocore.exceptions import ClientError
+          from datetime import datetime
+          from typing import Dict, Any
+
+          # Configure logging
+          logging.basicConfig(level=logging.INFO)
+          logger = logging.getLogger(__name__)
+
+          # Load configuration from environment variables
+          s3_client = boto3.client('s3')
+          ec2_client = boto3.client('ec2')
+
+          def get_node(my_dict: Dict[str, Any], paths: list) -> Dict[str, Any]:              
+              """Navigate through the dictionary using the given paths."""
+              for key in paths:
+                  my_dict = my_dict.setdefault(key, {})
+              return my_dict
+
+          def fetch_resource_data(resource_id: str) -> Dict[str, Any]:
+              logger.info(f"Fetch resource with ID: {resource_id}.")
+              """Fetch instance data from EC2 with retry logic."""
+              try:
+                  response = ec2_client.describe_instances(InstanceIds=[resource_id])
+                  return response['Reservations'][0]['Instances'][0]
+              except ClientError as err:
+                  logger.warning(f"Wrong InstanceID: {resource_id}. Error: {err}")
+                  raise err
+
+          def json_serial(obj: Any) -> str:
+              """Helper function to serialize datetime objects."""
+              if isinstance(obj, datetime):
+                  return obj.isoformat()
+              raise TypeError("Type not serializable")
+
+          def read_s3_object(bucket: str, key: str) -> Dict[str, Any]:
+              logger.info(f"Read in Bucket {bucket} with Key {key}.")
+              """Read JSON data from S3 bucket with retry logic."""
+              try:
+                  s3_response = s3_client.get_object(Bucket=bucket, Key=key)
+                  return json.loads(s3_response["Body"].read().decode('utf-8'))
+              except ClientError as err:
+                  logger.error(f"Error reading from S3 bucket {bucket}. Error: {err}")
+                  return {}
+
+          def write_s3_object(bucket: str, key: str, data: Dict[str, Any]) -> None:
+              logger.info(f"Write data in Bucket {bucket} with Key {key}.")
+              """Write JSON data to S3 bucket with retry logic."""
+              try:
+                  s3_client.put_object(
+                      Body=bytes(json.dumps(data, default=json_serial).encode('UTF-8')),
+                      Bucket=bucket,
+                      Key=key
+                  )
+              except ClientError as err:
+                  logger.error(f"Can't write to S3 bucket {bucket}. Error: {err}")
+                  raise err
+
+          def lambda_handler(event, context):
+              logger.info(f"event: {event}")
+              logger.info(f"context: {context}")
+              bucket = event["ResourceProperties"]["Bucket"]
+              bucket_key = event["ResourceProperties"]["BucketKey"]
+              bucket_object = event["ResourceProperties"]["BucketObject"]
+              parameter_key = event["ResourceProperties"]["Key"]
+              resource_id = event["ResourceProperties"]["Value"]
+              key = f"{bucket_key}/{bucket_object}"
+              response_data = {}
+
+              try:
+                  # Fetch resource data
+                  resource_data = fetch_resource_data(resource_id)
+
+                  # Read data file from S3
+                  s3_data = read_s3_object(bucket, key)
+
+                  # Split the parameter key into paths
+                  paths = parameter_key.split(":")
+                  last_index = paths.pop()
+
+                  # Update the JSON data with the instance information
+                  get_node(s3_data, paths)[last_index] = resource_data
+
+                  # Write the updated data back to S3
+                  write_s3_object(bucket, key, s3_data)
+
+                  response_data["Value"] = resource_id
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data, "CustomResourcePhysicalID")
+              except Exception as err:
+                  logger.error("An error occurred during processing", exc_info=True)
+                  response_data["Data"] = str(err)
+                  serialized_response_data = json.dumps(response_data, default=json_serial)
+                  cfnresponse.send(event, context, cfnresponse.FAILED, json.loads(serialized_response_data), "CustomResourcePhysicalID")
+      Description: Function to update parameter from JSON file in a S3 bucket
+      FunctionName: !Ref FunctionName
+      Handler: index.lambda_handler
+      LoggingConfig:
+        ApplicationLogLevel: INFO
+        LogFormat: !Ref LogFormat
+        LogGroup: !Sub "/aws/lambda/${FunctionName}"
+        SystemLogLevel: !Ref SystemLogLevel
+      MemorySize: 128
+      Role: !If 
+      - CreateRole
+      - !GetAtt LambdaFunctionRole.Arn
+      - !Join [ ":", [ "arn:aws:iam:", !Ref "AWS::AccountId", !Sub "role/${FunctionName}Role" ] ]
+      Runtime: python3.12
+      Timeout: 30
+    UpdateReplacePolicy: Delete
+
+  LambdaFunctionRoleToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: saveInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:IAMResourceToS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Region: !Ref AWS::Region
+      ResourceType: "Role"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:IAM:Role:${FunctionName}Role"
+      Value: !Ref LambdaFunctionRole
+
+Outputs:
+  LambdaFunctionArn:
+    Description: ARN of the Lambda Function
+    Value: !GetAtt LambdaFunction.Arn
+  LogGroupId:
+    Description: Lambda Function Log Group Id
+    Value: !Ref LambdaFunctionLogGroup
+  RoleArn:
+    Description: Lambda Function Role Arn
+    Value: !If [ CreateRole, !GetAtt LambdaFunctionRole.Arn, "" ]

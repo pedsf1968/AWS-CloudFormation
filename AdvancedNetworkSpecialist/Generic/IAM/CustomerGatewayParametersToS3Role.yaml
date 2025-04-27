@@ -73,6 +73,13 @@ Resources:
             Resource: 
             - "*"
       RoleName: CustomerGatewayParametersToS3Role
+      Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-CustomerGatewayParametersToS3Role"
+        - Key: ProjectName
+          Value: !Ref ProjectName
 
 Outputs:
   RoleArn:

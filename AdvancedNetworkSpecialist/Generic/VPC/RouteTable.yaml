@@ -39,7 +39,7 @@ Parameters:
   SubnetId:
     Description: "The ID of the Subnet to attach the Route Table"
     Type: String
-  VPCId:
+  VpcId:
     Description: "The ID of the VPC where to create the Route Table"
     Type: String
 
@@ -50,7 +50,7 @@ Resources:
   RouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
-      VpcId: !Ref VPCId
+      VpcId: !Ref VpcId
       Tags:
         - Key: EnvironmentName
           Value: !Ref EnvironmentName
@@ -65,33 +65,21 @@ Resources:
       RouteTableId: !Ref RouteTable
       SubnetId: !Ref SubnetId
 
-  RouteTableIdToS3:
+  RouteTableToS3:
     Type: AWS::CloudFormation::CustomResource
     Condition: saveInS3File
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:UpdateParametersFromS3"]]
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:EC2ResourceToS3"]]
       ServiceTimeout: 60
       Bucket: !Ref Bucket
       BucketKey: !Ref BucketKey
       BucketObject: !Ref BucketObject
-      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:RouteTable:${RouteTableName}:Id"
+      Region: !Ref AWS::Region
+      ResourceType: "RouteTable"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:RouteTable:${RouteTableName}"
       Value: !Ref RouteTable
-
-  SubnetRouteTableAssociationIdToS3:
-    Type: AWS::CloudFormation::CustomResource
-    Condition: saveInS3File
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
-    Properties:
-      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:UpdateParametersFromS3"]]
-      ServiceTimeout: 60
-      Bucket: !Ref Bucket
-      BucketKey: !Ref BucketKey
-      BucketObject: !Ref BucketObject
-      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:SubnetRouteTableAssociation:${RouteTableName}:Id"
-      Value: !Ref SubnetRouteTableAssociation
 
 Outputs:
   RouteTableId:

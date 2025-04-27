@@ -19,6 +19,7 @@ Metadata:
           - Bucket
           - BucketKey
           - BucketObject
+          - SaveInS3File
       - Label:
           default: "VPC configuration"
         Parameters:
@@ -39,6 +40,18 @@ Metadata:
 
 Parameters:
   # Global parameters
+  Bucket:
+    Description: CloudFormation buket URL
+    Type: String
+    Default: "hawkfund-cloudformation"
+  BucketKey:
+    Description: Key to find object in the bucket
+    Type: String
+    Default: "71_TransitGatewayFullRouting"
+  BucketObject:
+    Description: "File to store data in the bucket"
+    Type: String
+    Default: "Data.json"
   EnvironmentName:
     Description: "Environment name that prefix all resources"
     Type: String
@@ -52,18 +65,11 @@ Parameters:
     Description: "Project name that prefix all resources"
     Type: String
     Default: "ANS"
-  Bucket:
-    Description: CloudFormation buket URL
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "true"
+    Description: "Save resources information in s3 file"
     Type: String
-    Default: "hawkfund-cloudformation"
-  BucketKey:
-    Description: Key to find object in the bucket
-    Type: String
-    Default: "71_TransitGatewayFullRouting"
-  BucketObject:
-    Description: "File to store data in the bucket"
-    Type: String
-    Default: "Data.json"
 
   # Network parameters
   SubnetNames:
@@ -102,23 +108,9 @@ Parameters:
     Default: t2.micro
 
 Resources:
-  Roles:
-    Type: AWS::CloudFormation::Stack
-    DeletionPolicy: Delete
-    UpdateReplacePolicy: Retain
-    Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/71_Roles.yaml"
-      TimeoutInMinutes: 5
-      Parameters:
-        Bucket: !Ref Bucket
-        BucketKey: !Ref BucketKey
-        BucketObject: !Ref BucketObject
-
   Lambdas:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
-    DependsOn:
-      - Roles
     UpdateReplacePolicy: Retain
     Properties:
       TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/71_Lambdas.yaml"
@@ -127,12 +119,14 @@ Resources:
         Bucket: !Ref Bucket
         BucketKey: !Ref BucketKey
         BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
 
   VpcAndSubnets:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     DependsOn:
-      - Roles
       - Lambdas
     UpdateReplacePolicy: Retain
     Properties:
@@ -144,6 +138,7 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         SubnetPrivateCidrBlocks: !Ref SubnetPrivateCidrBlocks
         SubnetPublicCidrBlocks: !Ref SubnetPublicCidrBlocks
         SubnetNames: !Ref SubnetNames
@@ -154,7 +149,6 @@ Resources:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     DependsOn:
-      - Roles
       - Lambdas
     UpdateReplacePolicy: Delete
     Properties:
@@ -166,6 +160,7 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         BastionIngressCidrIp: "0.0.0.0/0"
         BastionVpcId:
           !Select [0, !Split [",", !GetAtt VpcAndSubnets.Outputs.VpcIds]]
@@ -176,7 +171,6 @@ Resources:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     DependsOn:
-      - Roles
       - Lambdas
     UpdateReplacePolicy: Delete
     Properties:
@@ -188,6 +182,7 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         IgwName: "Default"
         TgwName: "Default"
         SubnetIds: !GetAtt VpcAndSubnets.Outputs.SubnetPrivateIds
@@ -197,7 +192,6 @@ Resources:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     DependsOn:
-      - Roles
       - Lambdas
     UpdateReplacePolicy: Delete
     Properties:
@@ -208,6 +202,7 @@ Resources:
         BucketKey: !Ref BucketKey
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
+        SaveInS3File: !Ref SaveInS3File
         ProjectName: !Ref ProjectName
         DestinationCidrBlock: "10.0.0.0/8"
         VpcIds: !GetAtt VpcAndSubnets.Outputs.VpcIds
@@ -220,7 +215,6 @@ Resources:
   Instances:
     Type: AWS::CloudFormation::Stack
     DependsOn:
-      - Roles
       - Lambdas
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -233,6 +227,7 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         KeyName: !Ref InstanceKeyName
         ApplicationImageId: !Ref InstanceImageId
         ApplicationInstanceName: "Application"

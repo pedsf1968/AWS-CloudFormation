@@ -107,13 +107,15 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:VpnConnectionParametersToS3"]]
-      ServiceTimeout: 60
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:EC2ResourceToS3"]]
+      ServiceTimeout: 120
       Bucket: !Ref Bucket
       BucketKey: !Ref BucketKey
       BucketObject: !Ref BucketObject
-      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:VPNConnection:${Name}"
-      VpnConnectionId: !Ref VpnConnection
+      Region: !Ref AWS::Region
+      ResourceType: "VpnConnection"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:VpnConnection:${Name}"
+      Value: !Ref VpnConnection
 
 Outputs:
   VpnConnectionId:

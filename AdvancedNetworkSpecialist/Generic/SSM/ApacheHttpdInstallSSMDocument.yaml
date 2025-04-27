@@ -1,0 +1,82 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CloudFormation template to create an SSM Document for installing Apache Httpd"
+
+Resources:
+  ApacheHttpdInstallSSMDocument:
+    Type: "AWS::SSM::Document"
+    Properties:
+      Content:
+        description: "Install Apache Httpd with OS detection"
+        mainSteps:
+        - name: ApacheHttpdInstall
+          action: "aws:runShellScript"
+          inputs:
+            runCommand:
+            - |
+              #!/bin/bash
+              set -eux
+              
+              # Function to determine OS and install Apache Httpd
+              install_apache() {
+                if command -v yum &>/dev/null; then
+                  echo "Installing Apache Httpd using yum..."
+                  yum update -y
+                  yum install -y httpd
+                elif command -v apt-get &>/dev/null; then
+                  echo "Installing Apache Httpd using apt-get..."
+                  apt update -y
+                  apt install -y apache2
+                else
+                  echo "Unsupported OS: Cannot determine package manager."
+                  exit 1
+                fi
+              }
+              
+              # Check OS and install
+              if [[ -f /etc/os-release ]]; then
+                source /etc/os-release
+                if [[ "$ID" == "amzn" ]]; then
+                  echo "Detected Amazon Linux"
+                  install_apache
+                elif [[ "$ID" == "ubuntu" ]]; then
+                  echo "Detected Ubuntu"
+                  install_apache
+                elif [[ "$ID" == "centos" || "$ID" == "rhel" ]]; then
+                  echo "Detected CentOS/RHEL"
+                  install_apache
+                elif [[ "$ID" == "debian" ]]; then
+                  echo "Detected Debian"
+                  install_apache
+                else
+                  echo "Warning: OS '$ID' is not explicitly supported, attempting install."
+                  install_apache
+                fi
+              else
+                echo "Cannot determine OS from /etc/os-release, attempting install."
+                install_apache
+              fi
+              
+              # Start and enable the httpd service
+              echo "Starting and enabling httpd service..."
+              if command -v systemctl &>/dev/null; then
+                systemctl start httpd
+                systemctl enable httpd
+              else
+                echo "Warning: systemctl not found.  Please start and enable httpd service manually."
+              fi
+              
+              # Optional: Create a default index.html
+              echo "Creating a default index.html..."
+              echo "<h1>{{Message}} from $(hostname -f)/<h1>" > /var/www/html/index.html
+        parameters:
+          Message:
+            type: "String"
+            description: "Welcome Message"
+            default: "Hello World"
+        schemaVersion: "2.2"
+      DocumentFormat: YAML
+      DocumentType: Command
+      Name: LibreswanInstallSSMDocument
+      TargetType: "/AWS::EC2::Instance"
+      UpdateMethod: Replace

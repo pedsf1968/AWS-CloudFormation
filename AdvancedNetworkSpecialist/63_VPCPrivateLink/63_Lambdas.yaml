@@ -32,14 +32,46 @@ Parameters:
     Description: "Save resources information in s3 file"
     Type: String
 
+  # Stack parameters
+  ApplicationLogLevel:
+    AllowedValues: [ TRACE, DEBUG, INFO, WARN, ERROR, FATAL ]
+    Default: ERROR
+    Description: |
+      Set this property to filter the application logs for your function that Lambda sends to CloudWatch. 
+      Lambda only sends application logs at the selected level of detail and lower, 
+      where TRACE is the highest level and FATAL is the lowest.
+    Type: String
+
 Resources:
+  EC2ResourceToS3Stack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        ApplicationLogLevel: !Ref ApplicationLogLevel
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/Lambda/EC2ResourceToS3.yaml"
+      TimeoutInMinutes: 5
+
   CreateAmiFromInstanceIdStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
       Parameters:
-        ApplicationLogLevel: DEBUG
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        ApplicationLogLevel: !Ref ApplicationLogLevel
       TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/Lambda/CreateAmiFromInstanceId.yaml"
       TimeoutInMinutes: 5
 
@@ -49,14 +81,43 @@ Resources:
     UpdateReplacePolicy: Delete
     Properties:
       Parameters:
-        ApplicationLogLevel: DEBUG
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        ApplicationLogLevel: !Ref ApplicationLogLevel
       TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/Lambda/UpdateParametersFromS3.yaml"
       TimeoutInMinutes: 5
 
 Outputs:
-  CreateAmiFromInstanceIdLambdaFunctionArn:
-    Description: "ARN of CreateAmiFromInstanceId Lambda"
-    Value: !GetAtt CreateAmiFromInstanceIdStack.Outputs.LambdaFunctionArn
+  EC2ResourceToS3LambdaFunctionArn:
+    Description: "EC2ResourceToS3 Lambda Arn"
+    Value: !GetAtt EC2ResourceToS3Stack.Outputs.LambdaFunctionArn
+  EC2ResourceToS3RoleArn:
+    Description: "EC2ResourceToS3 Lambda Role Arn"
+    Value: !GetAtt EC2ResourceToS3Stack.Outputs.RoleArn
+  EC2ResourceToS3LogGroupId:
+    Description: EC2ResourceToS3 Lambda Log Group Id
+    Value: !GetAtt EC2ResourceToS3Stack.Outputs.LogGroupId
+
   UpdateParametersFromS3LambdaFunctionArn:
     Description: "ARN of UpdateParametersFromS3 Lambda"
     Value: !GetAtt UpdateParametersFromS3Stack.Outputs.LambdaFunctionArn
+  UpdateParametersFromS3RoleArn:
+    Description: "UpdateParametersFromS3 Lambda Role Arn"
+    Value: !GetAtt UpdateParametersFromS3Stack.Outputs.RoleArn
+  UpdateParametersFromS3LogGroupId:
+    Description: UpdateParametersFromS3 Lambda Log Group Id
+    Value: !GetAtt UpdateParametersFromS3Stack.Outputs.LogGroupId
+
+  CreateAmiFromInstanceIdLambdaFunctionArn:
+    Description: "ARN of CreateAmiFromInstanceId Lambda"
+    Value: !GetAtt CreateAmiFromInstanceIdStack.Outputs.LambdaFunctionArn
+  CreateAmiFromInstanceIdRoleArn:
+    Description: "CreateAmiFromInstanceId Lambda Role Arn"
+    Value: !GetAtt CreateAmiFromInstanceIdStack.Outputs.RoleArn
+  CreateAmiFromInstanceIdLogGroupId:
+    Description: CreateAmiFromInstanceId Lambda Log Group Id
+    Value: !GetAtt CreateAmiFromInstanceIdStack.Outputs.LogGroupId

@@ -47,6 +47,9 @@ Parameters:
   PrefixListEntries:
     Type: String
 
+Conditions:
+  saveInS3File: !Equals [ !Ref SaveInS3File, "true"]
+
 Resources:
   PrefixList:
     Type: AWS::CloudFormation::Stack
@@ -84,6 +87,22 @@ Resources:
           Value:  !Sub "${ProjectName}-${EnvironmentName}-Default-SG"
       VpcId: !Ref BastionVPCId
 
+  BastionSecurityGroupToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: saveInS3File 
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:EC2ResourceToS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Region: !Ref AWS::Region
+      ResourceType: "SecurityGroup"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:SecurityGroup:Bastion"
+      Value: !Ref BastionSecurityGroup
+
   ConsumerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -102,6 +121,22 @@ Resources:
         - Key: Name
           Value:  !Sub "${ProjectName}-${EnvironmentName}-Consumer-SG"
       VpcId: !Ref ConsumerVPCId
+
+  ConsumerSecurityGroupToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: saveInS3File 
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:EC2ResourceToS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Region: !Ref AWS::Region
+      ResourceType: "SecurityGroup"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:SecurityGroup:Consumer"
+      Value: !Ref ConsumerSecurityGroup
 
   WebServerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -126,6 +161,22 @@ Resources:
           Value: !Sub "${ProjectName}-${EnvironmentName}-WebServer-SG"
       VpcId: !Ref WebServerVPCId
 
+  WebServerSecurityGroupToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: saveInS3File 
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:EC2ResourceToS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Region: !Ref AWS::Region
+      ResourceType: "SecurityGroup"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:SecurityGroup:WebServer"
+      Value: !Ref WebServerSecurityGroup
+
   VPCEndpointServiceSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -140,6 +191,22 @@ Resources:
         - Key: Name
           Value: !Sub "${ProjectName}-${EnvironmentName}-VPCEndpointService-SG"
       VpcId: !Ref ConsumerVPCId
+
+  VPCEndpointServiceSecurityGroupToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: saveInS3File 
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:EC2ResourceToS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Region: !Ref AWS::Region
+      ResourceType: "SecurityGroup"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:SecurityGroup:VPCEndpointService"
+      Value: !Ref VPCEndpointServiceSecurityGroup
 
 Outputs:
   PrefixListId:

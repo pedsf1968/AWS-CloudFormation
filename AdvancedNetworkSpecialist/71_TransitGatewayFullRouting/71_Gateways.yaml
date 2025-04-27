@@ -29,6 +29,11 @@ Parameters:
     Description: "Project name that prefix all resources"
     Type: String
     Default: "ANS"
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
 
   # Stack parameters
   IgwName:
@@ -61,8 +66,8 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         Name: !Ref IgwName
-        SaveInS3File: "true"
         VpcId: !Select [0, !Split [",", !Ref VpcIds]]
 
   TransitGatewayStack:
@@ -78,9 +83,9 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         Description: !Sub "${ProjectName} ${EnvironmentName} Transit Gateway ${TgwName}" 
         Name: !Ref TgwName
-        SaveInS3File: "true"
 
   TransitGatewayAttachmentStackA:
     Type: AWS::CloudFormation::Stack
@@ -95,10 +100,10 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         Name: "A"
         TgwName: !Ref TgwName
         TransitGatewayId: !GetAtt TransitGatewayStack.Outputs.TransitGatewayId
-        SaveInS3File: "true"
         SubnetId: !Select [0, !Split [",", !Ref SubnetIds]]
         VpcId: !Select [0, !Split [",", !Ref VpcIds]]
 
@@ -115,10 +120,10 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         Name: "B"
         TgwName: !Ref TgwName
         TransitGatewayId: !GetAtt TransitGatewayStack.Outputs.TransitGatewayId
-        SaveInS3File: "true"
         SubnetId: !Select [1, !Split [",", !Ref SubnetIds]]
         VpcId: !Select [1, !Split [",", !Ref VpcIds]]
 
@@ -135,10 +140,10 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
         Name: "C"
         TgwName: !Ref TgwName
         TransitGatewayId: !GetAtt TransitGatewayStack.Outputs.TransitGatewayId
-        SaveInS3File: "true"
         SubnetId: !Select [2, !Split [",", !Ref SubnetIds]]
         VpcId: !Select [2, !Split [",", !Ref VpcIds]]
 

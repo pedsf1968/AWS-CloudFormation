@@ -64,6 +64,13 @@ Resources:
             - !Join [":", ["arn:aws:s3::", !Sub "${Bucket}/${BucketKey}"]]
             - !Join [":", ["arn:aws:s3::", !Sub "${Bucket}/${BucketKey}/*"]]
       RoleName: UpdateParametersFromS3Role
+      Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-UpdateParametersFromS3Role"
+        - Key: ProjectName
+          Value: !Ref ProjectName
 
 Outputs:
   RoleArn:

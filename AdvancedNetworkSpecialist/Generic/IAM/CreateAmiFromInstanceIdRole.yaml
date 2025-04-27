@@ -64,6 +64,13 @@ Resources:
               - 'ec2:DeleteSnapshot'
             Resource: ['*']
       RoleName: CreateAmiFromInstanceIdRole
+      Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-CreateAmiFromInstanceIdRole"
+        - Key: ProjectName
+          Value: !Ref ProjectName
 
 Outputs:
   RoleArn:

@@ -29,6 +29,11 @@ Parameters:
     Default: "ANS"
     Description: "Project name that prefix all resources"
     Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
 
   # Stack parameters
   GroupDescription:
@@ -78,7 +83,7 @@ Conditions:
   IsSSH: !Equals [!Ref SSHAllowed, "true" ]
   IsHTTP: !Equals [!Ref HTTPAllowed, "true" ]
   IsHTTPS: !Equals [!Ref HTTPSAllowed, "true" ]
-
+  saveInS3File: !Equals [ !Ref SaveInS3File, "true"]
 
 Resources:
   SecurityGroup:
@@ -134,6 +139,23 @@ Resources:
       GroupId: !Ref SecurityGroup
       IpProtocol: tcp
       ToPort: 443
+
+  SecurityGroupToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: saveInS3File 
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:EC2ResourceToS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Region: !Ref AWS::Region
+      ResourceType: "SecurityGroup"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:SecurityGroup:Default"
+      Value: !Ref SecurityGroup
+
 
 Outputs:
   SecurityGroupId:

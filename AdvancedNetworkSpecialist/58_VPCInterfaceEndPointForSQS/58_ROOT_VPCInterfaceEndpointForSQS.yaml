@@ -10,21 +10,32 @@ Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
       - Label:
+          default: "Project Configuration"
+        Parameters:
+          - ProjectName
+          - EnvironmentName
+      - Label:
+          default: "Configuration"
+        Parameters:
+          - Bucket
+          - BucketKey
+          - BucketObject
+          - SaveInS3File
+      - Label:
           default: "VPC configuration"
         Parameters:
-          - VPCName
+          - VpcName
           - VpcCidrBlock
       - Label:
           default: "Subnets configuration"
         Parameters:
           - SubnetName
-          - PrivateSubnetCidr
-          - PublicSubnetCidr
+          - SubnetPrivateCidrBlock
+          - SubnetPublicCidrBlock
       - Label:
           default: "IGW, Route Tables and Routes"
         Parameters:
           - InternetGatewayName
-          - RouteTableName
       - Label:
           default: "Queue"
         Parameters:
@@ -33,172 +44,297 @@ Metadata:
       - Label:
           default: "Instances"
         Parameters:
-          - InstanceImageId
-          - InstanceKeyName
-          - PrivateInstanceName
-          - PublicInstanceName
-      - Label:
-          default: "Configuration"
-        Parameters:
-          - Bucket
-          - BucketKey
+          - KeyName
+          - ApplicationImageId
+          - ApplicationInstanceName
+          - ApplicationInstanceType
+          - BastionImageId
+          - BastionInstanceName
+          - BastionInstanceType
 
 Parameters:
-  VPCName:
-    Description: "VPC name"
-    Type: String
-    Default: "My-VPC"
-  VpcCidrBlock:
-    Description: "The IPv4 network range for the VPC, in CIDR notation."
-    Type: String
-    Default: 10.10.0.0/16
-
-  SubnetName:
-    Description: Subnet name
-    Type: String
-    Default: "Subnet"
-  PrivateSubnetCidr:
-    Description: "Private Subnet CIDR"
-    Type: String
-    Default: 10.10.1.0/24
-  PublicSubnetCidr:
-    Description: "Public Subnet CIDR"
-    Type: String
-    Default: 10.10.0.0/24
-
-  QueueName:
-    Description: SQS queue name
-    Type: String
-    Default: "My-Queue"
-  QueueMessageRetentionPeriod:
-    Description: "SQS queue message retention period in second"
-    Type: Number
-    Default: 60
-
-  InternetGatewayName:
-    Type: String
-    Default: "VPC-IGW"
-  RouteTableName:
-    Type: String
-    Default: "VPC-RT"
- 
-  InstanceImageId:
-    Description: Instance AMI
-    Type: AWS::EC2::Image::Id
-    Default: ami-015875403620174eb
-  InstanceKeyName: 
-    Description: Instance Key name
-    Type: String
-    Default: "dso-paris"
-  PrivateInstanceName: 
-    Description: Private instance name
-    Type: String
-    Default: "My-Application"
-  PublicInstanceName: 
-    Description: Public instance name
-    Type: String
-    Default: "Bastion"
-
+  # Global parameters
   Bucket:
+    Default: "hawkfund-cloudformation"
     Description: CloudFormation buket URL
     Type: String
-    Default: "hawkfund-cloudformation"
   BucketKey:
+    Default: "58_VPCInterfaceEndPointForSQS"
     Description: Key to find object in the bucket
     Type: String
-    Default: "58_VPCInterfaceEndPointForSQS"
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: [ "dev", "test", "prod" ]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String    
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "true"
+    Description: "Save resources informations in s3 file"
+    Type: String
+
+  # Network parameters
+  InternetGatewayName:
+    Default: "VPC-IGW"
+    Type: String
+
+  SubnetName:
+    Default: "Subnet"
+    Description: "Subnet name"
+    Type: String
+  SubnetPrivateCidrBlock:
+    Default: "10.10.1.0/24"
+    Description: "Private Subnet CIDR"
+    Type: String
+  SubnetPublicCidrBlock:
+    Default: "10.10.0.0/24"
+    Description: "Public Subnet CIDR"
+    Type: String
+
+  VpcName:
+    Default: "My-VPC"
+    Description: "VPC name"
+    Type: String
+  VpcCidrBlock:
+    Default: 10.10.0.0/16
+    Description: "The IPv4 network range for the VPC, in CIDR notation."
+    Type: String
+
+  # SQS parameters
+  QueueName:
+    Default: "My-Queue"
+    Description: SQS queue name
+    Type: String
+  QueueMessageRetentionPeriod:
+    Default: 60
+    Description: "SQS queue message retention period in second"
+    Type: Number
+
+  # Instances parameters
+  ApplicationImageId:
+    Default: ami-08461dc8cd9e834e0
+    Description: "Application Instance AMI"
+    Type: AWS::EC2::Image::Id
+  ApplicationInstanceName:
+    Default: "Application"
+    Description: "Application Instances name"
+    Type: String
+  ApplicationInstanceType:
+    Default: t2.micro
+    Description: "Application Instances type"
+    Type: String
+  BastionImageId:
+    Default: ami-08461dc8cd9e834e0
+    Description: "Bastion Instance AMI"
+    Type: AWS::EC2::Image::Id
+  BastionInstanceName:
+    Default: "Bastion"
+    Description: "Bastion Instances name"
+    Type: String
+  BastionInstanceType:
+    Default: t2.micro
+    Description: "Bastion Instances type"
+    Type: String
+  KeyName:
+    Default: "dso-paris"
+    Description: "Instances Key name"
+    Type: String
 
 Resources:
-  VPCAndSubnets:
+  Lambdas:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
+    UpdateReplacePolicy: Retain
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/58_20_VPCAndSubnets.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/58_Lambdas.yaml"
       TimeoutInMinutes: 5
       Parameters:
-        VPCName: !Ref VPCName
-        VpcCidrBlock: !Ref VpcCidrBlock
-        SubnetName: !Ref SubnetName
-        PrivateSubnetCidr: !Ref PrivateSubnetCidr
-        PublicSubnetCidr: !Ref PublicSubnetCidr
-
-  SQS:
-    Type: AWS::CloudFormation::Stack
-    DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
-    Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/58_30_SQS.yaml"
-      TimeoutInMinutes: 5
-      Parameters:
-        QueueName: !Ref QueueName
-        QueueMessageRetentionPeriod: !Ref QueueMessageRetentionPeriod
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        ApplicationLogLevel: ERROR
 
   Roles:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/58_40_Roles.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/58_Roles.yaml"
       TimeoutInMinutes: 5
       Parameters:
-        QueueARN: !GetAtt SQS.Outputs.QueueARN
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
 
-# Create Internet Gateway and default route table for public subnet
-  InternetGateways:
+
+  VpcAndSubnets:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/58_50_Gateways.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/58_VpcAndSubnets.yaml"
       TimeoutInMinutes: 5
       Parameters:
-        VPCId: !GetAtt VPCAndSubnets.Outputs.VpcId
-        InternetGatewayName:  !Ref InternetGatewayName
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        SubnetPrivateCidrBlock: !Ref SubnetPrivateCidrBlock
+        SubnetPublicCidrBlock: !Ref SubnetPublicCidrBlock
+        SubnetName: !Ref SubnetName
+        VpcCidrBlock: !Ref VpcCidrBlock
+        VpcName: !Ref VpcName
+
+  SQS:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/58_SQS.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        QueueName: !Ref QueueName
+        QueueMessageRetentionPeriod: !Ref QueueMessageRetentionPeriod
+        Role: Private-Instance-Role
+
+  Gateways:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/58_Gateways.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        IgwName: !Ref InternetGatewayName
+        VpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
 
   RouteTables:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/58_60_RouteTables.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/58_RouteTables.yaml"
       TimeoutInMinutes: 5
       Parameters:
-        VPCId: !GetAtt VPCAndSubnets.Outputs.VpcId
-        PrivateSubnetId: !GetAtt VPCAndSubnets.Outputs.PrivateSubnetId
-        PublicSubnetId: !GetAtt VPCAndSubnets.Outputs.PublicSubnetId
-        InternetGatewayId:  !GetAtt InternetGateways.Outputs.InternetGatewayId
-        RouteTableName: !Ref RouteTableName
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        RouteTableNames: "A,B"
+        InternetGatewayId: !GetAtt Gateways.Outputs.InternetGatewayId
+        SubnetPrivateId: !GetAtt VpcAndSubnets.Outputs.SubnetPrivateId
+        SubnetPublicId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId
+        VpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
+
+  SecurityGroups:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - Roles
+      - Lambdas
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/58_SecurityGroups.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        ApplicationIngressCidrIp: "10.0.0.0/8"
+        ApplicationVpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
+        BastionIngressCidrIp: "0.0.0.0/0"
+        BastionVpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
+        InterfaceIngressCidrIp: "10.0.0.0/8"
+        InterfaceVpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
 
   Endpoints:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/58_70_Endpoints.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/58_Endpoints.yaml"
       TimeoutInMinutes: 5
       Parameters:
-        QueueARN: !GetAtt SQS.Outputs.QueueARN
-        VPCId: !GetAtt VPCAndSubnets.Outputs.VpcId
-        VpcCidrBlock: !Ref VpcCidrBlock
-        PrivateSubnetId: !GetAtt VPCAndSubnets.Outputs.PrivateSubnetId
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        QueueArn: !GetAtt SQS.Outputs.QueueArn
+        SecurityGroupId: !GetAtt SecurityGroups.Outputs.InterfaceSecurityGroupId
+        SubnetId: !GetAtt VpcAndSubnets.Outputs.SubnetPrivateId
+        VpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
 
   Instances:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
+      - Gateways
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/58_80_Instances.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/58_Instances.yaml"
       TimeoutInMinutes: 5
       Parameters:
-        VPCId: !GetAtt VPCAndSubnets.Outputs.VpcId
-        PrivateSubnetId: !GetAtt VPCAndSubnets.Outputs.PrivateSubnetId
-        PublicSubnetId: !GetAtt VPCAndSubnets.Outputs.PublicSubnetId
-        InstanceImageId: !Ref InstanceImageId
-        PrivateInstanceName: !Ref PrivateInstanceName
-        PublicInstanceName: !Ref PublicInstanceName
-        InstanceKeyName: !Ref InstanceKeyName
-        PrivateSourceCidr: !Ref VpcCidrBlock
-        PublicSourceCidr: "0.0.0.0/0"
-        PrivateInstanceProfile: !GetAtt Roles.Outputs.PrivateInstanceProfileId
-  
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        ApplicationImageId: !Ref ApplicationImageId
+        ApplicationInstanceName: !Ref ApplicationInstanceName
+        ApplicationInstanceProfile: !GetAtt Roles.Outputs.InstanceProfileId
+        ApplicationInstanceType: !Ref ApplicationInstanceType
+        ApplicationSecurityGroup: !GetAtt SecurityGroups.Outputs.ApplicationSecurityGroupId
+        ApplicationSubnetId: !GetAtt VpcAndSubnets.Outputs.SubnetPrivateId
+        BastionImageId: !Ref BastionImageId
+        BastionInstanceName: !Ref BastionInstanceName
+        BastionInstanceType: !Ref BastionInstanceType
+        BastionSecurityGroup: !GetAtt SecurityGroups.Outputs.BastionSecurityGroupId
+        BastionSubnetId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId
+        KeyName: !Ref KeyName
