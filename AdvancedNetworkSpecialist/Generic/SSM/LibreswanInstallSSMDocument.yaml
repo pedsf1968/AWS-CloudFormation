@@ -18,22 +18,6 @@ Resources:
               #!/bin/bash
               set -eux # Exit on error, print commands
 
-              # Configure fedora repository
-              cat << EOF > /etc/yum.repos.d/fedora.repo
-              [fedora] 
-              name=Fedora 36 - $basearch
-              #baseurl=http://download.example/pub/fedora/linux/releases/36/Everything/$basearch/os/ 
-              metalink=https://mirrors.fedoraproject.org/metalink?repo=fedora-36&arch=$basearch 
-              enabled=0 
-              countme=1 
-              metadata_expire=7d 
-              repo_gpgcheck=0 
-              type=rpm 
-              gpgcheck=1 
-              gpgkey=https://getfedora.org/static/fedora.gpg 
-              skip_if_unavailable=False
-              EOF
-
               # Determine the OS and install Libreswan accordingly
               if [[ $(command -v yum) ]]; then
                 # For Amazon Linux, CentOS, Red Hat
