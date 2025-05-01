@@ -1,0 +1,127 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CloudFormation template to create an SSM Document for installing Libreswan"
+
+Resources:
+  LibreswanDeploySSMDocument:
+    Type: AWS::SSM::Document
+    Properties:
+      Content:
+        description: "Deploy Libreswan server for IPSEC connection on instance."
+        parameters:
+          IpsecLeftId:
+            type: String
+            description: "Id of the left IPSEC"
+            default: ''
+          IpsecRightId:
+            type: String
+            description: "Id of the right IPSEC"
+            default: ''
+          IpsecLeftCidr:
+            type: String
+            description: "CIDR of the left IPSEC"
+            default: ''
+          IpsecRightCidr:
+            type: String
+            description: "CIDR of the right IPSEC"
+            default: ''
+          IpsecSecret:
+            type: String
+            description: "Secret of the IPSEC"
+            default: ''
+        mainSteps:
+        - name: "InstallLibreswan"
+          action: "aws:runShellScript"
+          inputs:
+            runCommand:
+            - |
+              #!/bin/bash
+              set -eux # Exit on error, print commands
+
+              # Determine the OS and install Libreswan accordingly
+              if [[ $(command -v yum) ]]; then
+                # For Amazon Linux, CentOS, Red Hat
+                yum update -y
+                yum install -y libreswan
+              elif [[ $(command -v apt-get) ]]; then
+                # For Ubuntu, Debian
+                apt update -y
+                apt install -y libreswan
+              elif [[ -f /etc/os-release ]]; then
+                # Fallback using /etc/os-release
+                source /etc/os-release
+                if [[ "$ID" == "amzn" ]]; then
+                  yum update -y
+                  amazon-linux-extras install -y libreswan # For newer Amazon Linux
+                  yum install -y libreswan
+                elif [[ "$ID" == "ubuntu" || "$ID" == "debian" ]]; then
+                  apt update -y
+                  apt install -y libreswan
+                elif [[ "$ID" == "centos" || "$ID" == "rhel" ]]; then
+                  yum update -y
+                  yum install -y libreswan
+                else
+                  echo "Unsupported OS: $ID"
+                  exit 1
+                fi
+              else
+                echo "Unsupported OS: Cannot determine package manager"
+                exit 1
+              fi
+              # Configure ip filters
+              cat << EOF > /etc/sysctl.conf
+              net.ipv4.ip_forward = 1 
+              net.ipv4.conf.default.rp_filter = 0 
+              net.ipv4.conf.default.accept_source_route = 0
+              EOF
+              sysctl -p
+        - name: IpsecConfiguration
+          action: aws:runShellScript
+          inputs:
+            timeoutSeconds: '60'
+            runCommand:
+            - |
+              cat << EOF > /etc/ipsec.d/aws.conf
+              conn Tunnel1
+                authby=secret
+                auto=start
+                left=%defaultroute
+                leftid={{IpsecLeftId}}
+                right={{IpsecRightId}}
+                type=tunnel
+                ikelifetime=8h
+                keylife=1h
+                phase2alg=aes256-sha1;modp2048
+                ike=aes256-sha1;modp2048
+                keyingtries=%forever
+                keyexchange=ike
+                leftsubnet={{IpsecLeftCidr}}
+                rightsubnet={{IpsecRightCidr}}
+                dpddelay=10
+                dpdtimeout=30
+                dpdaction=restart_by_peer
+                encapsulation=yes
+              EOF
+        - name: IpsecSecret
+          action: aws:runShellScript          
+          inputs:
+            timeoutSeconds: '60'
+            runCommand:
+            - |
+              cat << EOF > /etc/ipsec.d/aws.secrets
+              {{IpsecLeftId}} {{IpsecRightId}}: PSK "{{IpsecSecret}}"
+              EOF
+        - name: IpsecStart
+          action: aws:runShellScript          
+          inputs:
+            timeoutSeconds: '60'
+            runCommand:
+              - systemctl start ipsec.service
+              - systemctl enable ipsec.service
+              - systemctl status ipsec.service
+        schemaVersion: "2.2"
+      DocumentFormat: YAML
+      DocumentType: Command
+      Name: LibreswanDeploySSMDocument
+      TargetType: "/AWS::EC2::Instance"
+      UpdateMethod: Replace
