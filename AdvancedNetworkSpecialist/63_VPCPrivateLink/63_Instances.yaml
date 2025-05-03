@@ -125,20 +125,6 @@ Resources:
         KeyName: !Ref KeyName
         SecurityGroup: !Ref BastionSecurityGroup
         SubnetId: !Ref BastionSubnetId
-        UserData:
-          "Fn::Base64": !Sub |
-            #!/bin/bash -x
-            yum update -y
-            yum install -y httpd
-            systemctl start httpd
-            systemctl enable httpd
-            echo "This is a service hosted behind AWS private link" > /var/www/html/index.html
-            /opt/aws/bin/cfn-signal \
-              -e $? \
-              --stack ${AWS::StackName} \
-              --region ${AWS::Region} \
-              --resource WaitCondition
-            shutdown -h now
 
   # Create AMI from the previous Instance
   CreateAmi:

@@ -11,7 +11,7 @@ Parameters:
   BucketKey:
     Description: "Key to find object in the bucket"
     Type: String
-    Default: "90_SiteToSiteVpn"
+    Default: "91_SiteToSiteVpn"
   BucketObject:
     Description: "File to store data in the bucket"
     Type: String
@@ -96,24 +96,6 @@ Resources:
           - "false"
           - "true"
         SubnetId: !Ref SubnetId
-        UserData: 
-          !Base64 |
-            #!/bin/bash
-
-            # Install SSM Agent based on OS (you might need logic to detect OS)
-            if grep -q "amzn" /etc/os-release; then
-              yum update -y
-              amazon-linux-extras install -y aws-ssm-agent
-            elif grep -q "Ubuntu" /etc/os-release; then
-              apt update -y
-              apt install -y aws-ssm-agent
-            elif grep -q "CentOS" /etc/os-release || grep -q "Red Hat" /etc/os-release; then
-              yum update -y
-              yum install -y amazon-ssm-agent
-            fi
-
-            systemctl enable amazon-ssm-agent
-            systemctl start amazon-ssm-agent
 
 Outputs:
   InstanceId:

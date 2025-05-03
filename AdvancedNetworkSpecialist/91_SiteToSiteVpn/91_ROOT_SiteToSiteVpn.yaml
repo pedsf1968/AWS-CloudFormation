@@ -1,6 +1,6 @@
-# aws cloudformation validate-template --template-body file:/90_ROOT_SiteToSiteVpn.yaml
-# aws cloudformation create-stack --stack-name ANS-90 --template-body file:/90_ROOT_SiteToSiteVpn.yaml --region eu-west-3 --capabilities CAPABILITY_IAM
-# aws cloudformation delete-stack --stack-name ANS-90 --region eu-west-3
+# aws cloudformation validate-template --template-body file:/91_ROOT_SiteToSiteVpn.yaml
+# aws cloudformation create-stack --stack-name ANS-91 --template-body file:/91_ROOT_SiteToSiteVpn.yaml --region eu-west-3 --capabilities CAPABILITY_IAM
+# aws cloudformation delete-stack --stack-name ANS-91 --region eu-west-3
 #
 # Steps :
 # 1 - Launch Step 1 on eu-west-3 to create infrastructure
@@ -65,7 +65,7 @@ Parameters:
   BucketKey:
     Description: "Key to find object in the bucket"
     Type: String
-    Default: "90_SiteToSiteVpn"
+    Default: "91_SiteToSiteVpn"
   BucketObject:
     Description: "File to store data in the bucket"
     Type: String
@@ -212,7 +212,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Retain
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/90_Lambdas.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/91_Lambdas.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -231,7 +231,7 @@ Resources:
       - Lambdas
     UpdateReplacePolicy: Retain
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/90_Roles.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/91_Roles.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -248,7 +248,7 @@ Resources:
       - Lambdas
     UpdateReplacePolicy: Retain
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/90_VpcAndSubnets.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/91_VpcAndSubnets.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -271,7 +271,7 @@ Resources:
       - Lambdas
     UpdateReplacePolicy: Retain
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/90_RouteTables.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/91_RouteTables.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -294,7 +294,7 @@ Resources:
       - Lambdas
     UpdateReplacePolicy: Retain
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/90_Gateways.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/91_Gateways.yaml"
       TimeoutInMinutes: 10
       Parameters:
         Bucket: !Ref Bucket
@@ -321,7 +321,7 @@ Resources:
       - Lambdas
     UpdateReplacePolicy: Retain
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/90_SecurityGroups.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/91_SecurityGroups.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -343,7 +343,7 @@ Resources:
       - Lambdas
     UpdateReplacePolicy: Retain
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/90_Instances.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/91_Instances.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -372,7 +372,7 @@ Resources:
       - Lambdas
     UpdateReplacePolicy: Retain
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/90_SSM_Documents.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/91_SSM_Documents.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket

@@ -11,7 +11,7 @@ Parameters:
   BucketKey:
     Description: "Key to find object in the bucket"
     Type: String
-    Default: "90_SiteToSiteVpn"
+    Default: "91_SiteToSiteVpn"
   BucketObject:
     Description: "File to store data in the bucket"
     Type: String

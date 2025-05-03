@@ -1,0 +1,78 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create SSM Document to deploy Apache Httpd
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Description: "CloudFormation bucket URL"
+    Type: String
+    Default: "hawkfund-cloudformation"
+  BucketKey:
+    Description: "Key to find object in the bucket"
+    Type: String
+    Default: "63_VPCPrivateLink"
+  BucketObject:
+    Description: "File to store data in the bucket"
+    Type: String
+    Default: "Data.json"
+  EnvironmentName:
+    Description: "Environment name that prefix all resources"
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+  ProjectName:
+    Description: "Project name that prefix all resources"
+    Type: String
+    Default: "ANS"
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+  # Stack parameters
+  ApplicationInstanceIds:
+    Description: "Id of the Applications Instance"
+    Type: CommaDelimitedList
+  OutputS3BucketName:
+    Description: "The Bucket name for logs"
+    Type: String
+  OutputS3KeyPrefix:
+    Default: "logs/"
+    Description: "Logs prefix"
+    Type: String
+
+Resources:
+  ApacheHttpdInstallSSMDocument:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/SSM/ApacheHttpdInstallSSMDocument.yaml"
+      TimeoutInMinutes: 10
+
+  ApacheHttpdInstallSSMAssociation:
+    Type: AWS::SSM::Association
+    DependsOn:
+      - ApacheHttpdInstallSSMDocument
+    Properties:
+      AssociationName: ApacheHttpdInstallSSMAssociation
+      Name: ApacheHttpdInstallSSMDocument
+      Targets:
+      - Key: InstanceIds
+        Values:
+        - !Select [ 0, !Ref ApplicationInstanceIds ]
+        - !Select [ 1, !Ref ApplicationInstanceIds ]
+      OutputLocation:
+        S3Location: 
+          OutputS3BucketName: !Ref OutputS3BucketName
+          OutputS3KeyPrefix: !Ref OutputS3KeyPrefix
+      Parameters:
+        Message: 
+          - "Instance behind a Load Balancer"
+          

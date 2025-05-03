@@ -78,17 +78,10 @@ Parameters:
   SubnetId:
     Description: "Instance Subnet ID"
     Type: String
-  UserData:
-    Default: ""
-    Description: "Script to launch on the first start"
-    Type: String
 
 Conditions:
   hasElasticIP: !Equals [!Ref ElasticIP, "true" ]
   isSavedInS3File: !Equals [ !Ref SaveInS3File, "true"]
-  elasticIPSavedInS3File: !And 
-    - !Equals [!Ref ElasticIP, "true" ]
-    - !Equals [ !Ref SaveInS3File, "true"]
 
 Resources:
   Instance:
@@ -110,7 +103,24 @@ Resources:
           Value: !Sub "${ProjectName}-${EnvironmentName}-${InstanceName}"
         - Key: ProjectName
           Value: !Ref ProjectName
-      UserData: !Ref UserData
+      UserData: 
+        !Base64 |
+          #!/bin/bash
+
+          # Install SSM Agent based on OS (you might need logic to detect OS)
+          if grep -q "amzn" /etc/os-release; then
+            yum update -y
+            amazon-linux-extras install -y aws-ssm-agent
+          elif grep -q "Ubuntu" /etc/os-release; then
+            apt update -y
+            apt install -y aws-ssm-agent
+          elif grep -q "CentOS" /etc/os-release || grep -q "Red Hat" /etc/os-release; then
+            yum update -y
+            yum install -y amazon-ssm-agent
+          fi
+
+          systemctl enable amazon-ssm-agent
+          systemctl start amazon-ssm-agent
 
   EIP:
     Type: AWS::EC2::EIP

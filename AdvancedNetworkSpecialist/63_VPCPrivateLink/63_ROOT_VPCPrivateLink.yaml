@@ -326,3 +326,22 @@ Resources:
           - 0
           - !Split [ ",", !GetAtt VpcAndSubnets.Outputs.VpcIds ]
         VpcEpSecurityGroup: !GetAtt SecurityGroups.Outputs.VpcEndpointServiceSecurityGroupId
+
+  SSMDocuments:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/91_SSM_Documents.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        ApplicationInstanceIds: !GetAtt Instances.Outputs.ApplicationInstanceIds
+        OutputS3BucketName: !Ref Bucket
