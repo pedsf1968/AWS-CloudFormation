@@ -123,7 +123,7 @@ Resources:
         InstanceName: "Default"
         InstanceType: !Ref WebServerInstanceType
         KeyName: !Ref KeyName
-        SecurityGroup: !Ref BastionSecurityGroup
+        SecurityGroupIds: !Ref BastionSecurityGroup
         SubnetId: !Ref BastionSubnetId
 
   # Create AMI from the previous Instance
@@ -167,7 +167,7 @@ Resources:
         InstanceName: !Ref BastionInstanceName
         InstanceType: !Ref BastionInstanceType
         KeyName: !Ref KeyName
-        SecurityGroup: !Ref BastionSecurityGroup
+        SecurityGroupIds: !Ref BastionSecurityGroup
         SubnetId: !Ref BastionSubnetId
 
   ConsumerInstance:
@@ -189,7 +189,7 @@ Resources:
         InstanceName: !Ref ConsumerInstanceName
         InstanceType: !Ref ConsumerInstanceType
         KeyName: !Ref KeyName
-        SecurityGroup: !Ref ConsumerSecurityGroup
+        SecurityGroupIds: !Ref ConsumerSecurityGroup
         SubnetId: !Ref ConsumerSubnetId
 
   ApplicationInstance1:
@@ -213,7 +213,7 @@ Resources:
         InstanceName: !Sub "${WebServerInstanceName}-1"
         InstanceType: !Ref WebServerInstanceType
         KeyName: !Ref KeyName
-        SecurityGroup: !Ref WebServerSecurityGroup
+        SecurityGroupIds: !Ref WebServerSecurityGroup
         SubnetId: !Ref WebServerSubnetId
 
   ApplicationInstance2:
@@ -237,7 +237,7 @@ Resources:
         InstanceName: !Sub "${WebServerInstanceName}-2"
         InstanceType: !Ref WebServerInstanceType
         KeyName: !Ref KeyName
-        SecurityGroup: !Ref WebServerSecurityGroup
+        SecurityGroupIds: !Ref WebServerSecurityGroup
         SubnetId: !Ref WebServerSubnetId
 
 Outputs:

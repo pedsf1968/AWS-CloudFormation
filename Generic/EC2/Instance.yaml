@@ -1,0 +1,220 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Generic template create Instances"
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "63_VPCPrivateLink"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: ["dev", "test", "prod"]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: ["false", "true"]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+  # Stack parameters
+  AvailabilityZone: # Required: No
+    Description: >-
+      The Availability Zone of the instance. If not specified, an Availability
+      Zone will be automatically chosen for you based on the load balancing
+      criteria for the Region. This parameter is not supported by
+      DescribeImageAttribute.
+    Type: String
+  ElasticIP:
+    AllowedValues:
+      - "false"
+      - "true"
+    Default: "false"
+    Description: "Create elastic IP for the instance"
+    Type: String
+  IamInstanceProfile: # Required: No
+    Default: ""
+    Description: >-
+      The name of an IAM instance profile. To create a new IAM instance profile,
+      use the AWS::IAM::InstanceProfile resource.
+    Type: String
+  ImageId: # Required: Conditional
+    Default: ami-08461dc8cd9e834e0
+    Description: >-
+      The ID of the AMI. An AMI ID is required to launch an instance and must
+      be specified here or in a launch template.
+    Type: AWS::EC2::Image::Id
+  InstanceName:
+    Description: "Instance name"
+    Type: String
+  InstanceType: # Required: No
+    AllowedValues:
+      - t2.micro
+      - t2.small
+      - t2.large
+    Default: t2.micro
+    Description: >-
+      The instance type. For more information, see Instance types in the Amazon
+      EC2 User Guide. When you change your EBS-backed instance type, instance
+      restart or replacement behavior depends on the instance type
+      compatibility between the old and new types. An instance with an instance
+      store volume as the root volume is always replaced. For more information,
+      see Change the instance type in the Amazon EC2 User Guide.
+    Type: String
+  KeyName: # Required: No
+    Default: "dso-paris"
+    Description: >-
+      The name of the key pair. You can create a key pair using CreateKeyPair
+      or ImportKeyPair.
+    Type: String
+  SecurityGroupIds: # Required: Conditional
+    Default: ""
+    Description: >-
+      The IDs of the security groups. You can specify the IDs of existing
+      security groups and references to resources created by the stack
+      template. If you specify a network interface, you must specify any
+      security groups as part of the network interface.
+    Type: CommaDelimitedList
+  SourceDestCheck: # Required: No
+    AllowedValues:
+      - "false"
+      - "true"
+    Default: "true"
+    Description: >-
+      Enable or disable source/destination checks, which ensure that the
+      instance is either the source or the destination of any traffic that it
+      receives. If the value is true, source/destination checks are enabled;
+      otherwise, they are disabled. The default value is true. You must
+      disable source/destination checks if the instance runs services such as
+      network address translation, routing, or firewalls.
+    Type: String
+  SubnetId: # Required: No
+    Description: >-
+      The ID of the subnet to launch the instance into. If you specify a
+      network interface, you must specify any subnets as part of the network
+      interface instead of using this parameter.
+    Type: String
+  UserData: # Required: No
+    Default: ""
+    Description: >-
+      The parameters or scripts to store as user data. Any scripts in user data
+      are run when you launch the instance. User data is limited to 16 KB. You
+      must provide base64-encoded text. For more information, see Fn::Base64.
+      If the root volume is an EBS volume and you update user data,
+      CloudFormation restarts the instance. If the root volume is an instance
+      store volume and you update user data, the instance is replaced.
+    Type: String
+
+Conditions:
+  hasElasticIP: !Equals [!Ref ElasticIP, "true"]
+  hasNoUserData: !Equals [!Ref UserData, ""]
+  isSavedInS3File: !Equals [!Ref SaveInS3File, "true"]
+
+Resources:
+  Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone: !Ref AvailabilityZone
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref IamInstanceProfile
+      KeyName: !Ref KeyName
+      SecurityGroupIds: 
+        - !Select [0, !Ref SecurityGroupIds]
+      SubnetId: !Ref SubnetId
+      SourceDestCheck: !Ref SourceDestCheck
+      Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${InstanceName}"
+        - Key: ProjectName
+          Value: !Ref ProjectName
+      UserData: !If
+        - hasNoUserData
+        - !Base64 |
+          #!/bin/bash
+          if grep -q "amzn" /etc/os-release; then
+            yum update -y
+            amazon-linux-extras install -y aws-ssm-agent
+          elif grep -q "Ubuntu" /etc/os-release; then
+            apt update -y
+            apt install -y aws-ssm-agent
+          elif grep -q "CentOS" /etc/os-release || grep -q "Red Hat" /etc/os-release; then
+            yum update -y
+            yum install -y amazon-ssm-agent
+          fi
+          systemctl enable amazon-ssm-agent
+          systemctl start amazon-ssm-agent
+        - !Ref UserData
+
+  EIP:
+    Type: AWS::EC2::EIP
+    Condition: hasElasticIP
+    Properties:
+      InstanceId: !Ref Instance
+      Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${InstanceName}-EIP"
+        - Key: ProjectName
+          Value: !Ref ProjectName
+
+  # Intermediate resource to wait EIP Creation before InstanceToS3
+  EIPWaitConditionHandle:
+    Type: AWS::CloudFormation::WaitConditionHandle
+    Condition: isSavedInS3File
+    Metadata:
+      Handle: !If [hasElasticIP, !Ref EIP, ""]
+
+  InstanceToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: isSavedInS3File
+    DeletionPolicy: Retain
+    DependsOn: EIPWaitConditionHandle
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken:
+        !Join [
+          ":",
+          [
+            "arn:aws:lambda",
+            !Sub "${AWS::Region}",
+            !Sub "${AWS::AccountId}",
+            "function:EC2ResourceToS3",
+          ],
+        ]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Region: !Ref AWS::Region
+      ResourceType: "Instance"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:Instance:${InstanceName}"
+      Value: !Ref Instance
+
+Outputs:
+  InstanceId:
+    Description: "Id of the Instance"
+    Value: !Ref Instance
+  InstancePrivateIP:
+    Description: "Private IP v4 of the Instance"
+    Value: !GetAtt Instance.PrivateIp
+  InstancePublicIP:
+    Description: "Public IP v4 of the Instance"
+    Value: !If [hasElasticIP, !GetAtt EIP.PublicIp, ""]

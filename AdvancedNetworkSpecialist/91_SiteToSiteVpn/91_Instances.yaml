@@ -90,7 +90,7 @@ Resources:
         IamInstanceProfile: !Ref IamInstanceProfile
         InstanceType: !Ref InstanceType
         KeyName: !Ref KeyName
-        SecurityGroup: !Ref SecurityGroup
+        SecurityGroupIds: !Ref SecurityGroup
         SourceDestCheck:  !If 
           - IsEuWest3
           - "false"

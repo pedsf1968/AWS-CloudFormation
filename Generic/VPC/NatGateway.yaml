@@ -1,0 +1,108 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create CustomerGateway
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "16_NatGateway"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: [ "dev", "test", "prod" ]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String    
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+  # Stack parameters
+  AllocationId:
+    Default: ""
+    Description: "Allocation Id of the EIP"
+    Type: String
+  ElasticIP:
+    AllowedValues:
+      - "false"
+      - "true"
+    Default: "true"
+    Description: "Create elastic IP for the NAT Gateway"
+    Type: String
+  Name:
+    Default: "Default"
+    Description: "NAT Gateway name"
+    Type: String
+  SubnetId:
+    Description: "NAT Gateway Subnet Id"
+    Type: String
+
+Conditions:
+  hasElasticIP: !Equals [!Ref ElasticIP, "true" ]
+  saveInS3File: !Equals [ !Ref SaveInS3File, "true"]
+
+Resources:
+  NatGatewayEIP:
+   Type: AWS::EC2::EIP
+   Condition: hasElasticIP
+   Properties:
+    Domain: vpc
+    Tags:
+      - Key: EnvironmentName
+        Value: !Ref EnvironmentName
+      - Key: Name
+        Value: !Sub "${ProjectName}-${EnvironmentName}-${Name}-EIP"
+      - Key: ProjectName
+        Value: !Ref ProjectName
+
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !If [ hasElasticIP, !GetAtt NatGatewayEIP.AllocationId, !Ref AllocationId]
+      SubnetId: !Ref SubnetId
+      Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${Name}-NGW"
+        - Key: ProjectName
+          Value: !Ref ProjectName
+
+  NatGatewayParametersToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: saveInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:EC2ResourceToS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Region: !Ref AWS::Region
+      ResourceType: "NatGateway"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:NatGateway:${Name}"
+      Value: !Ref NatGateway
+ 
+Outputs:
+  NatGatewayId:
+    Description: "Id of the NAT Gateway"
+    Value: !Ref NatGateway
+  NatGatewayIP:
+    Description: "EIP of the Nat Gateway"
+    Value: !If [ hasElasticIP, !GetAtt NatGatewayEIP.PublicIp, ""]

@@ -9,7 +9,7 @@ Parameters:
     Description: CloudFormation buket URL
     Type: String
   BucketKey:
-    Default: "16_VPCWithPrivateAndPublicSubnet"
+    Default: "18_NatGateway"
     Description: Key to find object in the bucket
     Type: String
   BucketObject:
@@ -50,7 +50,7 @@ Parameters:
     Description: VPC name
     Type: String
   VpcCidrBlock:
-    Default: 10.100.0.0/16
+    Default: 10.100.0.0/18
     Description: "The IPv4 network range for the VPC, in CIDR notation."
     Type: String
 

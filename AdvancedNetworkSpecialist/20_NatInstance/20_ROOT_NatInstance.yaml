@@ -1,9 +1,9 @@
-# aws cloudformation validate-template --template-body file:/16_ROOT_VPCWithPrivateAndPublicSubnet.yaml
-# aws cloudformation create-stack --stack-name ANS-16 --template-body file:/16_ROOT_VPCWithPrivateAndPublicSubnet.yaml --region eu-west-3 --capabilities CAPABILITY_IAM
-# aws cloudformation delete-stack --stack-name ANS-16 --region eu-west-3
+# aws cloudformation validate-template --template-body file:/20_ROOT_NatInstance.yaml
+# aws cloudformation create-stack --stack-name ANS-20 --template-body file:/20_ROOT_NatInstance.yaml --region eu-west-3 --capabilities CAPABILITY_IAM
+# aws cloudformation delete-stack --stack-name ANS-20 --region eu-west-3
 
 AWSTemplateFormatVersion: "2010-09-09"
-Description: This template deploys a VPC, Private Subnet, Public Subnets, Bastion and Application
+Description: This template deploys a VPC, Private Subnet, Public Subnets, Bastion, Application and Nat Instance Gateway
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -35,6 +35,7 @@ Metadata:
           default: "IGW, Route Tables and Routes"
         Parameters:
           - InternetGatewayName
+          - NatGatewayName
       - Label:
           default: "Instances"
         Parameters:
@@ -45,6 +46,9 @@ Metadata:
           - BastionImageId
           - BastionInstanceName
           - BastionInstanceType
+          - NatImageId
+          - NatInstanceName
+          - NatInstanceType
 
 Parameters:
   # Global parameters
@@ -53,7 +57,7 @@ Parameters:
     Description: CloudFormation buket URL
     Type: String
   BucketKey:
-    Default: "16_VPCWithPrivateAndPublicSubnet"
+    Default: "20_NatInstance"
     Description: Key to find object in the bucket
     Type: String
   BucketObject:
@@ -80,6 +84,9 @@ Parameters:
   InternetGatewayName:
     Default: "VPC-IGW"
     Type: String
+  NatGatewayName:
+    Default: "VPC-NGW"
+    Type: String
 
   SubnetName:
     Default: "Subnet"
@@ -99,7 +106,7 @@ Parameters:
     Description: VPC name
     Type: String
   VpcCidrBlock:
-    Default: 10.100.0.0/16
+    Default: 10.100.0.0/18
     Description: "The IPv4 network range for the VPC, in CIDR notation."
     Type: String
 
@@ -128,6 +135,18 @@ Parameters:
     Default: t2.micro
     Description: "Bastion Instances type"
     Type: String
+  NatImageId:
+    Default: ami-015c7728d5cb3dccd
+    Description: "Nat Instance AMI"
+    Type: AWS::EC2::Image::Id
+  NatInstanceName:
+    Default: "Nat Instance"
+    Description: "Nat Instances name"
+    Type: String
+  NatInstanceType:
+    Default: t2.micro
+    Description: "Nat Instances type"
+    Type: String
   KeyName:
     Default: "dso-paris"
     Description: "Instances Key name"
@@ -139,7 +158,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Retain
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/16_Lambdas.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/20_Lambdas.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -157,7 +176,7 @@ Resources:
       - Lambdas
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/16_Roles.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/20_Roles.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -175,7 +194,7 @@ Resources:
       - Lambdas
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/16_VpcAndSubnets.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/20_VpcAndSubnets.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -199,7 +218,7 @@ Resources:
       - Lambdas
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/16_Gateways.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/20_Gateways.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -219,7 +238,7 @@ Resources:
       - Lambdas
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/16_RouteTables.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/20_RouteTables.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -228,8 +247,9 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
-        RouteTableNames: "A,B"
         InternetGatewayId: !GetAtt Gateways.Outputs.InternetGatewayId
+        NatInstanceId: !GetAtt Instances.Outputs.NatInstanceId
+        RouteTableNames: "A,B"
         SubnetPrivateId: !GetAtt VpcAndSubnets.Outputs.SubnetPrivateId
         SubnetPublicId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId
         VpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
@@ -242,7 +262,7 @@ Resources:
       - Lambdas
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/16_SecurityGroups.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/20_SecurityGroups.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -251,10 +271,12 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
-        ApplicationIngressCidrIp: "10.0.0.0/8"
+        ApplicationIngressCidrIp: !Ref VpcCidrBlock
         ApplicationVpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
         BastionIngressCidrIp: "0.0.0.0/0"
         BastionVpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
+        NatIngressCidrIp: !Ref SubnetPrivateCidrBlock
+        NatVpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
 
   Instances:
     Type: AWS::CloudFormation::Stack
@@ -264,7 +286,7 @@ Resources:
       - Gateways
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/16_Instances.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/20_Instances.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -284,4 +306,9 @@ Resources:
         BastionInstanceType: !Ref BastionInstanceType
         BastionSecurityGroup: !GetAtt SecurityGroups.Outputs.BastionSecurityGroupId
         BastionSubnetId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId
+        NatImageId: !Ref NatImageId
+        NatInstanceName: !Ref NatInstanceName
+        NatInstanceType: !Ref NatInstanceType
+        NatSecurityGroup: !GetAtt SecurityGroups.Outputs.NatSecurityGroupId
+        NatSubnetId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId
         KeyName: !Ref KeyName

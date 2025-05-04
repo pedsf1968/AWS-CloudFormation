@@ -201,6 +201,9 @@ Resources:
                 case "InternetGateway":
                   response = ec2_client.describe_internet_gateways(InternetGatewayIds=[resource_id])
                   return response['InternetGateways'][0]
+                case "NatGateway":
+                  response = ec2_client.describe_nat_gateways(NatGatewayIds=[ resource_id ])
+                  return response['NatGateways'][0]
                 case "RouteTable":
                   response = ec2_client.describe_route_tables(RouteTableIds=[resource_id])
                   return response['RouteTables'][0]

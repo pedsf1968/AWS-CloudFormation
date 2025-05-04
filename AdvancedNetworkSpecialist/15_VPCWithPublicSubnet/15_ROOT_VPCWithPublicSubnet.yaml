@@ -1,4 +1,4 @@
-# aws cloudformation validate-template --template-body file:/15_VPCWithPublicSubnet.yaml
+# aws cloudformation validate-template --template-body file:/15_ROOT_VPCWithPublicSubnet.yaml
 # aws cloudformation create-stack --stack-name ANS-15 --template-body file:/15_ROOT_VPCWithPublicSubnet.yaml --region eu-west-3 --capabilities CAPABILITY_IAM
 # aws cloudformation delete-stack --stack-name ANS-15 --region eu-west-3
 

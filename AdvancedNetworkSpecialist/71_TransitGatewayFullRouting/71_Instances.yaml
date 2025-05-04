@@ -97,7 +97,7 @@ Resources:
         InstanceName: !Ref BastionInstanceName
         InstanceType: !Ref BastionInstanceType
         KeyName: !Ref KeyName
-        SecurityGroup: !Ref BastionSecurityGroup
+        SecurityGroupIds: !Ref BastionSecurityGroup
         SubnetId: !Ref BastionSubnetId
 
   ApplicationAInstance:

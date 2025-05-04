@@ -1,6 +1,6 @@
 ---
 AWSTemplateFormatVersion: "2010-09-09"
-Description:  This template create a role for S3 Gateway Endpoint
+Description:  This template create a role for instance
 
 Parameters:
   # Global parameters

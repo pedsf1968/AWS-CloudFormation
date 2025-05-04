@@ -102,7 +102,7 @@ Resources:
         InstanceName: !Ref BastionInstanceName
         InstanceType: !Ref BastionInstanceType
         KeyName: !Ref KeyName
-        SecurityGroup: !Ref BastionSecurityGroup
+        SecurityGroupIds: !Ref BastionSecurityGroup
         SubnetId: !Ref BastionSubnetId
 
   ApplicationInstance:
@@ -125,7 +125,7 @@ Resources:
         InstanceName: !Ref ApplicationInstanceName
         InstanceType: !Ref ApplicationInstanceType
         KeyName: !Ref KeyName
-        SecurityGroup: !Ref ApplicationSecurityGroup
+        SecurityGroupIds: !Ref ApplicationSecurityGroup
         SubnetId: !Ref ApplicationSubnetId
 
 Outputs:
