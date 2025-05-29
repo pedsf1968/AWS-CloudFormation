@@ -15,6 +15,7 @@ $resources = @(
     "ElasticLoadBalancingV2"
     "IAM"
     "Lambda"
+    "Route53"
     "SQS"
     "SSM"
     "VPC"

@@ -36,7 +36,7 @@ Parameters:
     Type: String
 
   # Application parameters
-  ApplicationImageId:
+  ApplicationInstanceImageId:
     Default: ami-08461dc8cd9e834e0
     Description: "Application Instance AMI"
     Type: String
@@ -47,14 +47,14 @@ Parameters:
     Default: t2.micro
     Description: "Bastion Instances type"
     Type: String
-  ApplicationSubnetIds:
+  ApplicationInstanceSubnetIds:
     Description: "Application Subnet IDs"
     Type: String
-  ApplicationSecurityGroups:
+  ApplicationInstanceSecurityGroups:
     Description: "Application Security Groups"
     Type: String
   # Bastion parameters
-  BastionImageId:
+  BastionInstanceImageId:
     Default: ami-08461dc8cd9e834e0
     Description: "Bastion Instance AMI"
     Type: String
@@ -65,10 +65,10 @@ Parameters:
     Default: t2.micro
     Description: "Bastion Instances type"
     Type: String
-  BastionSecurityGroup:
+  BastionInstanceSecurityGroup:
     Description: "Bastion Security Group"
     Type: String
-  BastionSubnetId:
+  BastionInstanceSubnetId:
     Description: "Bastion Subnet ID"
     Type: String
   KeyName:
@@ -93,12 +93,12 @@ Resources:
         SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Select [ 0, !GetAZs ]
         ElasticIP: "true"
-        ImageId: !Ref BastionImageId
+        ImageId: !Ref BastionInstanceImageId
         InstanceName: !Ref BastionInstanceName
         InstanceType: !Ref BastionInstanceType
         KeyName: !Ref KeyName
-        SecurityGroupIds: !Ref BastionSecurityGroup
-        SubnetId: !Ref BastionSubnetId
+        SecurityGroupIds: !Ref BastionInstanceSecurityGroup
+        SubnetId: !Ref BastionInstanceSubnetId
 
   ApplicationAInstance:
     Type: AWS::CloudFormation::Stack
@@ -115,12 +115,12 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Select [ 0, !GetAZs ]
-        ImageId: !Ref ApplicationImageId
+        ImageId: !Ref ApplicationInstanceImageId
         InstanceName: !Sub "${ApplicationInstanceName}-A"
         InstanceType: !Ref ApplicationInstanceType
         KeyName: !Ref KeyName
-        SecurityGroup: !Select [ 0, !Split [ ",", !Ref ApplicationSecurityGroups ] ]
-        SubnetId: !Select [ 0, !Split [ ",", !Ref ApplicationSubnetIds ] ]
+        SecurityGroup: !Select [ 0, !Split [ ",", !Ref ApplicationInstanceSecurityGroups ] ]
+        SubnetId: !Select [ 0, !Split [ ",", !Ref ApplicationInstanceSubnetIds ] ]
 
   ApplicationBInstance:
     Type: AWS::CloudFormation::Stack
@@ -137,12 +137,12 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Select [ 1, !GetAZs ]
-        ImageId: !Ref ApplicationImageId
+        ImageId: !Ref ApplicationInstanceImageId
         InstanceName: !Sub "${ApplicationInstanceName}-B"
         InstanceType: !Ref ApplicationInstanceType
         KeyName: !Ref KeyName
-        SecurityGroup: !Select [ 1, !Split [ ",", !Ref ApplicationSecurityGroups ] ]
-        SubnetId: !Select [ 1, !Split [ ",", !Ref ApplicationSubnetIds ] ]
+        SecurityGroup: !Select [ 1, !Split [ ",", !Ref ApplicationInstanceSecurityGroups ] ]
+        SubnetId: !Select [ 1, !Split [ ",", !Ref ApplicationInstanceSubnetIds ] ]
 
   ApplicationCInstance:
     Type: AWS::CloudFormation::Stack
@@ -159,12 +159,12 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Select [ 2, !GetAZs ]
-        ImageId: !Ref ApplicationImageId
+        ImageId: !Ref ApplicationInstanceImageId
         InstanceName: !Sub "${ApplicationInstanceName}-C"
         InstanceType: !Ref ApplicationInstanceType
         KeyName: !Ref KeyName
-        SecurityGroup: !Select [2, !Split [",", !Ref ApplicationSecurityGroups]]
-        SubnetId: !Select [2, !Split [",", !Ref ApplicationSubnetIds]]
+        SecurityGroup: !Select [2, !Split [",", !Ref ApplicationInstanceSecurityGroups]]
+        SubnetId: !Select [2, !Split [",", !Ref ApplicationInstanceSubnetIds]]
 
 Outputs:
   BastionInstancesId:

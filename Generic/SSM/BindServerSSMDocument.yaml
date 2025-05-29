@@ -1,0 +1,252 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CloudFormation template to create an SSM Document for installing Bind DNS server"
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Description: "CloudFormation bucket URL"
+    Type: String
+    Default: "hawkfund-cloudformation"
+  BucketKey:
+    Description: "Key to find object in the bucket"
+    Type: String
+    Default: "91_SiteToSiteVpn"
+  BucketObject:
+    Description: "File to store data in the bucket"
+    Type: String
+    Default: "Data.json"
+  EnvironmentName:
+    Description: "Environment name that prefix all resources"
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+  ProjectName:
+    Description: "Project name that prefix all resources"
+    Type: String
+    Default: "ANS"
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+Resources:
+  BindServerSSMDocument:
+    Type: AWS::SSM::Document
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Content:
+        description: "Deploy DNS server."
+        parameters:
+          DnsInstanceName:
+            default: 'nameserver'
+            description: "Name of the DNS server Instance"
+            type: String
+          DnsInstanceIp:
+            default: ''
+            description: "Ip of the DNS server Instance"
+            type: String
+          DnsInstanceShortName:
+            default: 'dns'
+            description: "Name of the DNS server Instance"
+            type: String
+          DomainName:
+            default: 'corp.internal.'
+            description: "Name of the Domain"
+            type: String
+          VpcCidrBlock:
+            default: '10.10.0.0/16'
+            description: "The IPv4 network range for the VPC, in CIDR notation."
+            type: String
+          ZoneBaseCidr:
+            default: '10.10.0'
+            description: "Zone base CIDR"
+            type: String
+          ZoneName:
+            default: 'corp.internal'
+            description: "Name of the Zone"
+            type: String
+        mainSteps:
+        - name: BindPackagesInstall
+          action: aws:runShellScript
+          inputs:
+            runCommand:
+            - |
+              #!/bin/bash
+              export DEBIAN_FRONTEND="noninteractive"
+              apt-get update
+              apt-get install -y bind9 bind9utils bind9-doc dnsutils
+        - name: BindHostConfiguration
+          action: aws:runShellScript
+          inputs:
+            runCommand:
+            - |
+              #!/bin/bash
+              export DEBIAN_FRONTEND="noninteractive"
+              hostnamectl set-hostname {{ DnsInstanceName }}.{{ DomainName }}
+              cat << EOT > /etc/hosts
+              127.0.0.1   localhost
+              127.0.1.1   {{DnsInstanceName}}.{{ DomainName }}   {{DnsInstanceName}}
+              {{DnsInstanceIp}}   {{DnsInstanceName}}.{{ DomainName }}   {{DnsInstanceName}}
+              EOT
+        - name: BindNamedConfigurationOptions
+          action: aws:runShellScript
+          inputs:
+            timeoutSeconds: '60'
+            runCommand:
+            - |
+              cat << EOT > /etc/bind/named.conf.options
+              acl trustedclients {
+                {{ VpcCidrBlock }};
+                localhost;
+                localnets;
+              };
+
+              options {
+                directory "/var/cache/bind";
+
+                // If there is a firewall between you and nameservers you want
+                // to talk to, you may need to fix the firewall to allow multiple
+                // ports to talk.  See http://www.kb.cert.org/vuls/id/800113
+
+                // If your ISP provided one or more IP addresses for stable 
+                // nameservers, you probably want to use them as forwarders.  
+                // Uncomment the following block, and insert the addresses replacing 
+                // the all-0's placeholder.
+                recursion yes;
+                allow-query { trustedclients; };
+                allow-query-cache { trustedclients; };
+                allow-recursion { trustedclients; };
+
+                forwarders {
+                  10.10.0.2;
+                };
+                //========================================================================
+                // If BIND logs error messages about the root key being expired,
+                // you will need to update your keys.  See https://www.isc.org/bind-keys
+                //========================================================================
+                dnssec-validation auto;
+                //      auth-nxdomain no;
+
+                listen-on port 53 { {{ DnsInstanceIp }}; localhost; 127.0.0.1; };
+                listen-on-v6 port 53 { ::1; };
+              };
+              EOT
+        - name: BindNamedConfigurationLocal
+          action: aws:runShellScript
+          inputs:
+            timeoutSeconds: '60'
+            runCommand:
+            - |
+              #!/bin/bash
+              reversed_cidr=$(echo "{{ZoneBaseCidr}}" | tr '.' '\n' | tac | paste -s -d '.')
+
+              cat << EOT > /etc/bind/named.conf.local
+              zone "{{ZoneName}}" IN {
+                type master;
+                file "/etc/bind/db.{{ZoneName}}";
+                allow-update { none; };
+              };
+
+              zone "${reversed_cidr}.in.addr.arpa." IN {
+                type master;
+                file "/etc/bind/db.{{ZoneBaseCidr}}";
+                allow-update { none; };
+              };
+              EOT
+        - name: BindZoneConfiguration
+          action: aws:runShellScript
+          inputs:
+            timeoutSeconds: '60'
+            runCommand:
+            - |
+              cat << EOT > /etc/bind/db.{{ZoneName}}
+              \$TTL 604800
+              @ IN  SOA     {{DnsInstanceName}}.{{DomainName}} root.{{DomainName}} (
+                 2505250747       ; Serial
+                     604800       ; Refresh
+                      86400       ; Retry
+                    2419200       ; Expire
+                     604800       ; Negative Cache TTL
+              )
+              ; Specify our nameservers
+              @   IN   NS   {{DnsInstanceName}}.{{DomainName}}
+
+              ; Resolve nameserver hostnames to IP, replace with your two droplet IP addresses.
+              {{DnsInstanceName}}   IN   A   {{DnsInstanceIp}}
+              {{DnsInstanceShortName}}   IN CNAME   {{DnsInstanceName}}
+
+              ; Define hostname -> IP pairs which you wish to resolve
+              EOT
+        - name: BindReverseZoneConfiguration
+          action: aws:runShellScript
+          inputs:
+            timeoutSeconds: '60'
+            runCommand:
+            - |
+              #!/bin/bash
+              DNS_INSTANCE_IP="{{DnsInstanceIp}}"
+              IFS='.' read -r -a ip_parts <<< "$DNS_INSTANCE_IP"
+              REVERSE_IP_PART="${ip_parts[3]}"
+
+              # Reverse Zone CIDR
+              IFS='.' read -r -a cidr_parts <<< "$ZoneBaseCidr"
+              reversed_cidr_parts=("${cidr_parts[2]}" "${cidr_parts[1]}" "${cidr_parts[0]}")
+              ZONE_REVERSE_CIDR=$(IFS='.'; echo "${reversed_cidr_parts[*]}")
+
+              cat << EOT > /etc/bind/db.{{ZoneBaseCidr}}
+              \$TTL 604800
+              \$ORIGIN $ZONE_REVERSE_CIDR.in.addr.arpa.
+              @ IN  SOA     {{DnsInstanceName}}.{{DomainName}} root.{{DomainName}} (
+                 2505250747       ; Serial
+                     604800       ; Refresh
+                      86400       ; Retry
+                    2419200       ; Expire
+                     604800       ; Negative Cache TTL
+              )
+              ; Specify our nameservers
+              @   IN   NS   {{DnsInstanceName}}.{{DomainName}}
+
+              ; Resolve nameserver hostnames to IP, replace with your two droplet IP addresses.
+              $REVERSE_IP_PART   IN   PTR   {{DnsInstanceName}}.{{DomainName}}
+
+              ; Define hostname -> IP pairs which you wish to resolve
+              EOT
+        - name: BindResolvConf
+          action: aws:runShellScript
+          inputs:
+            timeoutSeconds: '60'
+            runCommand:
+            - |
+              sed -i "/^search.*/d" /etc/resolv.conf
+              sed -i "/^nameserver.*/d" /etc/resolv.conf
+              echo "nameserver 127.0.0.1" >> /etc/resolv.conf
+              echo "search {{DomainName}}" >> /etc/resolv.conf
+              echo "domain {{DomainName}}" >> /etc/resolv.conf
+              resolvconf -u
+        - name: BindStart
+          action: aws:runShellScript
+          inputs:
+            timeoutSeconds: '60'
+            runCommand:
+              - systemctl start bind9.service
+              - systemctl enable named.service
+        schemaVersion: "2.2"
+      DocumentFormat: YAML
+      DocumentType: Command
+      Name: BindServerSSMDocument
+      Tags:
+      - Key: EnvironmentName
+        Value: !Ref EnvironmentName
+      - Key: Name
+        Value: !Sub "${ProjectName}-${EnvironmentName}-BindServerSSMDocument"
+      - Key: ProjectName
+        Value: !Ref ProjectName
+      TargetType: "/AWS::EC2::Instance"
+      UpdateMethod: Replace

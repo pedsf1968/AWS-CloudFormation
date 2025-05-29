@@ -21,7 +21,7 @@ Parameters:
     ConstraintDescription: "Must specify dev, test or prod"
     Default: "dev"
     Description: "Environment name that prefix all resources"
-    Type: String    
+    Type: String
   ProjectName:
     Default: "ANS"
     Description: "Project name that prefix all resources"

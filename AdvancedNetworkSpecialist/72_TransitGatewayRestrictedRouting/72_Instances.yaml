@@ -39,19 +39,19 @@ Parameters:
   ApplicationInstanceName:
     Description: "Application Instance name"
     Type: String
-  ApplicationSubnetIds:
+  ApplicationInstanceSubnetIds:
     Description: "Application Subnet IDs"
     Type: String
-  ApplicationSecurityGroups:
+  ApplicationInstanceSecurityGroups:
     Description: "Application Security Groups"
     Type: String
   BastionInstanceName:
     Description: "Bastion Instance name"
     Type: String
-  BastionSecurityGroup:
+  BastionInstanceSecurityGroup:
     Description: "Bastion Security Group"
     Type: String
-  BastionSubnetId:
+  BastionInstanceSubnetId:
     Description: "Bastion Subnet ID"
     Type: String
   ImageId:
@@ -88,8 +88,8 @@ Resources:
         InstanceName: !Ref BastionInstanceName
         InstanceType: !Ref InstanceType
         KeyName: !Ref KeyName
-        SecurityGroupIds: !Ref BastionSecurityGroup
-        SubnetId: !Ref BastionSubnetId
+        SecurityGroupIds: !Ref BastionInstanceSecurityGroup
+        SubnetId: !Ref BastionInstanceSubnetId
 
   ApplicationAInstance:
     Type: AWS::CloudFormation::Stack
@@ -110,8 +110,8 @@ Resources:
         InstanceName: !Sub "${ApplicationInstanceName}-A"
         InstanceType: !Ref InstanceType
         KeyName: !Ref KeyName
-        SecurityGroup: !Select [ 0, !Split [ ",", !Ref ApplicationSecurityGroups ] ]
-        SubnetId: !Select [ 0, !Split [ ",", !Ref ApplicationSubnetIds ] ]
+        SecurityGroup: !Select [ 0, !Split [ ",", !Ref ApplicationInstanceSecurityGroups ] ]
+        SubnetId: !Select [ 0, !Split [ ",", !Ref ApplicationInstanceSubnetIds ] ]
 
   ApplicationBInstance:
     Type: AWS::CloudFormation::Stack
@@ -132,8 +132,8 @@ Resources:
         InstanceName: !Sub "${ApplicationInstanceName}-B"
         InstanceType: !Ref InstanceType
         KeyName: !Ref KeyName
-        SecurityGroup: !Select [ 1, !Split [ ",", !Ref ApplicationSecurityGroups ] ]
-        SubnetId: !Select [ 1, !Split [ ",", !Ref ApplicationSubnetIds ] ]
+        SecurityGroup: !Select [ 1, !Split [ ",", !Ref ApplicationInstanceSecurityGroups ] ]
+        SubnetId: !Select [ 1, !Split [ ",", !Ref ApplicationInstanceSubnetIds ] ]
 
   ApplicationCInstance:
     Type: AWS::CloudFormation::Stack
@@ -154,8 +154,8 @@ Resources:
         InstanceName: !Sub "${ApplicationInstanceName}-C"
         InstanceType: !Ref InstanceType
         KeyName: !Ref KeyName
-        SecurityGroup: !Select [2, !Split [",", !Ref ApplicationSecurityGroups]]
-        SubnetId: !Select [2, !Split [",", !Ref ApplicationSubnetIds]]
+        SecurityGroup: !Select [2, !Split [",", !Ref ApplicationInstanceSecurityGroups]]
+        SubnetId: !Select [2, !Split [",", !Ref ApplicationInstanceSubnetIds]]
 
 Outputs:
   BastionInstancesId:

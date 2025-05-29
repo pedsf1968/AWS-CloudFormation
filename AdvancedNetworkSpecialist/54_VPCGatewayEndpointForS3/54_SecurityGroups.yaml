@@ -33,9 +33,9 @@ Parameters:
     Type: String
   
   # Stack parameters
-  ApplicationVpcId:
+  ApplicationInstanceVpcId:
     Type: String
-  ApplicationIngressCidrIp:
+  ApplicationInstanceIngressCidrIp:
     Default: "10.10.0.0/16"
     Type: String
   EndpointVpcId:
@@ -43,9 +43,9 @@ Parameters:
   EndpointIngressCidrIp:
     Default: "10.10.0.0/16"
     Type: String
-  BastionVpcId:
+  BastionInstanceVpcId:
     Type: String
-  BastionIngressCidrIp:
+  BastionInstanceIngressCidrIp:
     Default: "0.0.0.0/0"
     Type: String
 
@@ -53,21 +53,21 @@ Conditions:
   saveInS3File: !Equals [ !Ref SaveInS3File, "true"]
 
 Resources:
-  ApplicationSecurityGroup:
+  ApplicationInstanceSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: "Security Group for Application"
-      GroupName: "ApplicationSecurityGroup"
+      GroupName: "ApplicationInstanceSecurityGroup"
       SecurityGroupIngress:
-        - CidrIp: !Ref ApplicationIngressCidrIp
+        - CidrIp: !Ref ApplicationInstanceIngressCidrIp
           FromPort: -1
           IpProtocol: icmp
           ToPort: -1
-        - CidrIp: !Ref ApplicationIngressCidrIp
+        - CidrIp: !Ref ApplicationInstanceIngressCidrIp
           FromPort: 22
           IpProtocol: tcp
           ToPort: 22
-        - CidrIp: !Ref ApplicationIngressCidrIp
+        - CidrIp: !Ref ApplicationInstanceIngressCidrIp
           FromPort: 80
           IpProtocol: tcp
           ToPort: 80
@@ -78,9 +78,9 @@ Resources:
           Value:  !Sub "${ProjectName}-${EnvironmentName}-Application-SG"
         - Key: ProjectName
           Value: !Ref ProjectName
-      VpcId: !Ref ApplicationVpcId
+      VpcId: !Ref ApplicationInstanceVpcId
 
-  ApplicationSecurityGroupToS3:
+  ApplicationInstanceSecurityGroupToS3:
     Type: AWS::CloudFormation::CustomResource
     Condition: saveInS3File
     DeletionPolicy: Retain
@@ -94,19 +94,19 @@ Resources:
       Region: !Ref AWS::Region
       ResourceType: "SecurityGroup"
       Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:SecurityGroup:Application"
-      Value: !Ref ApplicationSecurityGroup
+      Value: !Ref ApplicationInstanceSecurityGroup
 
-  BastionSecurityGroup:
+  BastionInstanceSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: "Security Group for Bastion"
-      GroupName: "BastionSecurityGroup"
+      GroupName: "BastionInstanceSecurityGroup"
       SecurityGroupIngress:
-        - CidrIp: !Ref BastionIngressCidrIp
+        - CidrIp: !Ref BastionInstanceIngressCidrIp
           FromPort: -1
           IpProtocol: icmp
           ToPort: -1
-        - CidrIp: !Ref BastionIngressCidrIp
+        - CidrIp: !Ref BastionInstanceIngressCidrIp
           FromPort: 22
           IpProtocol: tcp
           ToPort: 22
@@ -117,9 +117,9 @@ Resources:
           Value:  !Sub "${ProjectName}-${EnvironmentName}-Bastion-SG"
         - Key: ProjectName
           Value: !Ref ProjectName
-      VpcId: !Ref BastionVpcId
+      VpcId: !Ref BastionInstanceVpcId
 
-  BastionSecurityGroupToS3:
+  BastionInstanceSecurityGroupToS3:
     Type: AWS::CloudFormation::CustomResource
     Condition: saveInS3File 
     DeletionPolicy: Retain
@@ -133,7 +133,7 @@ Resources:
       Region: !Ref AWS::Region
       ResourceType: "SecurityGroup"
       Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:SecurityGroup:Bastion"
-      Value: !Ref BastionSecurityGroup
+      Value: !Ref BastionInstanceSecurityGroup
 
   EndpointSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -179,12 +179,12 @@ Resources:
       Value: !Ref EndpointSecurityGroup
 
 Outputs:
-  ApplicationSecurityGroupId:
+  ApplicationInstanceSecurityGroupId:
     Description: "Security GroupId for the Application"
-    Value: !GetAtt ApplicationSecurityGroup.GroupId
+    Value: !GetAtt ApplicationInstanceSecurityGroup.GroupId
   EndpointSecurityGroupId:
     Description: "Security GroupId for the Endpoint"
     Value: !GetAtt EndpointSecurityGroup.GroupId
-  BastionSecurityGroupId:
+  BastionInstanceSecurityGroupId:
     Description: "Security GroupId for the Bastion"
-    Value: !GetAtt BastionSecurityGroup.GroupId
+    Value: !GetAtt BastionInstanceSecurityGroup.GroupId

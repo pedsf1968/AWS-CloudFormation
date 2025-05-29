@@ -1,0 +1,222 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template deploy Lambda to use
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "30_VPCDNSWithRoute53PrivateHostedZone"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: [ "dev", "test", "prod" ]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String    
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+  # Stack parameters
+  ApplicationLogLevel:
+    AllowedValues: [ TRACE, DEBUG, INFO, WARN, ERROR, FATAL ]
+    Default: ERROR
+    Description: |
+      Set this property to filter the application logs for your function that Lambda sends to CloudWatch. 
+      Lambda only sends application logs at the selected level of detail and lower, 
+      where TRACE is the highest level and FATAL is the lowest.
+    Type: String
+
+Conditions:
+  CreateRole: !Equals [!Ref "AWS::Region", "eu-west-3" ]
+
+Resources:
+  IAMResourceToS3Stack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        CreateRole: !If
+          - CreateRole
+          - "true"
+          - "false"
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        ApplicationLogLevel: !Ref ApplicationLogLevel
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/Lambda/IAMResourceToS3.yaml"
+      TimeoutInMinutes: 5
+
+  GetParametersFromS3Stack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - IAMResourceToS3Stack
+    UpdateReplacePolicy: Delete
+    Properties:
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        CreateRole: !If
+          - CreateRole
+          - "true"
+          - "false"
+        SaveInS3File: !Ref SaveInS3File
+        ApplicationLogLevel: !Ref ApplicationLogLevel
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/Lambda/GetParametersFromS3.yaml"
+      TimeoutInMinutes: 5
+
+  EC2ResourceToS3Stack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - IAMResourceToS3Stack
+    UpdateReplacePolicy: Delete
+    Properties:
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        CreateRole: !If
+          - CreateRole
+          - "true"
+          - "false"
+        SaveInS3File: !Ref SaveInS3File
+        ApplicationLogLevel: !Ref ApplicationLogLevel
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/Lambda/EC2ResourceToS3.yaml"
+      TimeoutInMinutes: 5
+
+  Route53ResourceToS3Stack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - IAMResourceToS3Stack
+    UpdateReplacePolicy: Delete
+    Properties:
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        CreateRole: !If
+          - CreateRole
+          - "true"
+          - "false"
+        SaveInS3File: !Ref SaveInS3File
+        ApplicationLogLevel: !Ref ApplicationLogLevel
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/Lambda/Route53ResourceToS3.yaml"
+      TimeoutInMinutes: 5
+
+
+  UpdateParametersFromS3Stack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - IAMResourceToS3Stack
+    UpdateReplacePolicy: Delete
+    Properties:
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        CreateRole: !If
+          - CreateRole
+          - "true"
+          - "false"
+        SaveInS3File: !Ref SaveInS3File
+        ApplicationLogLevel: !Ref ApplicationLogLevel
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/Lambda/UpdateParametersFromS3.yaml"
+      TimeoutInMinutes: 5
+
+Outputs:
+  GetParametersFromS3LambdaFunctionArn:
+    Description: "GetParametersFromS3 Lambda Arn"
+    Value: !GetAtt GetParametersFromS3Stack.Outputs.LambdaFunctionArn
+  GetParametersFromS3RoleArn:
+    Description: "GetParametersFromS3 Lambda Role Arn"
+    Value: !If
+          - CreateRole
+          - !GetAtt GetParametersFromS3Stack.Outputs.RoleArn
+          - ""
+  GetParametersFromS3LogGroupId:
+    Description: GetParametersFromS3 Lambda Log Group Id
+    Value: !GetAtt GetParametersFromS3Stack.Outputs.LogGroupId
+
+  EC2ResourceToS3LambdaFunctionArn:
+    Description: "EC2ResourceToS3 Lambda Arn"
+    Value: !GetAtt EC2ResourceToS3Stack.Outputs.LambdaFunctionArn
+  EC2ResourceToS3RoleArn:
+    Description: "EC2ResourceToS3 Lambda Role Arn"
+    Value: !If
+          - CreateRole
+          - !GetAtt EC2ResourceToS3Stack.Outputs.RoleArn
+          - ""
+  EC2ResourceToS3LogGroupId:
+    Description: EC2ResourceToS3 Lambda Log Group Id
+    Value: !GetAtt EC2ResourceToS3Stack.Outputs.LogGroupId
+
+  Route53ResourceToS3LambdaFunctionArn:
+    Description: "Route53ResourceToS3 Lambda Arn"
+    Value: !GetAtt Route53ResourceToS3Stack.Outputs.LambdaFunctionArn
+  Route53ResourceToS3RoleArn:
+    Description: "Route53ResourceToS3 Lambda Role Arn"
+    Value: !If
+          - CreateRole
+          - !GetAtt Route53ResourceToS3Stack.Outputs.RoleArn
+          - ""
+  Route53ResourceToS3LogGroupId:
+    Description: Route53ResourceToS3 Lambda Log Group Id
+    Value: !GetAtt Route53ResourceToS3Stack.Outputs.LogGroupId
+
+  IAMResourceToS3LambdaFunctionArn:
+    Description: "IAMResourceToS3 Lambda Arn"
+    Value: !GetAtt IAMResourceToS3Stack.Outputs.LambdaFunctionArn
+  IAMResourceToS3RoleArn:
+    Description: "IAMResourceToS3 Lambda Role Arn"
+    Value: !If
+          - CreateRole
+          - !GetAtt IAMResourceToS3Stack.Outputs.RoleArn
+          - ""
+  IAMResourceToS3LogGroupId:
+    Description: IAMResourceToS3 Lambda Log Group Id
+    Value: !GetAtt IAMResourceToS3Stack.Outputs.LogGroupId
+
+  UpdateParametersFromS3LambdaFunctionArn:
+    Description: "ARN of UpdateParametersFromS3 Lambda"
+    Value: !GetAtt UpdateParametersFromS3Stack.Outputs.LambdaFunctionArn
+  UpdateParametersFromS3RoleArn:
+    Description: "UpdateParametersFromS3 Lambda Role Arn"
+    Value: !If
+          - CreateRole
+          - !GetAtt UpdateParametersFromS3Stack.Outputs.RoleArn
+          - ""
+  UpdateParametersFromS3LogGroupId:
+    Description: UpdateParametersFromS3 Lambda Log Group Id
+    Value: !GetAtt UpdateParametersFromS3Stack.Outputs.LogGroupId

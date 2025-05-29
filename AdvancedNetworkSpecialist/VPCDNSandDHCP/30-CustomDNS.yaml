@@ -219,7 +219,7 @@ Resources:
       SecurityGroupIds:
         - !Ref SSHSecurityGroup
         - !Ref ICMPSecurityGroup
-        - !Ref DNSSecurityGroup
+        - !Ref DnsInstanceSecurityGroup
       SourceDestCheck: False
       SubnetId: !Ref PublicSubnet
       Tags:
@@ -288,7 +288,7 @@ Resources:
         - Key: Name
           Value: ICMP-SG
 
-  DNSSecurityGroup:
+  DnsInstanceSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Enable DNS

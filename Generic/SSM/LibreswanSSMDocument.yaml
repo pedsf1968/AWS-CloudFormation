@@ -2,9 +2,44 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: "CloudFormation template to create an SSM Document for installing Libreswan"
 
+Parameters:
+  # Global parameters
+  Bucket:
+    Description: "CloudFormation bucket URL"
+    Type: String
+    Default: "hawkfund-cloudformation"
+  BucketKey:
+    Description: "Key to find object in the bucket"
+    Type: String
+    Default: "91_SiteToSiteVpn"
+  BucketObject:
+    Description: "File to store data in the bucket"
+    Type: String
+    Default: "Data.json"
+  EnvironmentName:
+    Description: "Environment name that prefix all resources"
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+  ProjectName:
+    Description: "Project name that prefix all resources"
+    Type: String
+    Default: "ANS"
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+
 Resources:
-  LibreswanDeploySSMDocument:
+  LibreswanSSMDocument:
     Type: AWS::SSM::Document
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
     Properties:
       Content:
         description: "Deploy Libreswan server for IPSEC connection on instance."
@@ -122,6 +157,13 @@ Resources:
         schemaVersion: "2.2"
       DocumentFormat: YAML
       DocumentType: Command
-      Name: LibreswanDeploySSMDocument
+      Name: LibreswanSSMDocument
+      Tags:
+      - Key: EnvironmentName
+        Value: !Ref EnvironmentName
+      - Key: Name
+        Value: !Sub "${ProjectName}-${EnvironmentName}-LibreswanSSMDocument"
+      - Key: ProjectName
+        Value: !Ref ProjectName
       TargetType: "/AWS::EC2::Instance"
       UpdateMethod: Replace

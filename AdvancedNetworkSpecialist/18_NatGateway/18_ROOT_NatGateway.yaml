@@ -40,10 +40,10 @@ Metadata:
           default: "Instances"
         Parameters:
           - KeyName
-          - ApplicationImageId
+          - ApplicationInstanceImageId
           - ApplicationInstanceName
           - ApplicationInstanceType
-          - BastionImageId
+          - BastionInstanceImageId
           - BastionInstanceName
           - BastionInstanceType
 
@@ -108,7 +108,7 @@ Parameters:
     Type: String
 
   # Instances parameters
-  ApplicationImageId:
+  ApplicationInstanceImageId:
     Default: ami-08461dc8cd9e834e0
     Description: "Application Instance AMI"
     Type: AWS::EC2::Image::Id
@@ -120,7 +120,7 @@ Parameters:
     Default: t2.micro
     Description: "Application Instances type"
     Type: String
-  BastionImageId:
+  BastionInstanceImageId:
     Default: ami-08461dc8cd9e834e0
     Description: "Bastion Instance AMI"
     Type: AWS::EC2::Image::Id
@@ -259,10 +259,11 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
-        ApplicationIngressCidrIp: "10.0.0.0/8"
-        ApplicationVpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
-        BastionIngressCidrIp: "0.0.0.0/0"
-        BastionVpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
+        ApplicationInstanceIngressCidrIp: "10.0.0.0/8"
+        ApplicationInstanceVpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
+        BastionInstanceIngressCidrIp: "0.0.0.0/0"
+        BastionInstanceVpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
+        VpcCidrBlock: !Ref VpcCidrBlock
 
   Instances:
     Type: AWS::CloudFormation::Stack
@@ -281,15 +282,15 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
-        ApplicationImageId: !Ref ApplicationImageId
+        ApplicationInstanceImageId: !Ref ApplicationInstanceImageId
         ApplicationInstanceName: !Ref ApplicationInstanceName
         ApplicationInstanceProfile: !GetAtt Roles.Outputs.InstanceProfileId
         ApplicationInstanceType: !Ref ApplicationInstanceType
-        ApplicationSecurityGroup: !GetAtt SecurityGroups.Outputs.ApplicationSecurityGroupId
-        ApplicationSubnetId: !GetAtt VpcAndSubnets.Outputs.SubnetPrivateId
-        BastionImageId: !Ref BastionImageId
+        ApplicationInstanceSecurityGroup: !GetAtt SecurityGroups.Outputs.ApplicationInstanceSecurityGroupId
+        ApplicationInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.SubnetPrivateId
+        BastionInstanceImageId: !Ref BastionInstanceImageId
         BastionInstanceName: !Ref BastionInstanceName
         BastionInstanceType: !Ref BastionInstanceType
-        BastionSecurityGroup: !GetAtt SecurityGroups.Outputs.BastionSecurityGroupId
-        BastionSubnetId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId
+        BastionInstanceSecurityGroup: !GetAtt SecurityGroups.Outputs.BastionInstanceSecurityGroupId
+        BastionInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId
         KeyName: !Ref KeyName

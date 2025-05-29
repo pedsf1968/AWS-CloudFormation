@@ -48,21 +48,21 @@ Parameters:
     Type: String
 
 Resources:
-  ApacheHttpdInstallSSMDocument:
+  ApacheHttpdSSMDocument:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/SSM/ApacheHttpdInstallSSMDocument.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/SSM/ApacheHttpdSSMDocument.yaml"
       TimeoutInMinutes: 10
 
   ApacheHttpdInstallSSMAssociation:
     Type: AWS::SSM::Association
     DependsOn:
-      - ApacheHttpdInstallSSMDocument
+      - ApacheHttpdSSMDocument
     Properties:
       AssociationName: ApacheHttpdInstallSSMAssociation
-      Name: ApacheHttpdInstallSSMDocument
+      Name: ApacheHttpdSSMDocument
       Targets:
       - Key: InstanceIds
         Values:

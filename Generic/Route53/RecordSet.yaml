@@ -1,0 +1,111 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  "Generic template to deploy RecordSet"
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: ""
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: [ "dev", "test", "prod" ]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String    
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+  # Stack parameters
+  Comment:
+    Default: ""
+    Description: >-
+      Optional: Any comments you want to include about a change batch request. 
+    MaxLength: 256  
+    Type: String
+  HostedZoneId:
+    Default: ""
+    Description: >-
+      Required: The ID of the hosted zone to be updated.
+    Type: String
+  HostedZoneName:
+    Default: ""
+    Description: >-
+      Optional: The name of the hosted zone.
+    MaxLength: 32
+    Type: String
+  Name:
+    Description: >-
+      Required: The name of the resource record set.
+    Type: String 
+  ResourceRecords:
+    Default: ""
+    Description: >-
+      Optional: List of values to associate with the resource record set.
+    Type: CommaDelimitedList
+  TTL:
+    Default: 300
+    Description: >-
+      Optional: The resource record cache time to live (TTL), in seconds.
+    Type: String
+  Type:
+    AllowedValues: [ "A", "AAAA", "CNAME", "MX", "NAPTR", "NS", "PTR", "SOA", "SPF", "SRV", "TXT" ]
+    Default: "A"
+    Description: >-
+      Optional: The type of the resource record set.
+    Type: String
+
+Conditions:
+  asNoHostedZoneId: !Equals [ !Ref HostedZoneId, "" ]
+  saveInS3File: !Equals [ !Ref SaveInS3File, "true"]
+
+Resources:
+  RecordSet:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      Comment: !Ref Comment
+      HostedZoneId: !If [ asNoHostedZoneId, !Ref AWS::NoValue ,!Ref HostedZoneId]
+      HostedZoneName: !If [ asNoHostedZoneId, !Ref HostedZoneName, !Ref AWS::NoValue]
+      Name: !Ref Name
+      ResourceRecords: 
+        - !Select [0, !Ref ResourceRecords]
+      TTL: !Ref TTL
+      Type: !Ref Type
+
+  RecordSetToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: saveInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:Route53ResourceToS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Region: !Ref AWS::Region
+      ResourceType: "RecordSet"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:Route53:RecordSet:${Name}"
+      Value: !Ref RecordSet
+
+
+Outputs:
+  RecordSetId:
+    Description: "Id of the RecordSet"
+    Value: !Ref RecordSet

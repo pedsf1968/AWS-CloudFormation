@@ -1,0 +1,122 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  "Generic template to deploy DHCP Option sets"
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: ""
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: [ "dev", "test", "prod" ]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String    
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+  # Stack parameters
+  DomainName: # Required: No
+    Description: >-
+      This value is used to complete unqualified DNS hostnames. If you're using
+      AmazonProvidedDNS in us-east-1, specify ec2.internal. If you're using
+      AmazonProvidedDNS in another Region, specify region.compute.internal
+      (for example, ap-northeast-1.compute.internal). Otherwise, specify a
+      domain name (for example, MyCompany.com).
+    Type: String
+  DomainNameServers: # Required: Conditional
+    Default: "AmazonProvidedDNS"
+    Description: >-
+      The IPv4 addresses of up to four domain name servers, or
+      AmazonProvidedDNS. The default is AmazonProvidedDNS. To have your
+      instance receive a custom DNS hostname as specified in DomainName, you
+      must set this property to a custom DNS server.
+    Type: CommaDelimitedList
+  NetbiosNameServers: # Required: Conditional
+    Default: "10.2.5.1"
+    Description: >-
+      The IPv4 addresses of up to four NetBIOS name servers.
+      Required if you're using AmazonProvidedDNS.
+    Type: CommaDelimitedList
+  NetbiosNodeType: # Required: No
+    Default: 2
+    Description: >-
+      The NetBIOS node type (1, 2, 4, or 8). We recommend that you specify 2
+      (broadcast and multicast are not currently supported).
+    Type: Number
+  NtpServers: # Required: Conditional
+    Default: "10.2.5.1"
+    Description: >-
+      The IPv4 addresses of up to four Network Time Protocol (NTP) servers.
+      Required if you're using AmazonProvidedDNS.
+    Type: CommaDelimitedList
+  VpcId: # Required: Yes
+    Description: "The ID of the VPC."
+    Type: String
+
+Conditions:
+  saveInS3File: !Equals [ !Ref SaveInS3File, "true"]
+
+Resources:
+  DhcpOptions:
+    Type: AWS::EC2::DHCPOptions
+    Properties:
+      DomainName: !Ref DomainName
+      DomainNameServers: 
+        - !Select [ 0, !Ref DomainNameServers ]
+      NetbiosNameServers: 
+        - !Select [ 0, !Ref NetbiosNameServers ]
+      NetbiosNodeType: !Ref NetbiosNodeType
+      NtpServers: 
+        - !Select [ 0, !Ref NtpServers ]
+      Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-DhcpOptions-${DomainName}"
+        - Key: ProjectName
+          Value: !Ref ProjectName
+
+  VpcDhcpOptionsAssociation:
+    Type: AWS::EC2::VPCDHCPOptionsAssociation
+    Properties:
+      DhcpOptionsId: !Ref DhcpOptions
+      VpcId: !Ref VpcId
+
+  DhcpOptionsToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: saveInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:EC2ResourceToS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Region: !Ref AWS::Region
+      ResourceType: "DhcpOptions"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:DHCPOptions:${DomainName}"
+      Value: !Ref DhcpOptions
+
+Outputs:
+  DhcpOptionsId:
+    Description: "Id of the DHCP Option Sets"
+    Value: !Ref DhcpOptions

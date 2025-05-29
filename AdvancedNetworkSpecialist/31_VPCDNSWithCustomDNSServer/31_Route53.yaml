@@ -1,0 +1,68 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create bastion and application Instances and Security Groups
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "31_VPCDNSWithCustomDNSServer"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: [ "dev", "test", "prod" ]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String    
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+  
+  # Stack parameters
+  DomainName:
+    Default: "corp.internal"
+    Description: >-
+      This value is used to complete unqualified DNS hostnames. If you're using
+      AmazonProvidedDNS in us-east-1, specify ec2.internal. If you're using
+      AmazonProvidedDNS in another Region, specify region.compute.internal
+      (for example, ap-northeast-1.compute.internal). Otherwise, specify a
+      domain name (for example, MyCompany.com).
+    Type: String
+  DomainNameServers:
+    Type: String
+  VpcId:
+    Description: "The ID of the VPC."
+    Type: String
+
+Resources:
+  DhcpOptionsStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/DhcpOptions.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        DomainName: !Ref DomainName
+        DomainNameServers: !Ref DomainNameServers
+        VpcId: !Ref VpcId

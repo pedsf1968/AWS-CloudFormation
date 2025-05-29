@@ -1,0 +1,245 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create all Security Groups
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "31_VPCDNSWithCustomDNSServer"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: [ "dev", "test", "prod" ]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String    
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+  
+  # Stack parameters
+  ApplicationInstanceVpcId:
+    Type: String
+  ApplicationInstanceIngressCidrIp:
+    Default: "0.0.0.0/0"
+    Type: String
+  BastionInstanceVpcId:
+    Type: String
+  BastionInstanceIngressCidrIp:
+    Default: "0.0.0.0/0"
+    Type: String
+  DatabaseVpcId:
+    Type: String
+  DatabaseIngressCidrIp:
+    Default: "10.10.0.0/16"
+    Type: String
+  DnsVpcId:
+    Type: String
+  DnsIngressCidrIp:
+    Default: "10.10.0.0/16"
+    Type: String
+  VpcCidrBlock:
+    Default: 10.10.0.0/16
+    Description: "The IPv4 network range for the VPC, in CIDR notation."
+    Type: String
+
+Conditions:
+  saveInS3File: !Equals [ !Ref SaveInS3File, "true"]
+
+Resources:
+  BastionInstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Security Group for Bastion"
+      GroupName: "BastionInstanceSecurityGroup"
+      SecurityGroupIngress:
+        - CidrIp: !Ref BastionInstanceIngressCidrIp
+          FromPort: -1
+          IpProtocol: icmp
+          ToPort: -1
+        - CidrIp: !Ref BastionInstanceIngressCidrIp
+          FromPort: 22
+          IpProtocol: tcp
+          ToPort: 22
+      Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value:  !Sub "${ProjectName}-${EnvironmentName}-Bastion-SG"
+        - Key: ProjectName
+          Value: !Ref ProjectName
+      VpcId: !Ref BastionInstanceVpcId
+
+  BastionInstanceSecurityGroupToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: saveInS3File 
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:EC2ResourceToS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Region: !Ref AWS::Region
+      ResourceType: "SecurityGroup"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:SecurityGroup:Bastion"
+      Value: !Ref BastionInstanceSecurityGroup
+
+  ApplicationInstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Security Group for Application"
+      GroupName: "ApplicationInstanceSecurityGroup"
+      SecurityGroupIngress:
+        - CidrIp: !Ref VpcCidrBlock
+          FromPort: -1
+          IpProtocol: icmp
+          ToPort: -1
+        - CidrIp: !Ref VpcCidrBlock
+          FromPort: 22
+          IpProtocol: tcp
+          ToPort: 22
+        - CidrIp: !Ref ApplicationInstanceIngressCidrIp
+          FromPort: 80
+          IpProtocol: tcp
+          ToPort: 80
+      Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value:  !Sub "${ProjectName}-${EnvironmentName}-Application-SG"
+        - Key: ProjectName
+          Value: !Ref ProjectName
+      VpcId: !Ref ApplicationInstanceVpcId
+
+  ApplicationInstanceSecurityGroupToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: saveInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:EC2ResourceToS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Region: !Ref AWS::Region
+      ResourceType: "SecurityGroup"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:SecurityGroup:Application"
+      Value: !Ref ApplicationInstanceSecurityGroup
+
+  DatabaseInstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Security Group for Database"
+      GroupName: "DatabaseInstanceSecurityGroup"
+      SecurityGroupIngress:
+        - CidrIp: !Ref VpcCidrBlock
+          FromPort: -1
+          IpProtocol: icmp
+          ToPort: -1
+        - CidrIp: !Ref VpcCidrBlock
+          FromPort: 22
+          IpProtocol: tcp
+          ToPort: 22
+        - CidrIp: !Ref DatabaseIngressCidrIp
+          FromPort: 5432
+          IpProtocol: tcp
+          ToPort: 5432
+      Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value:  !Sub "${ProjectName}-${EnvironmentName}-Database-SG"
+        - Key: ProjectName
+          Value: !Ref ProjectName
+      VpcId: !Ref DatabaseVpcId
+
+  DatabaseInstanceSecurityGroupToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: saveInS3File 
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:EC2ResourceToS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Region: !Ref AWS::Region
+      ResourceType: "SecurityGroup"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:SecurityGroup:Database"
+      Value: !Ref DatabaseInstanceSecurityGroup
+
+  DnsInstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Security Group for DNS server"
+      GroupName: "DnsInstanceSecurityGroup"
+      SecurityGroupIngress:
+        - CidrIp: !Ref VpcCidrBlock
+          FromPort: -1
+          IpProtocol: icmp
+          ToPort: -1
+        - CidrIp: !Ref VpcCidrBlock
+          FromPort: 22
+          IpProtocol: tcp
+          ToPort: 22
+        - CidrIp: !Ref DnsIngressCidrIp
+          FromPort: 53
+          IpProtocol: udp
+          ToPort: 53
+      Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value:  !Sub "${ProjectName}-${EnvironmentName}-DNS-SG"
+        - Key: ProjectName
+          Value: !Ref ProjectName
+      VpcId: !Ref DnsVpcId
+
+  DnsInstanceSecurityGroupToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: saveInS3File 
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:EC2ResourceToS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Region: !Ref AWS::Region
+      ResourceType: "SecurityGroup"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:SecurityGroup:Dns"
+      Value: !Ref DnsInstanceSecurityGroup
+
+Outputs:
+  ApplicationInstanceSecurityGroupId:
+    Description: "Security GroupId for the Application"
+    Value: !GetAtt ApplicationInstanceSecurityGroup.GroupId
+  BastionInstanceSecurityGroupId:
+    Description: "Security GroupId for the Bastion"
+    Value: !GetAtt BastionInstanceSecurityGroup.GroupId
+  DatabaseInstanceSecurityGroupId:
+    Description: "Security GroupId for the Database"
+    Value: !GetAtt DatabaseInstanceSecurityGroup.GroupId
+  DnsInstanceSecurityGroupId:
+    Description: "Security GroupId for the DNS server"
+    Value: !GetAtt DnsInstanceSecurityGroup.GroupId

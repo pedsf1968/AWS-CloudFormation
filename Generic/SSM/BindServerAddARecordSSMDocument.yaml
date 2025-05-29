@@ -1,0 +1,104 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CloudFormation template to create an SSM Document to add A Record in Bind configuration"
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Description: "CloudFormation bucket URL"
+    Type: String
+    Default: "hawkfund-cloudformation"
+  BucketKey:
+    Description: "Key to find object in the bucket"
+    Type: String
+    Default: "91_SiteToSiteVpn"
+  BucketObject:
+    Description: "File to store data in the bucket"
+    Type: String
+    Default: "Data.json"
+  EnvironmentName:
+    Description: "Environment name that prefix all resources"
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+  ProjectName:
+    Description: "Project name that prefix all resources"
+    Type: String
+    Default: "ANS"
+  SaveInS3File:
+    AllowedValues: ["false", "true"]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+Resources:
+  BindServerAddARecordSSMDocument:
+    Type: AWS::SSM::Document
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Content:
+        description: "Add A Record."
+        parameters:
+          DomainName:
+            default: "corp.internal."
+            description: "Name of the Domain"
+            type: String
+          RecordHostname:
+            default: "ns1"
+            description: "Hostname of the Instance"
+            type: String
+          RecordIp:
+            default: ""
+            description: "IP of the Instance"
+            type: String
+          RecordShortIp:
+            default: ""
+            description: "The last number of Instance IP"
+            type: String
+          ZoneBaseCidr:
+            default: "10.10.0"
+            description: "Zone base CIDR"
+            type: String
+          ZoneName:
+            default: "corp.internal"
+            description: "Name of the Zone"
+            type: String
+        mainSteps:
+          - name: BindZoneConfiguration
+            action: aws:runShellScript
+            inputs:
+              timeoutSeconds: "60"
+              runCommand:
+                - sed -i "/^{{RecordHostname}}.*/d" /etc/bind/db.{{ZoneName}}
+                - echo "{{RecordHostname}}   IN   A   {{RecordIp}}" >> /etc/bind/db.{{ZoneName}}
+          - name: BindReverseZoneConfiguration
+            action: aws:runShellScript
+            inputs:
+              timeoutSeconds: "60"
+              runCommand:
+                - sed -i "/{{RecordHostname}}.{{DomainName}}/d" /etc/bind/db.{{ZoneBaseCidr}}
+                - echo "{{RecordShortIp}}   IN   PTR   {{RecordHostname}}.{{DomainName}}" >> /etc/bind/db.{{ZoneBaseCidr}}
+          - name: BindRestart
+            action: aws:runShellScript
+            inputs:
+              timeoutSeconds: "60"
+              runCommand:
+                - systemctl restart bind9.service
+        schemaVersion: "2.2"
+      DocumentFormat: YAML
+      DocumentType: Command
+      Name: BindServerAddARecordSSMDocument
+      Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-BindServerAddARecordSSMDocument"
+        - Key: ProjectName
+          Value: !Ref ProjectName
+      TargetType: "/AWS::EC2::Instance"
+      UpdateMethod: Replace

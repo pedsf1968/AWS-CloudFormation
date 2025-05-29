@@ -37,7 +37,7 @@ Metadata:
       - Label:
           default: "Bastion"
         Parameters:
-          - BastionImageId
+          - BastionInstanceImageId
           - BastionInstanceName
           - BastionInstanceType
       - Label:
@@ -96,7 +96,7 @@ Parameters:
     Default: "Consumer,Provider"
 
   # Instances parameters
-  BastionImageId:
+  BastionInstanceImageId:
     Default: ami-08461dc8cd9e834e0
     Description: "Bastion Instance AMI"
     Type: AWS::EC2::Image::Id
@@ -185,8 +185,8 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
-        BastionIngressCidrIp: "0.0.0.0/0"
-        BastionVPCId: !Select
+        BastionInstanceIngressCidrIp: "0.0.0.0/0"
+        BastionInstanceVpcId: !Select
           - 0
           - !Split [",", !GetAtt VpcAndSubnets.Outputs.VpcIds]
         ConsumerIngressCidrIp: !Select [0, !Ref VpcCidrBlocks]
@@ -261,11 +261,11 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         KeyName: !Ref InstanceKeyName
-        BastionImageId: !Ref BastionImageId
+        BastionInstanceImageId: !Ref BastionInstanceImageId
         BastionInstanceName: !Ref BastionInstanceName
         BastionInstanceType: !Ref BastionInstanceType
-        BastionSecurityGroup: !GetAtt SecurityGroups.Outputs.BastionSecurityGroupId
-        BastionSubnetId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId
+        BastionInstanceSecurityGroup: !GetAtt SecurityGroups.Outputs.BastionInstanceSecurityGroupId
+        BastionInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId
         ConsumerImageId: !Ref ConsumerImageId
         ConsumerInstanceName: !Ref ConsumerInstanceName
         ConsumerInstanceType: !Ref ConsumerInstanceType

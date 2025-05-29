@@ -9,7 +9,7 @@ param (
     [String]
     $bucketKey = "20_NatInstance",
     [String]
-    $templateName = "20_ROOT_NatInstance",
+    $templateName = "20_ROOT_NatInstance.yaml",
     [String]
     $stackName = "ANS-20",
     [String]

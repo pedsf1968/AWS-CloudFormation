@@ -41,9 +41,6 @@ Parameters:
     Default: "Default"
     Description: "Nat Gateway name"
     Type: String
-  SubnetPrivateId:
-    Description: "Private Subnet ID"
-    Type: String
   SubnetPublicId:
     Description: "Public Subnet ID"
     Type: String

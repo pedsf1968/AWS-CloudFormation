@@ -36,14 +36,14 @@ Parameters:
     Type: String
 
   # Stack parameters
-  BastionVpcId:
+  BastionInstanceVpcId:
     Type: String
-  BastionIngressCidrIp:
+  BastionInstanceIngressCidrIp:
     Default: "0.0.0.0/0"
     Type: String
-  ApplicationVpcIds:
+  ApplicationInstanceVpcIds:
     Type: String
-  ApplicationIngressCidrIp:
+  ApplicationInstanceIngressCidrIp:
     Default: "10.0.0.0/8"
     Type: String
 
@@ -51,26 +51,26 @@ Conditions:
   saveInS3File: !Equals [ !Ref SaveInS3File, "true"]
 
 Resources:
-  BastionSecurityGroup:
+  BastionInstanceSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: "Security Group for Bastion"
-      GroupName: "BastionSecurityGroup"
+      GroupName: "BastionInstanceSecurityGroup"
       SecurityGroupIngress:
-        - CidrIp: !Ref BastionIngressCidrIp
+        - CidrIp: !Ref BastionInstanceIngressCidrIp
           FromPort: -1
           IpProtocol: icmp
           ToPort: -1
-        - CidrIp: !Ref BastionIngressCidrIp
+        - CidrIp: !Ref BastionInstanceIngressCidrIp
           FromPort: 22
           IpProtocol: tcp
           ToPort: 22
       Tags:
         - Key: Name
           Value:  !Sub "${ProjectName}-${EnvironmentName}-Bastion-SG"
-      VpcId: !Ref BastionVpcId
+      VpcId: !Ref BastionInstanceVpcId
 
-  BastionSecurityGroupToS3:
+  BastionInstanceSecurityGroupToS3:
     Type: AWS::CloudFormation::CustomResource
     Condition: saveInS3File 
     DeletionPolicy: Retain
@@ -84,7 +84,7 @@ Resources:
       Region: !Ref AWS::Region
       ResourceType: "SecurityGroup"
       Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:SecurityGroup:Bastion"
-      Value: !Ref BastionSecurityGroup
+      Value: !Ref BastionInstanceSecurityGroup
 
   ApplicationASecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -92,22 +92,22 @@ Resources:
       GroupDescription: "Security Group for A Application"
       GroupName: "ApplicationASecurityGroup"
       SecurityGroupIngress:
-        - CidrIp: !Ref ApplicationIngressCidrIp
+        - CidrIp: !Ref ApplicationInstanceIngressCidrIp
           FromPort: -1
           IpProtocol: icmp
           ToPort: -1
-        - CidrIp: !Ref ApplicationIngressCidrIp
+        - CidrIp: !Ref ApplicationInstanceIngressCidrIp
           FromPort: 22
           IpProtocol: tcp
           ToPort: 22
-        - CidrIp: !Ref ApplicationIngressCidrIp
+        - CidrIp: !Ref ApplicationInstanceIngressCidrIp
           FromPort: 80
           IpProtocol: tcp
           ToPort: 80
       Tags:
         - Key: Name
           Value:  !Sub "${ProjectName}-${EnvironmentName}-A-Application-SG"
-      VpcId: !Select [ 0, !Split [ ",", !Ref ApplicationVpcIds ] ]
+      VpcId: !Select [ 0, !Split [ ",", !Ref ApplicationInstanceVpcIds ] ]
 
   ApplicationASecurityGroupToS3:
     Type: AWS::CloudFormation::CustomResource
@@ -131,22 +131,22 @@ Resources:
       GroupDescription: "Security Group for BApplication"
       GroupName: "ApplicationBSecurityGroup"
       SecurityGroupIngress:
-        - CidrIp: !Ref ApplicationIngressCidrIp
+        - CidrIp: !Ref ApplicationInstanceIngressCidrIp
           FromPort: -1
           IpProtocol: icmp
           ToPort: -1
-        - CidrIp: !Ref ApplicationIngressCidrIp
+        - CidrIp: !Ref ApplicationInstanceIngressCidrIp
           FromPort: 22
           IpProtocol: tcp
           ToPort: 22
-        - CidrIp: !Ref ApplicationIngressCidrIp
+        - CidrIp: !Ref ApplicationInstanceIngressCidrIp
           FromPort: 80
           IpProtocol: tcp
           ToPort: 80
       Tags:
         - Key: Name
           Value:  !Sub "${ProjectName}-${EnvironmentName}-B-Application-SG"
-      VpcId: !Select [ 1, !Split [ ",", !Ref ApplicationVpcIds ] ]
+      VpcId: !Select [ 1, !Split [ ",", !Ref ApplicationInstanceVpcIds ] ]
 
   ApplicationBSecurityGroupToS3:
     Type: AWS::CloudFormation::CustomResource
@@ -170,22 +170,22 @@ Resources:
       GroupDescription: "Security Group for C Application"
       GroupName: "ApplicationCSecurityGroup"
       SecurityGroupIngress:
-        - CidrIp: !Ref ApplicationIngressCidrIp
+        - CidrIp: !Ref ApplicationInstanceIngressCidrIp
           FromPort: -1
           IpProtocol: icmp
           ToPort: -1
-        - CidrIp: !Ref ApplicationIngressCidrIp
+        - CidrIp: !Ref ApplicationInstanceIngressCidrIp
           FromPort: 22
           IpProtocol: tcp
           ToPort: 22
-        - CidrIp: !Ref ApplicationIngressCidrIp
+        - CidrIp: !Ref ApplicationInstanceIngressCidrIp
           FromPort: 80
           IpProtocol: tcp
           ToPort: 80
       Tags:
         - Key: Name
           Value:  !Sub "${ProjectName}-${EnvironmentName}-C-Application-SG"
-      VpcId: !Select [ 2, !Split [ ",", !Ref ApplicationVpcIds ] ]
+      VpcId: !Select [ 2, !Split [ ",", !Ref ApplicationInstanceVpcIds ] ]
 
   ApplicationCSecurityGroupToS3:
     Type: AWS::CloudFormation::CustomResource
@@ -204,10 +204,10 @@ Resources:
       Value: !Ref ApplicationCSecurityGroup
 
 Outputs:
-  BastionSecurityGroupId:
+  BastionInstanceSecurityGroupId:
     Description: "Security GroupId for the Bastion"
-    Value: !GetAtt BastionSecurityGroup.GroupId
-  ApplicationSecurityGroupIds:
+    Value: !GetAtt BastionInstanceSecurityGroup.GroupId
+  ApplicationInstanceSecurityGroupIds:
     Description: "Security GroupIds for the Application"
     Value: !Join [",", [!GetAtt ApplicationASecurityGroup.GroupId, !GetAtt ApplicationBSecurityGroup.GroupId, !GetAtt ApplicationCSecurityGroup.GroupId]]
 

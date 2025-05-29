@@ -195,6 +195,9 @@ Resources:
                 case "CustomerGateway":
                   response = ec2_client.describe_customer_gateways(CustomerGatewayIds=[ resource_id ])
                   return response['CustomerGateways'][0]
+                case "DhcpOptions":
+                  response = ec2_client.describe_dhcp_options(DhcpOptionsIds=[ resource_id ])
+                  return response['DhcpOptions'][0]
                 case "Instance":
                   response = ec2_client.describe_instances(InstanceIds=[resource_id])
                   return response['Reservations'][0]['Instances'][0]

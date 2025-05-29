@@ -39,7 +39,7 @@ Parameters:
     Type: String
 
   # Appplication parameters
-  ApplicationImageId:
+  ApplicationInstanceImageId:
     Default: ami-08461dc8cd9e834e0
     Description: "Application Instance AMI"
     Type: AWS::EC2::Image::Id
@@ -54,15 +54,15 @@ Parameters:
   ApplicationInstanceProfile:
     Description: "Profile of the Application"
     Type: String
-  ApplicationSecurityGroup:
+  ApplicationInstanceSecurityGroup:
     Description: "Application Security Group"
     Type: String
-  ApplicationSubnetId:
+  ApplicationInstanceSubnetId:
     Description: "Application Subnet ID"
     Type: String
 
   # Bastion parameters
-  BastionImageId:
+  BastionInstanceImageId:
     Default: ami-08461dc8cd9e834e0
     Description: "Bastion Instance AMI"
     Type: AWS::EC2::Image::Id
@@ -74,15 +74,15 @@ Parameters:
     Default: t2.micro
     Description: "Bastion Instances type"
     Type: String
-  BastionSecurityGroup:
+  BastionInstanceSecurityGroup:
     Description: "Bastion Security Group"
     Type: String
-  BastionSubnetId:
+  BastionInstanceSubnetId:
     Description: "Bastion Subnet ID"
     Type: String
 
   # Nat Instance parameters
-  NatImageId:
+  NatInstanceImageId:
     Default: ami-015c7728d5cb3dccd
     Description: "Nat Instance AMI"
     Type: AWS::EC2::Image::Id
@@ -94,10 +94,10 @@ Parameters:
     Default: t2.micro
     Description: "Nat Instances type"
     Type: String
-  NatSecurityGroup:
+  NatInstanceSecurityGroup:
     Description: "Nat Security Group"
     Type: String
-  NatSubnetId:
+  NatInstanceSubnetId:
     Description: "Nat Subnet ID"
     Type: String
 
@@ -119,12 +119,12 @@ Resources:
         SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Select [0, !GetAZs ]
         ElasticIP: "true"
-        ImageId: !Ref BastionImageId
+        ImageId: !Ref BastionInstanceImageId
         InstanceName: !Ref BastionInstanceName
         InstanceType: !Ref BastionInstanceType
         KeyName: !Ref KeyName
-        SecurityGroupIds: !Ref BastionSecurityGroup
-        SubnetId: !Ref BastionSubnetId
+        SecurityGroupIds: !Ref BastionInstanceSecurityGroup
+        SubnetId: !Ref BastionInstanceSubnetId
 
   ApplicationInstance:
     Type: AWS::CloudFormation::Stack
@@ -142,12 +142,12 @@ Resources:
         SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Select [0, !GetAZs ]
         IamInstanceProfile: !Ref ApplicationInstanceProfile
-        ImageId: !Ref ApplicationImageId
+        ImageId: !Ref ApplicationInstanceImageId
         InstanceName: !Ref ApplicationInstanceName
         InstanceType: !Ref ApplicationInstanceType
         KeyName: !Ref KeyName
-        SecurityGroupIds: !Ref ApplicationSecurityGroup
-        SubnetId: !Ref ApplicationSubnetId
+        SecurityGroupIds: !Ref ApplicationInstanceSecurityGroup
+        SubnetId: !Ref ApplicationInstanceSubnetId
 
   NatInstance:
     Type: AWS::CloudFormation::Stack
@@ -165,13 +165,13 @@ Resources:
         SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Select [0, !GetAZs ]
         ElasticIP: "false"
-        ImageId: !Ref NatImageId
+        ImageId: !Ref NatInstanceImageId
         InstanceName: !Ref NatInstanceName
         InstanceType: !Ref NatInstanceType
         KeyName: !Ref KeyName
-        SecurityGroupIds: !Ref NatSecurityGroup
+        SecurityGroupIds: !Ref NatInstanceSecurityGroup
         SourceDestCheck: "false"
-        SubnetId: !Ref NatSubnetId
+        SubnetId: !Ref NatInstanceSubnetId
 
 Outputs:
   ApplicationInstanceId:

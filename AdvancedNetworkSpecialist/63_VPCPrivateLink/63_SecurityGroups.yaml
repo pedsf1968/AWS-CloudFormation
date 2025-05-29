@@ -33,10 +33,10 @@ Parameters:
     Type: String
 
   # Stack parameters
-  BastionIngressCidrIp:
+  BastionInstanceIngressCidrIp:
     Type: String
     Default: "0.0.0.0/0"
-  BastionVPCId:
+  BastionInstanceVpcId:
     Type: String
   ConsumerIngressCidrIp:
     Type: String
@@ -68,26 +68,26 @@ Resources:
         PrefixListName: "All-VPC-pl"
         PrefixListEntries: !Ref PrefixListEntries
 
-  BastionSecurityGroup:
+  BastionInstanceSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: "Security Group for Bastion"
-      GroupName: "BastionSecurityGroup"
+      GroupName: "BastionInstanceSecurityGroup"
       SecurityGroupIngress:
-        - CidrIp: !Ref BastionIngressCidrIp
+        - CidrIp: !Ref BastionInstanceIngressCidrIp
           FromPort: -1
           IpProtocol: icmp
           ToPort: -1
-        - CidrIp: !Ref BastionIngressCidrIp
+        - CidrIp: !Ref BastionInstanceIngressCidrIp
           FromPort: 22
           IpProtocol: tcp
           ToPort: 22
       Tags:
         - Key: Name
           Value:  !Sub "${ProjectName}-${EnvironmentName}-Default-SG"
-      VpcId: !Ref BastionVPCId
+      VpcId: !Ref BastionInstanceVpcId
 
-  BastionSecurityGroupToS3:
+  BastionInstanceSecurityGroupToS3:
     Type: AWS::CloudFormation::CustomResource
     Condition: saveInS3File 
     DeletionPolicy: Retain
@@ -101,7 +101,7 @@ Resources:
       Region: !Ref AWS::Region
       ResourceType: "SecurityGroup"
       Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:SecurityGroup:Bastion"
-      Value: !Ref BastionSecurityGroup
+      Value: !Ref BastionInstanceSecurityGroup
 
   ConsumerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -212,9 +212,9 @@ Outputs:
   PrefixListId:
     Description: "Prefix List Id for all VPCs"
     Value: !Ref PrefixList
-  BastionSecurityGroupId:
+  BastionInstanceSecurityGroupId:
     Description: "Security GroupId for the Bastion"
-    Value: !GetAtt BastionSecurityGroup.GroupId
+    Value: !GetAtt BastionInstanceSecurityGroup.GroupId
   ConsumerSecurityGroupId:
     Description: "Security GroupId for the Consumer"
     Value: !GetAtt ConsumerSecurityGroup.GroupId

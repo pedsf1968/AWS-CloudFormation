@@ -76,6 +76,12 @@ Resources:
 
 
 Outputs:
+  InstanceRoleArn:
+    Description: "Instance Role ARN"
+    Value: !GetAtt InstanceRoleStack.Outputs.RoleArn
+  InstanceRoleId:
+    Description: "Instance Role ID"
+    Value: !GetAtt InstanceRoleStack.Outputs.RoleId
   InstanceProfileArn:
     Description: "Instance Profile ARN"
     Value: !GetAtt InstanceRoleStack.Outputs.InstanceProfileArn
