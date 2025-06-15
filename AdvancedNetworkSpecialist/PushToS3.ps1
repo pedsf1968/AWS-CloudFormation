@@ -11,7 +11,7 @@ param (
 )
 
 $resources = @(
-    "50_VPCPrivateConnectivityVPCPeering"
+    "51_VPCPrivateConnectivityVPCPeering"
     "54_VPCGatewayEndpointForS3"
     "58_VPCInterfaceEndPointForSQS"
     "62_VPCPrivateLink"

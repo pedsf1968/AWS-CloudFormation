@@ -160,7 +160,7 @@ NatGatewaysStack:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "${BucketUrl}/10_network/50_nat_gateway.yaml"
+      TemplateURL: !Sub "${BucketUrl}/10_network/51_nat_gateway.yaml"
       TimeoutInMinutes: 5
       Parameters:
         ProjectName: !Ref ProjectName

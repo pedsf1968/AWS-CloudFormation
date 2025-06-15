@@ -220,6 +220,7 @@ Resources:
             raise TypeError("Type not serializable")
 
           def lambda_handler(event, context):
+            logger.info(f"Event: {event}\nContext: {context}")
             bucket = event["ResourceProperties"]["Bucket"]
             bucket_key = event["ResourceProperties"]["BucketKey"]
             bucket_object = event["ResourceProperties"]["BucketObject"]
@@ -227,7 +228,6 @@ Resources:
             key = f"{bucket_key}/{bucket_object}"
             response_data  = {}
 
-            logger.info(f"Event: {event}\nContext: {context}")
             logger.info(f"Read in Bucket {bucket} file {key}.")
             logger.info(f"Get parameter withKey {parameter_key}.")
             

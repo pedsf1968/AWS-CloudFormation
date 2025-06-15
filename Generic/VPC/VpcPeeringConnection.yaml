@@ -1,0 +1,105 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create VPC Peering Connection between two VPCs
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: ""
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: [ "dev", "test", "prod" ]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String    
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "true"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+  # Stack parameters
+  PeerOwnerId:
+    AllowedPattern: "^[0-9]{12}$"
+    ConstraintDescription: "Must be a valid account id"
+    Description: The AWS account ID of the owner of the accepter VPC.
+    Type: String
+  PeerRegion:
+    Description: |
+      The Region code for the accepter VPC, if the accepter VPC is located in a
+      Region other than the Region in which you make the request.
+    Type: String
+  PeerRoleArn:
+    Description: |
+      The Amazon Resource Name (ARN) of the VPC peer role for the peering
+      connection in another AWS account. This is required when you are peering
+      a VPC in a different AWS account.
+    Type: String
+  PeerVpcId:
+    Description: |
+      The ID of the VPC with which you are creating the VPC peering connection.
+      You must specify this parameter in the request.
+    Type: String
+  VpcId:
+    Description: The ID of the VPC
+    Type: String
+  VpcPeeringConnectionName:
+    Default: VpcPeeringConnection
+    Description: Name of the VPC Peering Connection
+    Type: String
+
+Conditions:
+  saveInS3File: !Equals [ !Ref SaveInS3File, "true"]
+
+Resources:
+  # Create VPC Peering Connection
+  VpcPeeringConnection:
+    Type: AWS::EC2::VPCPeeringConnection
+    Properties:
+      PeerOwnerId: !Ref PeerOwnerId
+      PeerRegion: !Ref PeerRegion
+      PeerRoleArn: !Ref PeerRoleArn
+      PeerVpcId: !Ref PeerVpcId
+      Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${VpcPeeringConnectionName}"
+        - Key: ProjectName
+          Value: !Ref ProjectName
+      VpcId: !Ref VpcId
+
+  PeeringConnectionToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: saveInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:EC2ResourceToS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Region: !Ref AWS::Region
+      ResourceType: "VpcPeeringConnection"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:VPCPeeringConnection:${VpcPeeringConnectionName}"
+      Value: !Ref VpcPeeringConnection
+
+Outputs:
+  VpcPeeringConnectionId:
+    Description: ID of the VPC Peering Connection
+    Value: !Ref  VpcPeeringConnection

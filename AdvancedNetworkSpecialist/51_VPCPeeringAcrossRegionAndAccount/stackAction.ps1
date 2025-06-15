@@ -7,11 +7,11 @@ param (
     [String]
     $bucket = "hawkfund-cloudformation",
     [String]
-    $bucketKey = "50_VPCPrivateConnectivityVPCPeering",
+    $bucketKey = "51_VPCPeeringAcrossRegionAndAccount",
     [String]
-    $templateName = "50_ROOT_VPCPrivateConnectivityVPCPeering.yaml",
+    $templateName = "51_ROOT_VPCPeeringAcrossRegionAndAccount.yaml",
     [String]
-    $stackName = "ANS-54",
+    $stackName = "ANS-51",
     [String]
     $region = "eu-west-3",
     [String]

@@ -1,0 +1,117 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create a role for remote account to create VPC Peering
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "Datas"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: [ "dev", "test", "prod" ]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String    
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+  
+  # Stack parameters
+  FirstAccountId:
+    Description: First AWS Account ID for VPC peering
+    Type: String
+  PeerRequesterAccountId:
+    Description: Second AWS Account ID for VPC peering
+    Type: String
+  RoleName:
+    Default: "AcceptVpcPeeringConnection-Role"
+    Description: |
+      "The name of the VPC peering cross Account Role to create."
+    Type: String
+  RolePath:
+    Default: "/"
+    Description: |
+      "The path to the instance profile. For more information about paths, see IAM Identifiers in the IAM User Guide."
+    Type: String
+
+Conditions:
+  saveInS3File: !Equals [ !Ref SaveInS3File, "true"]
+
+Resources:
+  AcceptVpcPeeringConnectionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Action:
+          - 'sts:AssumeRole'
+          Effect: Allow
+          Principal:
+            AWS: 
+            - !Ref PeerRequesterAccountId
+      Description: "Allows the specified peer requester account to assume this role and accept VPC peering connections." # Improved description
+      Path: !Ref RolePath
+      Policies:
+        - PolicyName: AcceptVpcPeeringConnection-Policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: 
+                  - 'ec2:AcceptVpcPeeringConnection'
+                Resource: ['*'] # Often necessary for this action, as the resource (peering connection) doesn't exist beforehand.
+                # If you could restrict by the *requester's* account ID, it would be here, but policies for AcceptVpcPeeringConnection
+                # don't typically allow filtering by the requester's account ID directly on the resource.
+                # Example of a condition that *might* be applicable if the action supported it for the accepter:
+                # Condition:
+                #   StringEquals:
+                #     ec2:RequesterVpcOwner: !Ref FirstAccountId # This condition is generally for CreateVpcPeeringConnection
+      RoleName: !Ref RoleName
+      Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${RoleName}-Role"
+        - Key: ProjectName
+          Value: !Ref ProjectName
+
+  AcceptVpcPeeringConnectionRoleToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: saveInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:IAMResourceToS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Region: !Ref AWS::Region
+      ResourceType: "Role"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:IAM:Role:${RoleName}"
+      Value: !Ref AcceptVpcPeeringConnectionRole
+
+Outputs:
+  RoleArn:
+    Description: "VPC peering cross Account Role ARN"
+    Value: !GetAtt AcceptVpcPeeringConnectionRole.Arn
+  RoleId:
+    Description: "VPC peering cross Account Role ID"
+    Value: !Ref AcceptVpcPeeringConnectionRole

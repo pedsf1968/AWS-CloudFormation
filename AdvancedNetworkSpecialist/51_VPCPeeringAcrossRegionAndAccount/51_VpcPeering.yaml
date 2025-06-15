@@ -1,0 +1,109 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create a role for remote account to create VPC Peering
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "51_VPCPeeringAcrossRegionAndAccount"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: [ "dev", "test", "prod" ]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String    
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "true"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+  # Stack parameters
+  PeerOwnerId:
+    AllowedPattern: "^[0-9]{12}$"
+    ConstraintDescription: "Must be a valid account id"
+    Description: The AWS account ID of the owner of the accepter VPC.
+    Type: String
+  PeerRegion:
+    Description: |
+      The Region code for the accepter VPC, if the accepter VPC is located in a
+      Region other than the Region in which you make the request.
+    Type: String
+  VpcId:
+    Description: The ID of the VPC
+    Type: AWS::EC2::VPC::Id
+  PeerVpcName:
+    Description: VPC name
+    Type: String
+  VpcPeeringConnectionName:
+    Default: VpcPeeringConnection
+    Description: Name of the VPC Peering Connection
+    Type: String
+
+Resources:
+  # Get VPC ID of the other Account and Region
+  GetPeerVpcId:
+    Type: AWS::CloudFormation::CustomResource
+    Properties:
+      ServiceToken: !Join [":", ["arn:aws:lambda", !Ref AWS::Region, !Ref AWS::AccountId, "function:GetParametersFromS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Key: !Sub "${PeerRegion}:${ProjectName}:${EnvironmentName}:EC2:VPC:${PeerVpcName}:VpcId"
+      Delay: 30
+      DelayCount: 3
+
+  # Get Role ARN of the other Account and Region
+  GetPeerRoleArn:
+    Type: AWS::CloudFormation::CustomResource
+    Properties:
+      ServiceToken: !Join [":", ["arn:aws:lambda", !Ref AWS::Region, !Ref AWS::AccountId, "function:GetParametersFromS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Key: !Sub "${PeerRegion}:${ProjectName}:${EnvironmentName}:IAM:Role:VpcPeeringCrossAccount-Role:Arn"
+      Delay: 30
+      DelayCount: 3
+
+  # Create VPC Peering Connection
+  VpcPeeringConnectionStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/VpcPeeringConnection.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        PeerOwnerId: !Ref PeerOwnerId
+        PeerRegion: !Ref PeerRegion
+        PeerRoleArn: !GetAtt GetPeerRoleArn.Value
+        PeerVpcId: !GetAtt GetPeerVpcId.Value
+        VpcId: !Ref VpcId
+        VpcPeeringConnectionName: !Ref VpcPeeringConnectionName
+
+Outputs:
+  VpcPeeringConnectionId:
+    Description: ID of the VPC Peering Connection
+    Value: !GetAtt VpcPeeringConnectionStack.Outputs.VpcPeeringConnectionId

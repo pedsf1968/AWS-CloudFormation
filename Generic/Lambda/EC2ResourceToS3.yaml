@@ -237,6 +237,9 @@ Resources:
                 case "VpnGateway":
                   response = ec2_client.describe_vpn_gateways(VpnGatewayIds=[ resource_id ])
                   return response['VpnGateways'][0]
+                case "VpcPeeringConnection":
+                  response = ec2_client.describe_vpc_peering_connections(VpcPeeringConnectionIds=[ resource_id ])
+                  return response['VpcPeeringConnections'][0]
                 case _:
                   logger.warning(f"Unsupported resource type: {resource_type}")
                   return {}

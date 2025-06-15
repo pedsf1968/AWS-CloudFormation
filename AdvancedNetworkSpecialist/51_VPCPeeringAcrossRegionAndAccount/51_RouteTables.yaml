@@ -1,0 +1,142 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create Tables and Route Tables
+
+Parameters:  
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "51_VPCPeeringAcrossRegionAndAccount"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: [ "dev", "test", "prod" ]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String    
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "true"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+  # Stack parameters
+  DestinationCidrBlock:
+    Description: CIDR of the other AWS Account for VPC peering
+    Type: String
+  FirstRegion:
+    Default: eu-west-3
+    Description: Region of the first AWS Account for VPC peering
+    Type: String
+  InternetGatewayId:
+    Description: "Internet Gateway ID"
+    Type: String
+  RouteTableNames:
+    Default: "A,B"
+    Description: "Names of all Route Tables"
+    Type: CommaDelimitedList
+  SecondRegion:
+    Default: eu-central-1
+    Description: Region of the second AWS Account for VPC peering
+    Type: String
+  SubnetId:
+    Description: "Subnets ID"
+    Type: String
+  VpcId:
+    Description: "The ID of the VPC."
+    Type: String
+  VpcPeeringConnectionName:
+    Default: VpcPeeringConnection
+    Description: Name of the VPC Peering Connection
+    Type: String
+
+Conditions:
+  IsFirstAccount: !Equals [!Ref "AWS::Region", !Ref FirstRegion]
+  IsSecondAccount: !Equals [!Ref "AWS::Region", !Ref SecondRegion]
+
+Resources:
+  # Get VPC Peering Connection ID
+  GetVpcPeeringConnectionId:
+    Type: AWS::CloudFormation::CustomResource
+    Properties:
+      ServiceToken: !Join [":", ["arn:aws:lambda", !Ref AWS::Region, !Ref AWS::AccountId, "function:GetParametersFromS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Key: !Sub "${SecondRegion}:${ProjectName}:${EnvironmentName}:EC2:VPCPeeringConnection:${VpcPeeringConnectionName}:VpcPeeringConnectionId"
+      Delay: 30
+      DelayCount: 3
+
+  # Route, Route Table and Associations
+  RouteTableStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/RouteTable.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        VpcId: !Ref VpcId
+        RouteTableName: !Select [ 0, !Ref RouteTableNames ]
+        SubnetId: !Ref SubnetId
+
+  # Route, Route Table and Associations
+  SubnetPublicRouteStack:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsFirstAccount
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/Route.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        DestinationCidrBlock: "0.0.0.0/0"
+        DestinationType: "InternetGateway"
+        GatewayId: !Ref InternetGatewayId
+        RouteTableId: !GetAtt RouteTableStack.Outputs.RouteTableId
+        RouteTableName: !Select [ 0, !Ref RouteTableNames ]
+
+  SubnetPrivateRouteStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/Route.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        DestinationCidrBlock: !Ref DestinationCidrBlock
+        DestinationType: "VpcPeeringConnection"
+        RouteTableId: !GetAtt RouteTableStack.Outputs.RouteTableId
+        RouteTableName: !Select [ 0, !Ref RouteTableNames ]
+        VpcPeeringConnectionId: !GetAtt GetVpcPeeringConnectionId.Value
