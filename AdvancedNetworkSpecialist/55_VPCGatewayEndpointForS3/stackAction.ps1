@@ -7,11 +7,11 @@ param (
     [String]
     $bucket = "hawkfund-cloudformation",
     [String]
-    $bucketKey = "58_VPCInterfaceEndPointForSQS",
+    $bucketKey = "55_VPCGatewayEndpointForS3",
     [String]
-    $templateName = "58_ROOT_VPCInterfaceEndPointForSQS.yaml",
+    $templateName = "55_ROOT_VPCGatewayEndpointForS3.yaml",
     [String]
-    $stackName = "ANS-58",
+    $stackName = "ANS-55",
     [String]
     $region = "eu-west-3",
     [String]
@@ -45,8 +45,8 @@ while ($continue){
               $fileName =  $f.Name
               aws s3 cp $fileName s3://$bucket/$bucketKey/$fileName
           }
-     }
-     1 {
+      }
+      1 {
         # Push files to S3
         Write-Host "Push files modified the last $days days and $minutes minutes"
         $files = $(Get-ChildItem -Path .\*.yaml | Where-Object {$_.lastwritetime -gt (Get-Date).AddDays(-$days).AddMinutes(-$minutes)} | Select-Object Name)

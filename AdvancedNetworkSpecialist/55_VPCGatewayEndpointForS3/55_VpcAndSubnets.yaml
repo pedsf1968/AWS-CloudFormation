@@ -9,7 +9,7 @@ Parameters:
     Description: CloudFormation buket URL
     Type: String
   BucketKey:
-    Default: "58_VPCInterfaceEndPointForSQS"
+    Default: "55_VPCGatewayEndpointForS3"
     Description: Key to find object in the bucket
     Type: String
   BucketObject:
@@ -34,25 +34,28 @@ Parameters:
   
   # Stack parameters
   SubnetName:
-    Description: "Subnet name"
-    Type: String
     Default: "Subnet"
+    Description: Subnet name
+    Type: String
   SubnetPrivateCidrBlock:
-    Description: "Subnet CIDR"
+    Default: 10.10.1.0/24
+    Description: "Private Subnet CIDR"
     Type: String
-    Default: "10.10.1.0/24"
   SubnetPublicCidrBlock:
-    Description: "Subnet CIDR"
+    Default: 10.10.0.0/24
+    Description: "Public Subnet CIDR"
     Type: String
-    Default: "10.10.0.0/24"
   VpcName:
-    Description: "VPC name"
-    Type: String
     Default: "My-VPC"
+    Description: VPC name
+    Type: String
   VpcCidrBlock:
+    Default: 10.10.0.0/16
     Description: "The IPv4 network range for the VPC, in CIDR notation."
     Type: String
-    Default: 10.10.0.0/16
+
+Conditions:
+  saveInS3File: !Equals [ !Ref SaveInS3File, "true"]
 
 Resources:
   # VPC, DHCPOptions, Association and App and DB Subnets
@@ -115,6 +118,22 @@ Resources:
         SaveInS3File: !Ref SaveInS3File
         SubnetName: !Sub "${SubnetName}-Public"
         VpcId: !GetAtt VpcStack.Outputs.VpcId
+
+  VpcToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: saveInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:EC2ResourceToS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Region: !Ref AWS::Region
+      ResourceType: "Vpc"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:VPC:${VpcName}"
+      Value: !GetAtt VpcStack.Outputs.VpcId
 
 Outputs:
   VpcId:

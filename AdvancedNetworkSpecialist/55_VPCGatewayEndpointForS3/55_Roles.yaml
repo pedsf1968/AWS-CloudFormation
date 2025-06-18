@@ -11,7 +11,7 @@ Parameters:
   BucketKey:
     Description: "Key to find object in the bucket"
     Type: String
-    Default: "54_VPCGatewayEndpointForS3"
+    Default: "55_VPCGatewayEndpointForS3"
   BucketObject:
     Description: "File to store data in the bucket"
     Type: String

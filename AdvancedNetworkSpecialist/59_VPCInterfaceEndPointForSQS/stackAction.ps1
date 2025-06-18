@@ -7,11 +7,11 @@ param (
     [String]
     $bucket = "hawkfund-cloudformation",
     [String]
-    $bucketKey = "54_VPCGatewayEndpointForS3",
+    $bucketKey = "59_VPCInterfaceEndPointForSQS",
     [String]
-    $templateName = "54_ROOT_VPCGatewayEndpointForS3.yaml",
+    $templateName = "59_ROOT_VPCInterfaceEndpointForSQS.yaml",
     [String]
-    $stackName = "ANS-54",
+    $stackName = "ANS-59",
     [String]
     $region = "eu-west-3",
     [String]
@@ -21,6 +21,8 @@ param (
     [String]
     $minutes = 15
 )
+
+
 
 $templateUrl = "https://hawkfund-cloudformation.s3.eu-west-3.amazonaws.com/$bucketKey/$templateName"
 

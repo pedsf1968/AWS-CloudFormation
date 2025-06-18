@@ -55,7 +55,7 @@ Resources:
         - Key: EnvironmentName
           Value: !Ref EnvironmentName
         - Key: Name
-          Value: !Sub "${ProjectName}-${EnvironmentName}-${RouteTableName}-RT"
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${RouteTableName}"
         - Key: ProjectName
           Value: !Ref ProjectName
 

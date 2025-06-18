@@ -9,7 +9,7 @@ Parameters:
     Description: CloudFormation buket URL
     Type: String
   BucketKey:
-    Default: "54_VPCGatewayEndpointForS3"
+    Default: "59_VPCInterfaceEndPointForSQS"
     Description: Key to find object in the bucket
     Type: String
   BucketObject:
@@ -36,12 +36,17 @@ Parameters:
   InternetGatewayId:
     Description: "Internet Gateway ID"
     Type: String
-  RouteTableNames:
-    Description: "Names of all Route Tables"
-    Type: CommaDelimitedList
-  SubnetPrivateId:
-    Description: "Private Subnets ID"
+  RouteTablePrivateName:
+    Default: "Private"
+    Description: "Name of Private Route Table"
     Type: String
+  RouteTablePublicName:
+    Default: "Public"
+    Description: "Name of Public Route Table"
+    Type: String
+  SubnetPrivateIds:
+    Description: "ID of all Private Subnets"
+    Type: CommaDelimitedList
   SubnetPublicId:
     Description: "Public Subnets ID"
     Type: String
@@ -49,11 +54,7 @@ Parameters:
     Description: "VPC ID"
     Type: String
 
-Conditions:
-  saveInS3File: !Equals [ !Ref SaveInS3File, "true"]
-
-Resources:  
-  # Route, Route Table and Associations
+Resources:
   SubnetPublicRouteTableStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
@@ -69,7 +70,7 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         VpcId: !Ref VpcId
-        RouteTableName: !Join [ "-", [ !Select [ 0, !Ref RouteTableNames ], "Bastion" ] ]
+        RouteTableName: !Ref RouteTablePublicName
         SubnetId: !Ref SubnetPublicId
 
   SubnetPublicRouteStack:
@@ -90,6 +91,7 @@ Resources:
         DestinationType: "InternetGateway"
         GatewayId: !Ref InternetGatewayId
         RouteTableId: !GetAtt SubnetPublicRouteTableStack.Outputs.RouteTableId
+        RouteTableName: !Ref RouteTablePublicName
 
   SubnetPrivateRouteTableStack:
     Type: AWS::CloudFormation::Stack
@@ -105,24 +107,40 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
-        RouteTableName: !Join [ "-", [ !Select [ 0, !Ref RouteTableNames ], "Application" ] ]
-        SubnetId: !Ref SubnetPrivateId
+        RouteTableName: !Ref RouteTablePrivateName
+        SubnetId: !Select [0, !Ref SubnetPrivateIds]
         VpcId: !Ref VpcId
 
+  SubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !GetAtt SubnetPrivateRouteTableStack.Outputs.RouteTableId
+      SubnetId: !Select [1, !Ref SubnetPrivateIds]
+
+  SubnetCRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !GetAtt SubnetPrivateRouteTableStack.Outputs.RouteTableId
+      SubnetId: !Select [2, !Ref SubnetPrivateIds]
+
+
 Outputs:
-  SubnetPrivateRouteTableAssociationId:
-    Description: "Private Route Table Association ID"
-    Value: SubnetPrivateRouteTableStack.Outputs.SubnetRouteTableAssociationId
   SubnetPrivateRouteTableId:
     Description: "Private Subnet Route Table ID"
     Value: !GetAtt SubnetPrivateRouteTableStack.Outputs.RouteTableId
+  SubnetPrivateARouteTableAssociationId:
+    Description: "Private Subnet A Route Table Association ID"
+    Value: !GetAtt SubnetPrivateRouteTableStack.Outputs.SubnetRouteTableAssociationId
+  SubnetPrivateBRouteTableAssociationId:
+    Description: "Private Subnet B Route Table Association ID"
+    Value: !Ref SubnetBRouteTableAssociation
+  SubnetPrivateCRouteTableAssociationId:
+    Description: "Private Subnet C Route Table Association ID"
+    Value: !Ref SubnetBRouteTableAssociation
 
-  SubnetPublicRouteId:
-    Description: "Public Subnet Route IDs"
-    Value: !GetAtt SubnetPublicRouteStack.Outputs.GatewayRouteId
-  SubnetPublicRouteTableId:
-    Description: "Public Subnet Route Table ID"
-    Value: !GetAtt SubnetPublicRouteTableStack.Outputs.RouteTableId
   SubnetPublicRouteTableAssociationId:
     Description: "Public Route Table Association ID"
     Value: !GetAtt SubnetPublicRouteTableStack.Outputs.SubnetRouteTableAssociationId
+  SubnetPublicRouteTableId:
+    Description: "Public Subnet Route Table ID"
+    Value: !GetAtt SubnetPublicRouteTableStack.Outputs.RouteTableId

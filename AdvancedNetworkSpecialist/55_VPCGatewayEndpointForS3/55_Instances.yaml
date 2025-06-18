@@ -9,7 +9,7 @@ Parameters:
     Description: CloudFormation buket URL
     Type: String
   BucketKey:
-    Default: "58_VPCInterfaceEndPointForSQS"
+    Default: "55_VPCGatewayEndpointForS3"
     Description: Key to find object in the bucket
     Type: String
   BucketObject:
@@ -82,7 +82,6 @@ Parameters:
     Type: String
 
 Resources:
-  # Public and Private Instances
   BastionInstance:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete

@@ -9,7 +9,7 @@ Parameters:
     Description: CloudFormation buket URL
     Type: String
   BucketKey:
-    Default: "58_VPCInterfaceEndPointForSQS"
+    Default: "59_VPCInterfaceEndPointForSQS"
     Description: Key to find object in the bucket
     Type: String
   BucketObject:

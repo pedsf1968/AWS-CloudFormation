@@ -9,7 +9,7 @@ Parameters:
     Description: CloudFormation buket URL
     Type: String
   BucketKey:
-    Default: "54_VPCGatewayEndpointForS3"
+    Default: "55_VPCGatewayEndpointForS3"
     Description: Key to find object in the bucket
     Type: String
   BucketObject:
