@@ -1,0 +1,88 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: This template create a SQS Interface Endpoint
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "62_VPCInterfaceEndPointForSQS"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: ["dev", "test", "prod"]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: ["false", "true"]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+  # Stack parameters
+  SecurityGroupId:
+    Type: String
+  SubnetId:
+    Type: String
+  QueueArn:
+    Type: String
+  VpcId:
+    Type: String
+
+Resources:
+  SQSInterfaceEndpoint:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/VpcEndpoint.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        PolicyDocument: !Sub
+          - |
+            {
+              "Id": "Policy1741889422812",
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "Stmt1741889419872",
+                  "Action": [
+                    "sqs:SendMessage"
+                  ],
+                  "Effect": "Allow",
+                  "Resource": "${QueueArn}",
+                  "Principal": "*"
+                }
+              ]
+            }
+          - { QueueArn: !Ref QueueArn }
+        PrivateDnsEnabled: true
+        SecurityGroupId: !Ref SecurityGroupId
+        ServiceName: !Sub "com.amazonaws.${AWS::Region}.sqs"
+        SubnetId: !Ref SubnetId
+        VpcId: !Ref VpcId
+        VpcEndpointType: "Interface"
+
+Outputs:
+  GatewayEndpointId:
+    Description: "Id of the SQS Interface Endpoint"
+    Value: !GetAtt SQSInterfaceEndpoint.Outputs.VpcEndpointId

@@ -117,7 +117,9 @@ Resources:
       - Key: EnvironmentName
         Value: !Ref EnvironmentName
       - Key: Name
-        Value: !Sub "${ProjectName}-${EnvironmentName}-ApacheHttpdSSMDocument"
+        Value: !Sub "${ProjectName}-${EnvironmentName}-ApacheHttpd-SSMDocument"
+      - Key: ManagedBy
+        Value: "CloudFormation"
       - Key: ProjectName
         Value: !Ref ProjectName
       TargetType: "/AWS::EC2::Instance"

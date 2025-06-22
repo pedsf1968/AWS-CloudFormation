@@ -7,7 +7,9 @@ param (
     [String]
     $bucketKey = "Generic",
     [String]
-    $days = 1
+    $days = 0,
+    [String]
+    $minutes = 15
 )
 
 $resources = @(
@@ -21,8 +23,12 @@ $resources = @(
     "VPC"
 )
 
+Write-Host "Push files modified the last $days days and $minutes minutes"
+
 foreach ($resource in $resources) {
-    $files = $(Get-ChildItem -Path $resource\*.yaml |where {$_.lastwritetime -gt (get-date).adddays(-$days)} | Select-Object Name)
+    #$files = $(Get-ChildItem -Path $resource\*.yaml |where {$_.lastwritetime -gt (get-date).adddays(-$days)} | Select-Object Name)
+    $files = $(Get-ChildItem -Path $resource\*.yaml | Where {$_.lastwritetime -gt (Get-Date).AddDays(-$days).AddMinutes(-$minutes)} | Select-Object Name)
+    Write-Host "Resource: $resource"
 
     foreach ($f in $files) {
         $fileName =  $f.Name

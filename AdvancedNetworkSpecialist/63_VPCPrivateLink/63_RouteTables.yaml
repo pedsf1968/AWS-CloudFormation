@@ -17,7 +17,7 @@ Parameters:
     Description: "File to store data in the bucket"
     Type: String
   EnvironmentName:
-    AllowedValues: [ "dev", "test", "prod" ]
+    AllowedValues: ["dev", "test", "staging", "prod"]
     ConstraintDescription: "Must specify dev, test or prod"
     Default: "dev"
     Description: "Environment name that prefix all resources"
@@ -83,9 +83,10 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         DestinationCidrBlock: "0.0.0.0/0"
-        DestinationType: "InternetGateway"
-        GatewayId: !Ref InternetGatewayId
         RouteTableId: !GetAtt SubnetAPublicRouteTableStack.Outputs.RouteTableId
+        RouteTableName: !Join [ "-", [ !Select [ 0, !Ref RouteTableNames ], "Bastion" ] ]
+        TargetType: "InternetGateway"
+        TargetId: !Ref InternetGatewayId
 
   SubnetAPrivateRouteTableStack:
     Type: AWS::CloudFormation::Stack

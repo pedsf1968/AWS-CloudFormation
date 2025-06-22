@@ -48,7 +48,7 @@ Parameters:
     Type: String
 
 Conditions:
-  saveInS3File: !Equals [ !Ref SaveInS3File, "true"]
+  SaveInS3File: !Equals [ !Ref SaveInS3File, "true"]
 
 Resources:
   BastionInstanceSecurityGroup:
@@ -72,7 +72,7 @@ Resources:
 
   BastionInstanceSecurityGroupToS3:
     Type: AWS::CloudFormation::CustomResource
-    Condition: saveInS3File 
+    Condition: SaveInS3File 
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
@@ -111,7 +111,7 @@ Resources:
 
   ApplicationASecurityGroupToS3:
     Type: AWS::CloudFormation::CustomResource
-    Condition: saveInS3File 
+    Condition: SaveInS3File 
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
@@ -150,7 +150,7 @@ Resources:
 
   ApplicationBSecurityGroupToS3:
     Type: AWS::CloudFormation::CustomResource
-    Condition: saveInS3File 
+    Condition: SaveInS3File 
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
@@ -189,7 +189,7 @@ Resources:
 
   ApplicationCSecurityGroupToS3:
     Type: AWS::CloudFormation::CustomResource
-    Condition: saveInS3File 
+    Condition: SaveInS3File 
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:

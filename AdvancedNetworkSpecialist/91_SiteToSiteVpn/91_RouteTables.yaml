@@ -17,7 +17,7 @@ Parameters:
     Description: "File to store data in the bucket"
     Type: String
   EnvironmentName:
-    AllowedValues: [ "dev", "test", "prod" ]
+    AllowedValues: ["dev", "test", "staging", "prod"]
     ConstraintDescription: "Must specify dev, test or prod"
     Default: "dev"
     Description: "Environment name that prefix all resources"
@@ -36,7 +36,7 @@ Parameters:
   DestinationCidrBlocks:
     Description: "C"
     Type: String
-  DestinationType:
+  TargetType:
     AllowedValues:
          - "InternetGateway"
          - "VirtualPrivateGateway"
@@ -85,9 +85,10 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         DestinationCidrBlock: !Select [ 0, !Split [ ",", !Ref DestinationCidrBlocks ] ]
-        DestinationType: !Ref DestinationType
-        GatewayId: !Ref GatewayId
         RouteTableId: !GetAtt SubnetRouteTableStack.Outputs.RouteTableId
+        RouteTableName: !Select [ 0 , !Split [",", !Ref RouteTableNames ] ] 
+        TargetType: !Ref TargetType
+        TargetId: !Ref GatewayId
 
 Outputs:
   SubnetRouteTableStackId:

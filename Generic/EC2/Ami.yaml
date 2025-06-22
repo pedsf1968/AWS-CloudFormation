@@ -16,7 +16,7 @@ Parameters:
     Description: "File to store data in the bucket"
     Type: String
   EnvironmentName:
-    AllowedValues: [ "dev", "test", "prod" ]
+    AllowedValues: ["dev", "test", "staging", "prod"]
     ConstraintDescription: "Must specify dev, test or prod"
     Default: "dev"
     Description: "Environment name that prefix all resources"

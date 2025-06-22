@@ -17,7 +17,7 @@ Parameters:
     Description: "File to store data in the bucket"
     Type: String
   EnvironmentName:
-    AllowedValues: [ "dev", "test", "prod" ]
+    AllowedValues: ["dev", "test", "staging", "prod"]
     ConstraintDescription: "Must specify dev, test or prod"
     Default: "dev"
     Description: "Environment name that prefix all resources"
@@ -34,6 +34,7 @@ Parameters:
 
   # Stack parameters
   DestinationCidrBlock:
+    AllowedPattern: "^$|^([0-9]{1,3}\\.){3}[0-9]{1,3}/[0-9]{1,2}$"
     Default: ""
     Description: "The IPv4 CIDR address block used for the destination match."
     Type: String
@@ -42,47 +43,27 @@ Parameters:
     Description: "The IPv6 CIDR block used for the destination match. Routing decisions are based on the most specific match."
     Type: String
   DestinationPrefixListId:
+    AllowedPattern: "^$|^pl-[0-9a-f]{8,17}$"
     Default: ""
     Description: "The ID of a prefix list used for the destination match."
     Type: String
-  DestinationType:
+  TargetId:
+    Type: String
+    Description: ID of the target resource (gateway, instance, etc.)
+  TargetType:
     AllowedValues:
-         - "EgressOnlyInternetGateway"
-         - "Instance"
-         - "InternetGateway"
-         - "LocalGateway"
-         - "NatGateway"
-         - "NetworkInterface"
-         - "TransitGateway"
-         - "VirtualPrivateGateway"
-         - "VpcEndpoint"
-         - "VpcPeeringConnection"
+      - "EgressOnlyInternetGateway"
+      - "Instance"
+      - "InternetGateway"
+      - "LocalGateway"
+      - "NatGateway"
+      - "NetworkInterface"
+      - "TransitGateway"
+      - "VirtualPrivateGateway"
+      - "VpcEndpoint"
+      - "VpcPeeringConnection"
     Default: "InternetGateway"
     Description: "The destination type of the route"
-    Type: String
-  EgressOnlyInternetGatewayId:
-    Default: ""
-    Description: "[IPv6 traffic only] The ID of an egress-only internet gateway."
-    Type: String
-  GatewayId:
-    Default: ""
-    Description: "The ID of an internet gateway or virtual private gateway attached to your VPC."
-    Type: String
-  InstanceId:
-    Default: ""
-    Description: "The ID of a NAT instance in your VPC. The operation fails if you specify an instance ID unless exactly one network interface is attached."
-    Type: String
-  LocalGatewayId:
-    Default: ""
-    Description: "The ID of the local gateway."
-    Type: String
-  NetworkInterfaceId:
-    Default: ""
-    Description: "The ID of a network interface."
-    Type: String
-  NatGatewayId:
-    Default: ""
-    Description: "[IPv4 traffic only] The ID of a NAT gateway."
     Type: String
   RouteTableId:
     Description: "The ID of the route table for the route."
@@ -90,58 +71,61 @@ Parameters:
   RouteTableName:
     Description: "The name of the Route Table"
     Type: String
-  TransitGatewayId:
-    Default: ""
-    Description: "The ID of a transit gateway."
-    Type: String
-  VpcEndpointId:
-    Default: ""
-    Description: "The ID of a VPC endpoint. Supported for Gateway Load Balancer endpoints only."
-    Type: String
-  VpcPeeringConnectionId:
-    Default: ""
-    Description: "The ID of a VPC peering connection."
-    Type: String
+
+Rules:
+  DestinationValidation:
+    Assertions:
+      - Assert: !Or
+          - !Not [!Equals [!Ref DestinationCidrBlock, ""]]
+          - !Not [!Equals [!Ref DestinationIpv6CidrBlock, ""]]
+          - !Not [!Equals [!Ref DestinationPrefixListId, ""]]
+        AssertDescription: "At least one destination (CIDR, IPv6 CIDR, or Prefix List) must be specified"
 
 Conditions:
-  isEgressOnlyInternetGatewayType: !Equals [ !Ref DestinationType, "EgressOnlyInternetGateway" ]
-  isInstanceType: !Equals [ !Ref DestinationType, "Instance" ]
-  isGatewayType: !Or
-    - !Equals [ !Ref DestinationType, "InternetGateway" ]
-    - !Equals [ !Ref DestinationType, "VirtualPrivateGateway" ]
-  isLocalGatewayType: !Equals [ !Ref DestinationType, "LocalGateway" ]
-  isNatGatewayType: !Equals [ !Ref DestinationType, "NatGateway" ]
-  isNetworkInterface: !Equals [ !Ref DestinationType, "NetworkInterface" ]
-  isTransitGatewayType: !Equals [ !Ref DestinationType, "TransitGateway" ]
-  isVirtualPrivateGatewayType: !Equals [ !Ref DestinationType, "VirtualPrivateGateway" ]
-  isVpcEndpointType: !Equals [ !Ref DestinationType, "VpcEndpoint" ]
-  isVpcPeeringConnectionType: !Equals [ !Ref DestinationType, "VpcPeeringConnection" ]
-  saveInS3File: !Equals [ !Ref SaveInS3File, "true"]
-  useDestinationPrefixListId: !Not [ !Equals [ !Ref DestinationPrefixListId, "" ] ]
-  useDestinationCidrBlock: !Not [ !Equals [ !Ref DestinationCidrBlock, "" ] ]
-  useDestinationIpv6CidrBlock: !Not [ !Equals [ !Ref DestinationIpv6CidrBlock, "" ] ]
+  # Destination conditions
+  HasDestinationCidr: !Not [!Equals [!Ref DestinationCidrBlock, ""]]
+  HasDestinationIpv6Cidr: !Not [!Equals [!Ref DestinationIpv6CidrBlock, ""]]
+  HasDestinationPrefixList: !Not [!Equals [!Ref DestinationPrefixListId, ""]]
+  
+  # Target type conditions (simplified)
+  IsEgressOnlyIGW: !Equals [!Ref TargetType, "EgressOnlyInternetGateway"]
+  IsInstance: !Equals [!Ref TargetType, "Instance"]
+  IsGateway: !Or
+    - !Equals [!Ref TargetType, "InternetGateway"]
+    - !Equals [!Ref TargetType, "VirtualPrivateGateway"]
+  IsLocalGateway: !Equals [!Ref TargetType, "LocalGateway"]
+  IsNatGateway: !Equals [!Ref TargetType, "NatGateway"]
+  IsNetworkInterface: !Equals [!Ref TargetType, "NetworkInterface"]
+  IsTransitGateway: !Equals [!Ref TargetType, "TransitGateway"]
+  IsVpcEndpoint: !Equals [!Ref TargetType, "VpcEndpoint"]
+  IsVpcPeering: !Equals [!Ref TargetType, "VpcPeeringConnection"]
+  IsVpnGateway: !Equals [!Ref TargetType, "VirtualPrivateGateway"]
+  
+  # S3 and utility conditions
+  SaveInS3File: !Equals [ !Ref SaveInS3File, "true"]
+  HasRouteTableName: !Not [!Equals [!Ref RouteTableName, ""]]
 
 Resources:
   Route:
     Type: AWS::EC2::Route
     Properties:
-      DestinationCidrBlock: !If [ useDestinationCidrBlock, !Ref DestinationCidrBlock, !Ref "AWS::NoValue" ]
-      DestinationIpv6CidrBlock: !If [ useDestinationIpv6CidrBlock, !Ref DestinationIpv6CidrBlock, !Ref "AWS::NoValue" ]
-      DestinationPrefixListId: !If [ useDestinationPrefixListId, !Ref DestinationPrefixListId, !Ref "AWS::NoValue" ]    
-      EgressOnlyInternetGatewayId: !If [ isEgressOnlyInternetGatewayType, !Ref EgressOnlyInternetGatewayId, !Ref "AWS::NoValue" ]
-      GatewayId: !If [ isGatewayType, !Ref GatewayId, !Ref "AWS::NoValue" ]
-      InstanceId: !If [ isInstanceType, !Ref InstanceId, !Ref "AWS::NoValue"]
-      LocalGatewayId: !If [ isLocalGatewayType, !Ref LocalGatewayId, !Ref "AWS::NoValue"]
-      NatGatewayId: !If [ isNatGatewayType, !Ref NatGatewayId, !Ref "AWS::NoValue"]
-      NetworkInterfaceId: !If [ isNetworkInterface, !Ref NetworkInterfaceId, !Ref "AWS::NoValue"]
       RouteTableId: !Ref RouteTableId
-      TransitGatewayId: !If [ isTransitGatewayType, !Ref TransitGatewayId, !Ref "AWS::NoValue"]
-      VpcEndpointId: !If [ isVpcEndpointType, !Ref VpcEndpointId, !Ref "AWS::NoValue"]
-      VpcPeeringConnectionId: !If [ isVpcPeeringConnectionType, !Ref VpcPeeringConnectionId, !Ref "AWS::NoValue"]
+      DestinationCidrBlock: !If [HasDestinationCidr, !Ref DestinationCidrBlock, !Ref "AWS::NoValue"]
+      DestinationIpv6CidrBlock: !If [HasDestinationIpv6Cidr, !Ref DestinationIpv6CidrBlock, !Ref "AWS::NoValue"]
+      DestinationPrefixListId: !If [HasDestinationPrefixList, !Ref DestinationPrefixListId, !Ref "AWS::NoValue"]
+      EgressOnlyInternetGatewayId: !If [IsEgressOnlyIGW, !Ref TargetId, !Ref "AWS::NoValue"]
+      GatewayId: !If [IsGateway, !Ref TargetId, !Ref "AWS::NoValue"]
+      InstanceId: !If [IsInstance, !Ref TargetId, !Ref "AWS::NoValue"]
+      LocalGatewayId: !If [IsLocalGateway, !Ref TargetId, !Ref "AWS::NoValue"]
+      NatGatewayId: !If [IsNatGateway, !Ref TargetId, !Ref "AWS::NoValue"]
+      NetworkInterfaceId: !If [IsNetworkInterface, !Ref TargetId, !Ref "AWS::NoValue"]
+      TransitGatewayId: !If [IsTransitGateway, !Ref TargetId, !Ref "AWS::NoValue"]
+      VpcEndpointId: !If [IsVpcEndpoint, !Ref TargetId, !Ref "AWS::NoValue"]
+      VpcPeeringConnectionId: !If [IsVpcPeering, !Ref TargetId, !Ref "AWS::NoValue"]
 
   RouteTableToS3:
     Type: AWS::CloudFormation::CustomResource
-    Condition: saveInS3File
+    Condition: SaveInS3File
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
@@ -152,18 +136,34 @@ Resources:
       BucketObject: !Ref BucketObject
       Region: !Ref AWS::Region
       ResourceType: "RouteTable"
-      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:RouteTable:${RouteTableName}"
+      Key: !If 
+        - HasRouteTableName
+        - !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:RouteTable:${RouteTableName}"
+        - !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:RouteTable:${RouteTableId}"
       Value: !Ref RouteTableId
 
-  GatewayRoutePropagation:
+  VpnGatewayRoutePropagation:
     Type: AWS::EC2::VPNGatewayRoutePropagation
-    Condition: isVirtualPrivateGatewayType
+    Condition: IsVpnGateway
     Properties:
-      RouteTableIds: 
-        - !Ref RouteTableId
-      VpnGatewayId: !Ref GatewayId
+      RouteTableIds: [!Ref RouteTableId]
+      VpnGatewayId: !Ref TargetId
 
 Outputs:
   RouteId:
-    Description: "ID of the Route"
+    Description: ID of the created route
     Value: !Ref Route
+    Export:
+      Name: !Sub "${AWS::StackName}-RouteId"
+      
+  RouteTableId:
+    Description: ID of the route table
+    Value: !Ref RouteTableId
+    Export:
+      Name: !Sub "${AWS::StackName}-RouteTableId"
+      
+  TargetType:
+    Description: Type of route target
+    Value: !Ref TargetType
+    Export:
+      Name: !Sub "${AWS::StackName}-TargetType"

@@ -28,7 +28,7 @@ Parameters:
     Description: "File to store data in the bucket"
     Type: String
   EnvironmentName:
-    AllowedValues: [ "dev", "test", "prod" ]
+    AllowedValues: ["dev", "test", "staging", "prod"]
     ConstraintDescription: "Must specify dev, test or prod"
     Default: "dev"
     Description: "Environment name that prefix all resources"
@@ -90,7 +90,7 @@ Parameters:
 
 Conditions:
   CreateRole: !Equals [!Ref CreateRole, "true" ]
-  saveInS3File: !And 
+  SaveInS3File: !And 
     - !Equals [!Ref CreateRole, "true" ]
     - !Equals [ !Ref SaveInS3File, "true"]
 
@@ -113,7 +113,7 @@ Resources:
       - arn:aws:iam::aws:policy/service-role/AWSLambdaRole
       Path: "/"
       Policies:
-      - PolicyName: UpdateObjectFromS3Policy
+      - PolicyName: UpdateObjectFromS3-Policy
         PolicyDocument:
           Version: '2012-10-17'
           Statement:
@@ -126,7 +126,7 @@ Resources:
             Resource: 
               - !Join [":", ["arn:aws:s3::", !Sub "${Bucket}/${BucketKey}"]]
               - !Join [":", ["arn:aws:s3::", !Sub "${Bucket}/${BucketKey}/*"]]
-      - PolicyName: !Sub "${FunctionName}Policy"
+      - PolicyName: !Sub "${FunctionName}-Policy"
         PolicyDocument:
           Version: '2012-10-17'
           Statement:
@@ -140,7 +140,9 @@ Resources:
         - Key: EnvironmentName
           Value: !Ref EnvironmentName
         - Key: Name
-          Value: !Sub "${ProjectName}-${EnvironmentName}-${FunctionName}Role"
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${FunctionName}"
+        - Key: ManagedBy
+          Value: "CloudFormation"
         - Key: ProjectName
           Value: !Ref ProjectName
 
@@ -257,7 +259,7 @@ Resources:
 
   LambdaFunctionRoleToS3:
     Type: AWS::CloudFormation::CustomResource
-    Condition: saveInS3File
+    Condition: SaveInS3File
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:

@@ -83,7 +83,7 @@ Conditions:
   IsSSH: !Equals [!Ref SSHAllowed, "true" ]
   IsHTTP: !Equals [!Ref HTTPAllowed, "true" ]
   IsHTTPS: !Equals [!Ref HTTPSAllowed, "true" ]
-  saveInS3File: !Equals [ !Ref SaveInS3File, "true"]
+  SaveInS3File: !Equals [ !Ref SaveInS3File, "true"]
 
 Resources:
   SecurityGroup:
@@ -142,7 +142,7 @@ Resources:
 
   SecurityGroupToS3:
     Type: AWS::CloudFormation::CustomResource
-    Condition: saveInS3File 
+    Condition: SaveInS3File 
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:

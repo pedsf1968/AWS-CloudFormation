@@ -17,7 +17,7 @@ Parameters:
     Description: "File to store data in the bucket"
     Type: String
   EnvironmentName:
-    AllowedValues: [ "dev", "test", "prod" ]
+    AllowedValues: ["dev", "test", "staging", "prod"]
     ConstraintDescription: "Must specify dev, test or prod"
     Default: "dev"
     Description: "Environment name that prefix all resources"
@@ -88,10 +88,11 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
-        RouteTableId: !GetAtt SubnetAPublicRouteTableStack.Outputs.RouteTableId
         DestinationCidrBlock: "0.0.0.0/0"
-        DestinationType: "InternetGateway"
-        GatewayId: !Ref InternetGatewayId
+        RouteTableId: !GetAtt SubnetAPublicRouteTableStack.Outputs.RouteTableId
+        RouteTableName: !Join [ "-", [ !Select [ 0, !Split [ ",", !Ref RouteTableNames ] ], "Public" ] ]
+        TargetType: "InternetGateway"
+        TargetId: !Ref InternetGatewayId
 
   SubnetAPrivateRouteTableStack:
     Type: AWS::CloudFormation::Stack
@@ -126,9 +127,10 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         DestinationCidrBlock: !Ref DestinationCidrBlock
-        DestinationType: "TransitGateway"
         RouteTableId: !GetAtt SubnetAPrivateRouteTableStack.Outputs.RouteTableId
-        TransitGatewayId: !Ref TransitGatewayId
+        RouteTableName: !Join [ "-", [ !Select [ 0, !Split [ ",", !Ref RouteTableNames ] ], "Private" ] ]
+        TargetType: "TransitGateway"
+        TargetId: !Ref TransitGatewayId
 
   SubnetBPrivateRouteTableStack:
     Type: AWS::CloudFormation::Stack
@@ -163,9 +165,10 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         DestinationCidrBlock: !Ref DestinationCidrBlock
-        DestinationType: "TransitGateway"
         RouteTableId: !GetAtt SubnetBPrivateRouteTableStack.Outputs.RouteTableId
-        TransitGatewayId: !Ref TransitGatewayId
+        RouteTableName: !Join [ "-", [ !Select [ 1, !Split [ ",", !Ref RouteTableNames ] ], "Private" ] ]
+        TargetType: "TransitGateway"
+        TargetId: !Ref TransitGatewayId
 
   SubnetCPrivateRouteTableStack:
     Type: AWS::CloudFormation::Stack
@@ -200,9 +203,10 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         DestinationCidrBlock: !Ref DestinationCidrBlock
-        DestinationType: "TransitGateway"
         RouteTableId: !GetAtt SubnetCPrivateRouteTableStack.Outputs.RouteTableId
-        TransitGatewayId: !Ref TransitGatewayId
+        RouteTableName: !Join [ "-", [ !Select [ 2, !Split [ ",", !Ref RouteTableNames ] ], "Private" ] ]
+        TargetType: "TransitGateway"
+        TargetId: !Ref TransitGatewayId
 
 Outputs:
   SubnetPrivateRouteTableIds:

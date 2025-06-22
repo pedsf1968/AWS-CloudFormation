@@ -1,0 +1,92 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create a role for instance
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Description: "CloudFormation bucket URL"
+    Type: String
+    Default: "hawkfund-cloudformation"
+  BucketKey:
+    Description: "Key to find object in the bucket"
+    Type: String
+    Default: "34_VPCDNSWithCustomDNSServer"
+  BucketObject:
+    Description: "File to store data in the bucket"
+    Type: String
+    Default: "Data.json"
+  EnvironmentName:
+    Description: "Environment name that prefix all resources"
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+  ProjectName:
+    Description: "Project name that prefix all resources"
+    Type: String
+    Default: "ANS"
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+Resources:
+  InstanceRoleStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/IAM/InstanceRole.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        InstanceProfileName: Private-Instance-Profile
+        RoleName: Private-Instance-Role
+        SaveInS3File: !Ref SaveInS3File
+
+  InstanceS3Policy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: S3-Allow-Policy
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          -
+            Effect: Allow
+            Action:
+              - s3:Get*
+              - s3:Put*
+              - s3:List*
+              - s3:AbortMultipartUpload 
+            Resource:
+              - !Sub "arn:aws:s3:::${Bucket}/${BucketKey}/*"
+              - !Sub "arn:aws:s3:::${Bucket}/${BucketKey}"
+      Roles:
+        -
+          !GetAtt InstanceRoleStack.Outputs.RoleId
+
+Outputs:
+  InstanceRoleArn:
+    Description: "Instance Role ARN"
+    Value: !GetAtt InstanceRoleStack.Outputs.RoleArn
+  InstanceRoleId:
+    Description: "Instance Role ID"
+    Value: !GetAtt InstanceRoleStack.Outputs.RoleId
+  InstanceProfileArn:
+    Description: "Instance Profile ARN"
+    Value: !GetAtt InstanceRoleStack.Outputs.InstanceProfileArn
+  InstanceProfileId:
+    Description: "Instance Profile ID"
+    Value: !GetAtt InstanceRoleStack.Outputs.InstanceProfileId
+  InstanceS3PolicyId:
+    Description: ID of the Instance S3 Policy
+    Value: !Ref InstanceS3Policy

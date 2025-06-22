@@ -17,7 +17,7 @@ Parameters:
     Description: "File to store data in the bucket"
     Type: String
   EnvironmentName:
-    AllowedValues: [ "dev", "test", "prod" ]
+    AllowedValues: ["dev", "test", "staging", "prod"]
     ConstraintDescription: "Must specify dev, test or prod"
     Default: "dev"
     Description: "Environment name that prefix all resources"
@@ -44,7 +44,7 @@ Parameters:
       "The path to the instance profile. For more information about paths, see IAM Identifiers in the IAM User Guide."
     Type: String
   RoleName:
-    Default: "Instance-Role"
+    Default: "Instance"
     Description: |
       "The name of the instance profile to create."
     Type: String
@@ -55,7 +55,7 @@ Parameters:
     Type: String
 
 Conditions:
-  saveInS3File: !Equals [ !Ref SaveInS3File, "true"]
+  SaveInS3File: !Equals [ !Ref SaveInS3File, "true"]
 
 Resources:
   SSMInstanceRole: 
@@ -107,13 +107,15 @@ Resources:
         - Key: EnvironmentName
           Value: !Ref EnvironmentName
         - Key: Name
-          Value:  !Sub "${ProjectName}-${EnvironmentName}-${RoleName}-Role"
+          Value:  !Sub "${ProjectName}-${EnvironmentName}-${RoleName}"
+        - Key: ManagedBy
+          Value: "CloudFormation"
         - Key: ProjectName
           Value: !Ref ProjectName
 
   InstanceRoleToS3:
     Type: AWS::CloudFormation::CustomResource
-    Condition: saveInS3File
+    Condition: SaveInS3File
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
@@ -137,7 +139,7 @@ Resources:
 
   InstanceProfileToS3:
     Type: AWS::CloudFormation::CustomResource
-    Condition: saveInS3File
+    Condition: SaveInS3File
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:

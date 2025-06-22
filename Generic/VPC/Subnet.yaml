@@ -17,7 +17,7 @@ Parameters:
     Description: "File to store data in the bucket"
     Type: String
   EnvironmentName:
-    AllowedValues: [ "dev", "test", "prod" ]
+    AllowedValues: ["dev", "test", "staging", "prod"]
     ConstraintDescription: "Must specify dev, test or prod"
     Default: "dev"
     Description: "Environment name that prefix all resources"
@@ -33,18 +33,35 @@ Parameters:
     Type: String
 
   # Stack parameters
+  EnableIpv6:
+    AllowedValues: [ "false", "true" ]
+    ConstraintDescription: "Must be false"
+    Default: "false"
+    Description: |
+      Indicates whether a network interface created in this subnet receives an
+      IPv6 address. The default value is false. If you specify
+      AssignIpv6AddressOnCreation, you must also specify an IPv6 CIDR block.
+    Type: String
   AvailabilityZone:
-    Description: "Subnet AZ"
+    Description: |
+      The Availability Zone of the subnet.
+      If you update this property, you must also update the CidrBlock property.
     Type: String
   CidrBlock:
-    Description: "Subnet Cidr"
+    Description: |
+      The IPv4 CIDR block assigned to the subnet. If you update this property,
+      we create a new subnet, and then delete the existing one.
+    Type: String
+  Ipv6CidrBlock:
+    Default: ""
+    Description: |
+      The IPv6 CIDR block. If you specify AssignIpv6AddressOnCreation, you must
+      also specify an IPv6 CIDR block.
     Type: String
   MapPublicIpOnLaunch:
+    AllowedValues: [ "false", "true" ]
     Description: "Subnet by default is public"
     Type: String
-    AllowedValues:
-    - true
-    - false
   SubnetName:
     Description: "Subnet name"
     Type: String
@@ -53,11 +70,14 @@ Parameters:
     Type: String
 
 Conditions:
-  saveInS3File: !Equals [ !Ref SaveInS3File, "true"]
+  EnableIpv6: !Equals [ !Ref EnableIpv6, "true"]
+  OnlyIpv4: !Equals [ !Ref EnableIpv6, "false"]
+  SaveInS3File: !Equals [ !Ref SaveInS3File, "true"]
 
 Resources:
-  Subnet:
+  SubnetWithOnlyIpv4:
     Type: AWS::EC2::Subnet
+    Condition: OnlyIpv4
     Properties:
       AvailabilityZone: !Ref AvailabilityZone
       CidrBlock: !Ref CidrBlock
@@ -68,12 +88,34 @@ Resources:
           Value: !Ref EnvironmentName
         - Key: Name
           Value: !Sub "${ProjectName}-${EnvironmentName}-${SubnetName}"
+        - Key: ManagedBy
+          Value: "CloudFormation"
+        - Key: ProjectName
+          Value: !Ref ProjectName
+
+  SubnetWithIpv6:
+    Type: AWS::EC2::Subnet
+    Condition: EnableIpv6
+    Properties:
+      AssignIpv6AddressOnCreation: !Ref EnableIpv6
+      AvailabilityZone: !Ref AvailabilityZone
+      CidrBlock: !Ref CidrBlock
+      Ipv6CidrBlock: !Ref Ipv6CidrBlock
+      MapPublicIpOnLaunch: !Ref MapPublicIpOnLaunch
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${SubnetName}"
+        - Key: ManagedBy
+          Value: "CloudFormation"
         - Key: ProjectName
           Value: !Ref ProjectName
 
   SubnetToS3:
     Type: AWS::CloudFormation::CustomResource
-    Condition: saveInS3File
+    Condition: SaveInS3File
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
@@ -85,12 +127,34 @@ Resources:
       Region: !Ref AWS::Region
       ResourceType: "Subnet"
       Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:Subnet:${SubnetName}"
-      Value: !Ref Subnet
+      Value: !If 
+        - EnableIpv6
+        - !Ref SubnetWithIpv6
+        - !Ref SubnetWithOnlyIpv4
 
 Outputs:
   SubnetId:
-    Description: "Id of the Subnet"
-    Value: !Ref Subnet
-  CidrBlock:
-    Description: "CidrBlock of the Subnet"
-    Value: !GetAtt Subnet.CidrBlock
+    Description: Id of the Subnet.
+    Value: !If 
+      - EnableIpv6
+      - !Ref SubnetWithIpv6
+      - !Ref SubnetWithOnlyIpv4
+    Export:
+      Name: !Sub "${ProjectName}-${EnvironmentName}-${SubnetName}-Id"
+
+  SubnetCidrBlock:
+    Description: The IPv4 CIDR blocks that are associated with the subnet.
+    Value: !If 
+      - EnableIpv6
+      - !GetAtt SubnetWithIpv6.CidrBlock
+      - !GetAtt SubnetWithOnlyIpv4.CidrBlock
+    Export:
+      Name: !Sub "${ProjectName}-${EnvironmentName}-${SubnetName}-CidrBlock"
+  SubnetIpV6CidrBlock:
+    Description: The IPv6 CIDR blocks that are associated with the subnet.
+    Value: !If 
+      - EnableIpv6
+      - !Select [ 0, !GetAtt SubnetWithIpv6.Ipv6CidrBlocks ]
+      - "AWS::NoValue"
+    Export:
+      Name: !Sub "${ProjectName}-${EnvironmentName}-${SubnetName}-Ipv6CidrBlock"

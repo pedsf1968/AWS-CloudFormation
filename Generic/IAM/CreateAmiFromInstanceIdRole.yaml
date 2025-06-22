@@ -17,7 +17,7 @@ Parameters:
     Description: "File to store data in the bucket"
     Type: String
   EnvironmentName:
-    AllowedValues: [ "dev", "test", "prod" ]
+    AllowedValues: ["dev", "test", "staging", "prod"]
     ConstraintDescription: "Must specify dev, test or prod"
     Default: "dev"
     Description: "Environment name that prefix all resources"
@@ -32,11 +32,17 @@ Parameters:
     Description: "Save resources information in s3 file"
     Type: String
 
+  # Stack parameters
+  RoleName:
+    Default: "CreateAmiFromInstanceId"
+    Description: "The name Role."
+    Type: String
+
 Conditions:
-  saveInS3File: !Equals [ !Ref SaveInS3File, "true"]
+  SaveInS3File: !Equals [ !Ref SaveInS3File, "true"]
 
 Resources:
-  CreateAmiFromInstanceIdRole:
+  Role:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -53,7 +59,7 @@ Resources:
       - arn:aws:iam::aws:policy/service-role/AWSLambdaRole
       Path: "/"
       Policies:
-      - PolicyName: CreateAmiFromInstanceIdPolicy
+      - PolicyName: !Sub "${RoleName}-Policy"
         PolicyDocument:
           Version: '2012-10-17'
           Statement:
@@ -66,18 +72,20 @@ Resources:
               - 'ec2:DescribeSnapshots'
               - 'ec2:DeleteSnapshot'
             Resource: ['*']
-      RoleName: CreateAmiFromInstanceIdRole
+      RoleName: !Ref RoleName
       Tags:
         - Key: EnvironmentName
           Value: !Ref EnvironmentName
         - Key: Name
-          Value: !Sub "${ProjectName}-${EnvironmentName}-CreateAmiFromInstanceIdRole"
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${RoleName}"
+        - Key: ManagedBy
+          Value: "CloudFormation"
         - Key: ProjectName
           Value: !Ref ProjectName
 
-  CreateAmiFromInstanceIdRoleToS3:
+  RoleToS3:
     Type: AWS::CloudFormation::CustomResource
-    Condition: saveInS3File
+    Condition: SaveInS3File
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
@@ -88,13 +96,13 @@ Resources:
       BucketObject: !Ref BucketObject
       Region: !Ref AWS::Region
       ResourceType: "Role"
-      Key: !Sub "${ProjectName}-${EnvironmentName}-CreateAmiFromInstanceIdRole"
-      Value: !Ref CreateAmiFromInstanceIdRoleS3
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:IAM:Role:${RoleName}"
+      Value: !Ref Role
 
 Outputs:
   RoleArn:
-    Description: "CreateAmiFromInstanceId Role Arn"
-    Value: !GetAtt CreateAmiFromInstanceIdRole.Arn
+    Description: "Role Arn"
+    Value: !GetAtt Role.Arn
   RoleId:
-    Description: "CreateAmiFromInstanceId Role ID"
-    Value: !Ref AcceptVpcPeeringConnectionRole
+    Description: "Role ID"
+    Value: !Ref Role

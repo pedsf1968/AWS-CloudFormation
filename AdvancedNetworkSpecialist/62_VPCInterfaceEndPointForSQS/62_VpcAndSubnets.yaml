@@ -1,0 +1,178 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template deploys a VPC, Public and Private Subnets
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "62_VPCInterfaceEndPointForSQS"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: ["dev", "test", "staging", "prod"]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String    
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+  
+  # Stack parameters
+  SubnetPrivateNames:
+    Default: "ec2-connect-endpoint-private-subnet,ec2-private-subnet,vpc-endpoint-private-subnet"
+    Description: "Subnet names"
+    Type: String
+  SubnetPrivateCidrBlocks:
+    Default: "10.10.1.0/24,10.10.2.0/24,10.10.3.0/24"
+    Description: "Private Subnet CIDR"
+    Type: String
+  SubnetPublicName:
+    Default: "public-subnet"
+    Description: "Subnet names"
+    Type: String
+  SubnetPublicCidrBlock:
+    Default: "10.10.0.0/24"
+    Description: "Public Subnet CIDR"
+    Type: String
+  VpcName:
+    Description: "VPC name"
+    Type: String
+    Default: "My-VPC"
+  VpcCidrBlock:
+    Description: "The IPv4 network range for the VPC, in CIDR notation."
+    Type: String
+    Default: 10.10.0.0/16
+
+Resources:
+  # VPC, DHCPOptions, Association and App and DB Subnets
+  VpcStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/Vpc.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        CidrBlock: !Ref VpcCidrBlock
+        EnableDnsSupport: "true"
+        EnableDnsHostnames: "true"
+        InstanceTenancy: default
+        VpcName: !Ref VpcName
+
+  SubnetPrivateAStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/Subnet.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        AvailabilityZone: !Select [ 0, !GetAZs ]
+        CidrBlock: !Select [0, !Split [",", !Ref SubnetPrivateCidrBlocks]]
+        MapPublicIpOnLaunch: "false"
+        SaveInS3File: !Ref SaveInS3File
+        SubnetName: !Select [0, !Split [",", !Ref SubnetPrivateNames]]
+        VpcId: !GetAtt VpcStack.Outputs.VpcId
+
+  SubnetPrivateBStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/Subnet.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        AvailabilityZone: !Select [ 0, !GetAZs ]
+        CidrBlock: !Select [1, !Split [",", !Ref SubnetPrivateCidrBlocks]]
+        MapPublicIpOnLaunch: "false"
+        SaveInS3File: !Ref SaveInS3File
+        SubnetName: !Select [1, !Split [",", !Ref SubnetPrivateNames]]
+        VpcId: !GetAtt VpcStack.Outputs.VpcId
+
+  SubnetPrivateCStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/Subnet.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        AvailabilityZone: !Select [ 0, !GetAZs ]
+        CidrBlock: !Select [2, !Split [",", !Ref SubnetPrivateCidrBlocks]]
+        MapPublicIpOnLaunch: "false"
+        SaveInS3File: !Ref SaveInS3File
+        SubnetName: !Select [2, !Split [",", !Ref SubnetPrivateNames]]
+        VpcId: !GetAtt VpcStack.Outputs.VpcId
+
+  SubnetPublicStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/Subnet.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        AvailabilityZone: !Select [ 0, !GetAZs ]
+        CidrBlock: !Ref SubnetPublicCidrBlock
+        MapPublicIpOnLaunch: "true"
+        SaveInS3File: !Ref SaveInS3File
+        SubnetName: !Ref SubnetPublicName
+        VpcId: !GetAtt VpcStack.Outputs.VpcId
+
+Outputs:
+  VpcId:
+    Description: "VPC Id"
+    Value: !GetAtt VpcStack.Outputs.VpcId
+  SubnetPrivateAId:
+    Description: "Private Subnet A Id"
+    Value: !GetAtt SubnetPrivateAStack.Outputs.SubnetId
+  SubnetPrivateBId:
+    Description: "Private Subnet B Id"
+    Value: !GetAtt SubnetPrivateBStack.Outputs.SubnetId
+  SubnetPrivateCId:
+    Description: "Private Subnet C Id"
+    Value: !GetAtt SubnetPrivateCStack.Outputs.SubnetId
+  SubnetPublicId:
+    Description: "Public Subnets Id"
+    Value: !GetAtt SubnetPublicStack.Outputs.SubnetId

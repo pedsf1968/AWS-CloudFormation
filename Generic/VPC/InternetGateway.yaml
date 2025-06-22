@@ -8,7 +8,7 @@ Parameters:
     Description: CloudFormation buket URL
     Type: String
   BucketKey:
-    Default: "63_VPCPrivateLink"
+    Default: ""
     Description: Key to find object in the bucket
     Type: String
   BucketObject:
@@ -16,7 +16,7 @@ Parameters:
     Description: "File to store data in the bucket"
     Type: String
   EnvironmentName:
-    AllowedValues: [ "dev", "test", "prod" ]
+    AllowedValues: ["dev", "test", "staging", "prod"]
     ConstraintDescription: "Must specify dev, test or prod"
     Default: "dev"
     Description: "Environment name that prefix all resources"
@@ -41,7 +41,7 @@ Parameters:
     Type: String
 
 Conditions:
-  saveInS3File: !Equals [ !Ref SaveInS3File, "true"]
+  SaveInS3File: !Equals [ !Ref SaveInS3File, "true"]
 
 Resources:
   # Internet Gateway and Attachment
@@ -53,6 +53,8 @@ Resources:
           Value: !Ref EnvironmentName
         - Key: Name
           Value: !Sub "${ProjectName}-${EnvironmentName}-${Name}-IGW" 
+        - Key: ManagedBy
+          Value: "CloudFormation"
         - Key: ProjectName
           Value: !Ref ProjectName
 
@@ -64,7 +66,7 @@ Resources:
 
   InternetGatewayToS3:
     Type: AWS::CloudFormation::CustomResource
-    Condition: saveInS3File
+    Condition: SaveInS3File
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
@@ -77,7 +79,6 @@ Resources:
       ResourceType: "InternetGateway"
       Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:InternetGateway:${Name}"
       Value: !Ref InternetGateway
-
 
 Outputs:
   InternetGatewayId:

@@ -1,0 +1,69 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create Internet Gateway
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "16_VPCWithPublicSubnet"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: ["dev", "test", "staging", "prod"]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String    
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+  # Stack parameters
+  IgwName:
+    Default: "Default"
+    Description: "Internet Gateway name"
+    Type: String
+  VpcId:
+    Description: "VPC ID"
+    Type: String
+
+Resources:  
+  # Internet Gateway and Attachment
+  InternetGatewayStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/InternetGateway.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        Name: !Ref IgwName
+        VpcId: !Ref VpcId
+
+Outputs:
+  InternetGatewayAttachmentId:
+    Description: "Internet Gateway Attachment ID"
+    Value: !GetAtt InternetGatewayStack.Outputs.InternetGatewayAttachmentId
+  InternetGatewayId:
+    Description: "Internet Gateway ID"
+    Value: !GetAtt InternetGatewayStack.Outputs.InternetGatewayId

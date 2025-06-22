@@ -17,7 +17,7 @@ Parameters:
     Description: "File to store data in the bucket"
     Type: String
   EnvironmentName:
-    AllowedValues: [ "dev", "test", "prod" ]
+    AllowedValues: ["dev", "test", "staging", "prod"]
     ConstraintDescription: "Must specify dev, test or prod"
     Default: "dev"
     Description: "Environment name that prefix all resources"
@@ -40,9 +40,8 @@ Parameters:
     Description: Second AWS Account ID for VPC peering
     Type: String
   RoleName:
-    Default: "AcceptVpcPeeringConnection-Role"
-    Description: |
-      "The name of the VPC peering cross Account Role to create."
+    Default: "AcceptVpcPeeringConnection"
+    Description: "The name of Role."
     Type: String
   RolePath:
     Default: "/"
@@ -51,10 +50,10 @@ Parameters:
     Type: String
 
 Conditions:
-  saveInS3File: !Equals [ !Ref SaveInS3File, "true"]
+  SaveInS3File: !Equals [ !Ref SaveInS3File, "true"]
 
 Resources:
-  AcceptVpcPeeringConnectionRole:
+  Role:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -69,7 +68,7 @@ Resources:
       Description: "Allows the specified peer requester account to assume this role and accept VPC peering connections." # Improved description
       Path: !Ref RolePath
       Policies:
-        - PolicyName: AcceptVpcPeeringConnection-Policy
+        - PolicyName: !Sub "${RoleName}-Policy"
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -88,13 +87,15 @@ Resources:
         - Key: EnvironmentName
           Value: !Ref EnvironmentName
         - Key: Name
-          Value: !Sub "${ProjectName}-${EnvironmentName}-${RoleName}-Role"
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${RoleName}"
+        - Key: ManagedBy
+          Value: "CloudFormation"
         - Key: ProjectName
           Value: !Ref ProjectName
 
-  AcceptVpcPeeringConnectionRoleToS3:
+  RoleToS3:
     Type: AWS::CloudFormation::CustomResource
-    Condition: saveInS3File
+    Condition: SaveInS3File
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
@@ -110,8 +111,8 @@ Resources:
 
 Outputs:
   RoleArn:
-    Description: "VPC peering cross Account Role ARN"
-    Value: !GetAtt AcceptVpcPeeringConnectionRole.Arn
+    Description: "Role Arn"
+    Value: !GetAtt Role.Arn
   RoleId:
-    Description: "VPC peering cross Account Role ID"
-    Value: !Ref AcceptVpcPeeringConnectionRole
+    Description: "Role ID"
+    Value: !Ref Role

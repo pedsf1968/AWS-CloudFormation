@@ -6,7 +6,7 @@ Description:
   # {
   #   "ResourceProperties": {
   #     "Bucket": "hawkfund-cloudformation",
-  #     "BucketKey": "59_VPCInterfaceEndPointForSQS",
+  #     "BucketKey": "62_VPCInterfaceEndPointForSQS",
   #     "BucketObject": "Data.json",
   #     "Region": "eu-west-3",
   #     "ResourceType": "Queue",
@@ -93,7 +93,7 @@ Parameters:
 
 Conditions:
   CreateRole: !Equals [!Ref CreateRole, "true" ]
-  saveInS3File: !And 
+  SaveInS3File: !And 
     - !Equals [!Ref CreateRole, "true" ]
     - !Equals [ !Ref SaveInS3File, "true"]
 
@@ -130,7 +130,7 @@ Resources:
                 Resource:
                   - !Join [":", ["arn:aws:s3::", !Sub "${Bucket}/${BucketKey}"]]
                   - !Join [":", ["arn:aws:s3::", !Sub "${Bucket}/${BucketKey}/*"]]
-        - PolicyName: !Sub "${FunctionName}Policy"
+        - PolicyName: !Sub "${FunctionName}-Policy"
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
@@ -139,12 +139,14 @@ Resources:
                   - "sqs:GetQueueAttributes"
                 Resource:
                   - "*"
-      RoleName: !Sub "${FunctionName}Role"
+      RoleName: !Sub "${FunctionName}"
       Tags:
         - Key: EnvironmentName
           Value: !Ref EnvironmentName
         - Key: Name
-          Value: !Sub "${ProjectName}-${EnvironmentName}-${FunctionName}Role"
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${FunctionName}"
+        - Key: ManagedBy
+          Value: "CloudFormation"
         - Key: ProjectName
           Value: !Ref ProjectName
 
@@ -291,7 +293,7 @@ Resources:
 
   LambdaFunctionRoleToS3:
     Type: AWS::CloudFormation::CustomResource
-    Condition: saveInS3File
+    Condition: SaveInS3File
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:

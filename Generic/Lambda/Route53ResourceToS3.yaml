@@ -93,7 +93,7 @@ Parameters:
 
 Conditions:
   CreateRole: !Equals [!Ref CreateRole, "true" ]
-  saveInS3File: !And 
+  SaveInS3File: !And 
     - !Equals [!Ref CreateRole, "true" ]
     - !Equals [ !Ref SaveInS3File, "true"]
 
@@ -116,7 +116,7 @@ Resources:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaRole
       Path: "/"
       Policies:
-        - PolicyName: UpdateObjectFromS3Policy
+        - PolicyName: UpdateObjectFromS3-Policy
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
@@ -144,7 +144,9 @@ Resources:
         - Key: EnvironmentName
           Value: !Ref EnvironmentName
         - Key: Name
-          Value: !Sub "${ProjectName}-${EnvironmentName}-${FunctionName}Role"
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${FunctionName}"
+        - Key: ManagedBy
+          Value: "CloudFormation"
         - Key: ProjectName
           Value: !Ref ProjectName
 
@@ -291,7 +293,7 @@ Resources:
 
   LambdaFunctionRoleToS3:
     Type: AWS::CloudFormation::CustomResource
-    Condition: saveInS3File
+    Condition: SaveInS3File
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:

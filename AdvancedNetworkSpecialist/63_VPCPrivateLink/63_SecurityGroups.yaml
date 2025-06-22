@@ -17,7 +17,7 @@ Parameters:
     Description: "File to store data in the bucket"
     Type: String
   EnvironmentName:
-    AllowedValues: [ "dev", "test", "prod" ]
+    AllowedValues: ["dev", "test", "staging", "prod"]
     ConstraintDescription: "Must specify dev, test or prod"
     Default: "dev"
     Description: "Environment name that prefix all resources"
@@ -48,7 +48,7 @@ Parameters:
     Type: String
 
 Conditions:
-  saveInS3File: !Equals [ !Ref SaveInS3File, "true"]
+  SaveInS3File: !Equals [ !Ref SaveInS3File, "true"]
 
 Resources:
   PrefixList:
@@ -89,7 +89,7 @@ Resources:
 
   BastionInstanceSecurityGroupToS3:
     Type: AWS::CloudFormation::CustomResource
-    Condition: saveInS3File 
+    Condition: SaveInS3File 
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
@@ -124,7 +124,7 @@ Resources:
 
   ConsumerSecurityGroupToS3:
     Type: AWS::CloudFormation::CustomResource
-    Condition: saveInS3File 
+    Condition: SaveInS3File 
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
@@ -163,7 +163,7 @@ Resources:
 
   WebServerSecurityGroupToS3:
     Type: AWS::CloudFormation::CustomResource
-    Condition: saveInS3File 
+    Condition: SaveInS3File 
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
@@ -194,7 +194,7 @@ Resources:
 
   VPCEndpointServiceSecurityGroupToS3:
     Type: AWS::CloudFormation::CustomResource
-    Condition: saveInS3File 
+    Condition: SaveInS3File 
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:

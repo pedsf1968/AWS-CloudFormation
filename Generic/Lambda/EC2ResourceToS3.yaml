@@ -93,7 +93,7 @@ Parameters:
 
 Conditions:
   CreateRole: !Equals [!Ref CreateRole, "true" ]
-  saveInS3File: !And 
+  SaveInS3File: !And 
     - !Equals [!Ref CreateRole, "true" ]
     - !Equals [ !Ref SaveInS3File, "true"]
 
@@ -198,6 +198,15 @@ Resources:
                 case "DhcpOptions":
                   response = ec2_client.describe_dhcp_options(DhcpOptionsIds=[ resource_id ])
                   return response['DhcpOptions'][0]
+                case "EgressOnlyInternetGateway":
+                  response = ec2_client.describe_egress_only_internet_gateways(EgressOnlyInternetGatewayIds=[ resource_id ])
+                  return response['EgressOnlyInternetGateways'][0]
+                case "FlowLog":
+                  response = ec2_client.describe_flow_logs(FlowLogIds=[ resource_id ])
+                  return response['FlowLogs'][0]
+                case "Image":
+                  response = ec2_client.describe_images(ImageIds=[ resource_id ])
+                  return response['Images'][0]
                 case "Instance":
                   response = ec2_client.describe_instances(InstanceIds=[resource_id])
                   return response['Reservations'][0]['Instances'][0]
@@ -336,7 +345,7 @@ Resources:
 
   LambdaFunctionRoleToS3:
     Type: AWS::CloudFormation::CustomResource
-    Condition: saveInS3File
+    Condition: SaveInS3File
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:

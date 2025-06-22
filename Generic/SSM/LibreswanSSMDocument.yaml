@@ -162,7 +162,9 @@ Resources:
       - Key: EnvironmentName
         Value: !Ref EnvironmentName
       - Key: Name
-        Value: !Sub "${ProjectName}-${EnvironmentName}-LibreswanSSMDocument"
+        Value: !Sub "${ProjectName}-${EnvironmentName}-Libreswan-SSMDocument"
+      - Key: ManagedBy
+        Value: "CloudFormation"
       - Key: ProjectName
         Value: !Ref ProjectName
       TargetType: "/AWS::EC2::Instance"

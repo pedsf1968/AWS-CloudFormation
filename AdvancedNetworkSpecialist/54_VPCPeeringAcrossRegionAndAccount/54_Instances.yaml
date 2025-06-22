@@ -1,0 +1,98 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create a role for remote account to create VPC Peering
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "54_VPCPeeringAcrossRegionAndAccount"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: ["dev", "test", "staging", "prod"]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String    
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "true"
+    Description: "Save resources information in s3 file"
+    Type: String
+  
+  # Stack parameters
+  KeyName:
+    Default: "dso-paris"
+    Description: "Instances Key name"
+    Type: String
+  InstanceElasticIP:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Add EIP to instance"
+    Type: String
+  InstanceImageId:
+    Default: ami-08461dc8cd9e834e0
+    Description: "Instance AMI"
+    Type: AWS::EC2::Image::Id
+  InstanceName:
+    Default: "Bastion"
+    Description: "Instances name"
+    Type: String
+  InstanceType:
+    Default: t2.micro
+    Description: "Instances type"
+    Type: String
+  InstanceSecurityGroup:
+    Description: "Security Group"
+    Type: String
+  InstanceSubnetId:
+    Description: "Subnet ID"
+    Type: String
+
+Resources:     
+  # Instances and Security Groups
+  Instance:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/EC2/Instance.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        AvailabilityZone: !Select [0, !GetAZs ]
+        ElasticIP: !Ref InstanceElasticIP
+        ImageId: !Ref InstanceImageId
+        InstanceName: !Ref InstanceName
+        InstanceType: !Ref InstanceType
+        KeyName: !Ref KeyName
+        SecurityGroupIds: !Ref InstanceSecurityGroup
+        SubnetId: !Ref InstanceSubnetId
+
+Outputs:
+  InstanceId:
+    Description: "Id of the Instance"
+    Value: !GetAtt Instance.Outputs.InstanceId
+  InstancePrivateIP:
+    Description: "Private IP of the Instance"
+    Value: !GetAtt Instance.Outputs.InstancePrivateIP
+  InstancePublicIP:
+    Description: "Public IP of the Instance"
+    Value: !GetAtt Instance.Outputs.InstancePublicIP

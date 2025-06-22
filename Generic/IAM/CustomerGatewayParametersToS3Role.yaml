@@ -17,7 +17,7 @@ Parameters:
     Description: "File to store data in the bucket"
     Type: String
   EnvironmentName:
-    AllowedValues: [ "dev", "test", "prod" ]
+    AllowedValues: ["dev", "test", "staging", "prod"]
     ConstraintDescription: "Must specify dev, test or prod"
     Default: "dev"
     Description: "Environment name that prefix all resources"
@@ -32,8 +32,15 @@ Parameters:
     Description: "Save resources information in s3 file"
     Type: String
 
+  # Stack parameters
+  RoleName:
+    Default: "CustomerGatewayParameters"
+    Description: |
+      "The name of the Role to create AMI instance."
+    Type: String
+
 Resources:
-  CustomerGatewayParametersToS3Role:
+  Role:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -50,7 +57,7 @@ Resources:
       - arn:aws:iam::aws:policy/service-role/AWSLambdaRole
       Path: "/"
       Policies:
-      - PolicyName: UpdateParametersFromS3Policy
+      - PolicyName: UpdateParametersFromS3-Policy
         PolicyDocument:
           Version: '2012-10-17'
           Statement:
@@ -63,7 +70,7 @@ Resources:
             Resource: 
             - !Join [":", ["arn:aws:s3::", !Sub "${Bucket}/${BucketKey}"]]
             - !Join [":", ["arn:aws:s3::", !Sub "${Bucket}/${BucketKey}/*"]]
-      - PolicyName: CustomerGatewayParametersToS3Policy
+      - PolicyName: !Sub "${RoleName}-Policy"
         PolicyDocument:
           Version: '2012-10-17'
           Statement:
@@ -72,16 +79,21 @@ Resources:
             - ec2:DescribeCustomerGateways
             Resource: 
             - "*"
-      RoleName: CustomerGatewayParametersToS3Role
+      RoleName: !Ref RoleName
       Tags:
         - Key: EnvironmentName
           Value: !Ref EnvironmentName
         - Key: Name
-          Value: !Sub "${ProjectName}-${EnvironmentName}-CustomerGatewayParametersToS3Role"
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${RoleName}"
+        - Key: ManagedBy
+          Value: "CloudFormation"
         - Key: ProjectName
           Value: !Ref ProjectName
 
 Outputs:
   RoleArn:
-    Description: "CustomerGatewayParametersToS3 Lambda Role Arn"
-    Value: !GetAtt CustomerGatewayParametersToS3Role.Arn
+    Description: "Role Arn"
+    Value: !GetAtt Role.Arn
+  RoleId:
+    Description: "Role ID"
+    Value: !Ref Role

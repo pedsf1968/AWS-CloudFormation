@@ -245,7 +245,9 @@ Resources:
       - Key: EnvironmentName
         Value: !Ref EnvironmentName
       - Key: Name
-        Value: !Sub "${ProjectName}-${EnvironmentName}-BindServerSSMDocument"
+        Value: !Sub "${ProjectName}-${EnvironmentName}-BindServer-SSMDocument"
+      - Key: ManagedBy
+        Value: "CloudFormation"
       - Key: ProjectName
         Value: !Ref ProjectName
       TargetType: "/AWS::EC2::Instance"

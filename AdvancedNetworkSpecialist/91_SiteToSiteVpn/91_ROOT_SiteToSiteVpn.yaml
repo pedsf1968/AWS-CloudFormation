@@ -281,7 +281,7 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         DestinationCidrBlocks: !If [ IsCustomerInfra, !Ref CustomerSecurityGroupIngressCidrIp, !Ref CloudSecurityGroupIngressCidrIp]
-        DestinationType:  !If [ IsCustomerInfra, "InternetGateway", "VirtualPrivateGateway"]
+        TargetType:  !If [ IsCustomerInfra, "InternetGateway", "VirtualPrivateGateway"]
         GatewayId: !If [ IsCustomerInfra, !GetAtt Gateways.Outputs.InternetGatewayId, !GetAtt Gateways.Outputs.VirtualPrivateGatewayId ]
         RouteTableNames: !If [ IsCustomerInfra, "Public", "Private"]
         SubnetIds: !GetAtt VpcAndSubnets.Outputs.SubnetId

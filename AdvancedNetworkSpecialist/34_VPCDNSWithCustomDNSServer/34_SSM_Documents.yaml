@@ -1,0 +1,430 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: This template create Internet Gateway and Attachement
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Description: "CloudFormation bucket URL"
+    Type: String
+    Default: "hawkfund-cloudformation"
+  BucketKey:
+    Description: "Key to find object in the bucket"
+    Type: String
+    Default: "34_VPCDNSWithCustomDNSServer"
+  BucketObject:
+    Description: "File to store data in the bucket"
+    Type: String
+    Default: "Data.json"
+  EnvironmentName:
+    Description: "Environment name that prefix all resources"
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+  ProjectName:
+    Description: "Project name that prefix all resources"
+    Type: String
+    Default: "ANS"
+  SaveInS3File:
+    AllowedValues: ["false", "true"]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+  # Stack parameters
+  BastionInstanceName:
+    Default: "bastion"
+    Description: "Bastion Instances name"
+    Type: String
+  BastionInstanceShortName:
+    Default: "bast"
+    Description: "Bastion Instances short name"
+    Type: String
+  BastionInstanceIp:
+    Default: ""
+    Description: "Ip of the Bastion Instance"
+    Type: String
+  ApplicationInstanceName:
+    Default: "application"
+    Description: "Application Instances name"
+    Type: String
+  ApplicationInstanceShortName:
+    Default: "app"
+    Description: "Application Instances short name"
+    Type: String
+  ApplicationInstanceId:
+    Description: "Id of the Application Instance"
+    Type: String
+  ApplicationInstanceIp:
+    Default: ""
+    Description: "Ip of the Application Instance"
+    Type: String
+  DatabaseInstanceName:
+    Default: "database"
+    Description: "Database Instances name"
+    Type: String
+  DatabaseInstanceShortName:
+    Default: "db"
+    Description: "Database Instances short name"
+    Type: String
+  DatabaseInstanceIp:
+    Default: ""
+    Description: "Ip of the Database Instance"
+    Type: String
+  DnsInstanceName:
+    Default: "nameserver"
+    Description: "DNS Instances name"
+    Type: String
+  DnsInstanceShortName:
+    Default: "dns"
+    Description: "DNS Instances short name"
+    Type: String
+  DnsInstanceId:
+    Description: "Id of the DNS Instance"
+    Type: String
+  DnsInstanceIp:
+    Default: ""
+    Description: "Ip of the DNS server Instance"
+    Type: String
+  DomainName:
+    Default: "corp.internal."
+    Description: "Name of the Domain"
+    Type: String
+  OutputS3BucketName:
+    Description: "The Bucket name for logs"
+    Type: String
+  OutputS3KeyPrefix:
+    Default: "logs/"
+    Description: "Logs prefix"
+    Type: String
+  VpcCidrBlock:
+    Default: 10.10.0.0/16
+    Description: "The IPv4 network range for the VPC, in CIDR notation."
+    Type: String
+  ZoneName:
+    Default: "corp.internal"
+    Description: "Name of the Zone"
+    Type: String
+
+Resources:
+  # Create SSM Document for the WEB server
+  ApacheHttpdSSMDocument:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/SSM/ApacheHttpdSSMDocument.yaml"
+      TimeoutInMinutes: 10
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+
+  # Create SSM Documents for the DNS server
+  DnsServerSSMDocument:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/SSM/BindServerSSMDocument.yaml"
+      TimeoutInMinutes: 10
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+
+  DnsServerAddARecordSSMDocument:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/SSM/BindServerAddARecordSSMDocument.yaml"
+      TimeoutInMinutes: 10
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+
+  DnsServerAddCnameRecordSSMDocument:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/SSM/BindServerAddCnameRecordSSMDocument.yaml"
+      TimeoutInMinutes: 10
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+
+  # Create Association for WEB server
+  ApacheHttpdInstallSSMAssociation:
+    Type: AWS::SSM::Association
+    DependsOn:
+      - ApacheHttpdSSMDocument
+    Properties:
+      AssociationName: ApacheHttpdInstallSSMAssociation
+      Name: ApacheHttpdSSMDocument
+      Targets:
+        - Key: InstanceIds
+          Values:
+            - !Ref ApplicationInstanceId
+      OutputLocation:
+        S3Location:
+          OutputS3BucketName: !Ref OutputS3BucketName
+          OutputS3KeyPrefix: !Ref OutputS3KeyPrefix
+      Parameters:
+        Message:
+          - "Application Instance"
+
+  # Create Associations for DNS server
+  DnsServerSSMAssociation:
+    Type: AWS::SSM::Association
+    DeletionPolicy: Delete
+    DependsOn:
+      - DnsServerSSMDocument
+    UpdateReplacePolicy: Delete
+    Properties:
+      AssociationName: DnsServerSSMAssociation
+      Name: BindServerSSMDocument
+      Targets:
+        - Key: InstanceIds
+          Values:
+            - !Ref DnsInstanceId
+      OutputLocation:
+        S3Location:
+          OutputS3BucketName: !Ref OutputS3BucketName
+          OutputS3KeyPrefix: !Ref OutputS3KeyPrefix
+      Parameters:
+        DnsInstanceName:
+          - !Ref DnsInstanceName
+        DnsInstanceIp:
+          - !Ref DnsInstanceIp
+        DnsInstanceShortName:
+          - !Ref DnsInstanceShortName
+        DomainName:
+          - !Ref DomainName
+        VpcCidrBlock:
+          - !Ref VpcCidrBlock
+        ZoneBaseCidr:
+          - !Join
+            - "."
+            - - !Select [0, !Split [".", !Ref VpcCidrBlock]]
+              - !Select [1, !Split [".", !Ref VpcCidrBlock]]
+              - !Select [2, !Split [".", !Ref VpcCidrBlock]]
+        ZoneName:
+          - !Ref ZoneName
+
+  DnsServerAddApplicationARecordSSMAssociation:
+    Type: AWS::SSM::Association
+    DeletionPolicy: Delete
+    DependsOn:
+      - DnsServerSSMDocument
+      - DnsServerSSMAssociation
+      - DnsServerAddARecordSSMDocument
+      - DnsServerAddCnameRecordSSMDocument
+    UpdateReplacePolicy: Delete
+    Properties:
+      AssociationName: DnsServerAddApplicationARecordSSMAssociation
+      Name: BindServerAddARecordSSMDocument
+      Targets:
+        - Key: InstanceIds
+          Values:
+            - !Ref DnsInstanceId
+      OutputLocation:
+        S3Location:
+          OutputS3BucketName: !Ref OutputS3BucketName
+          OutputS3KeyPrefix: !Ref OutputS3KeyPrefix
+      Parameters:
+        DomainName:
+          - !Ref DomainName
+        RecordHostname:
+          - !Ref ApplicationInstanceName
+        RecordIp:
+          - !Ref ApplicationInstanceIp
+        RecordShortIp:
+          - !Select [3, !Split [".", !Ref ApplicationInstanceIp]]
+        ZoneBaseCidr:
+          - !Join
+            - "."
+            - - !Select [0, !Split [".", !Ref VpcCidrBlock]]
+              - !Select [1, !Split [".", !Ref VpcCidrBlock]]
+              - !Select [2, !Split [".", !Ref VpcCidrBlock]]
+        ZoneName:
+          - !Ref ZoneName
+
+  DnsServerAddApplicationCnameRecordSSMAssociation:
+    Type: AWS::SSM::Association
+    DeletionPolicy: Delete
+    DependsOn:
+      - DnsServerSSMDocument
+      - DnsServerSSMAssociation
+      - DnsServerAddARecordSSMDocument
+      - DnsServerAddCnameRecordSSMDocument
+    UpdateReplacePolicy: Delete
+    Properties:
+      AssociationName: DnsServerAddApplicationCnameRecordSSMAssociation
+      Name: BindServerAddCnameRecordSSMDocument
+      Targets:
+        - Key: InstanceIds
+          Values:
+            - !Ref DnsInstanceId
+      OutputLocation:
+        S3Location:
+          OutputS3BucketName: !Ref OutputS3BucketName
+          OutputS3KeyPrefix: !Ref OutputS3KeyPrefix
+      Parameters:
+        RecordAlias:
+          - !Ref ApplicationInstanceShortName
+        RecordHostname:
+          - !Ref ApplicationInstanceName
+        ZoneName:
+          - !Ref ZoneName
+
+  DnsServerAddBastionARecordSSMAssociation:
+    Type: AWS::SSM::Association
+    DeletionPolicy: Delete
+    DependsOn:
+      - DnsServerSSMDocument
+      - DnsServerSSMAssociation
+      - DnsServerAddARecordSSMDocument
+      - DnsServerAddCnameRecordSSMDocument
+    UpdateReplacePolicy: Delete
+    Properties:
+      AssociationName: DnsServerAddBastionARecordSSMAssociation
+      Name: BindServerAddARecordSSMDocument
+      Targets:
+        - Key: InstanceIds
+          Values:
+            - !Ref DnsInstanceId
+      OutputLocation:
+        S3Location:
+          OutputS3BucketName: !Ref OutputS3BucketName
+          OutputS3KeyPrefix: !Ref OutputS3KeyPrefix
+      Parameters:
+        DomainName:
+          - !Ref DomainName
+        RecordHostname:
+          - !Ref BastionInstanceName
+        RecordIp:
+          - !Ref BastionInstanceIp
+        RecordShortIp:
+          - !Select [3, !Split [".", !Ref BastionInstanceIp]]
+        ZoneBaseCidr:
+          - !Join
+            - "."
+            - - !Select [0, !Split [".", !Ref VpcCidrBlock]]
+              - !Select [1, !Split [".", !Ref VpcCidrBlock]]
+              - !Select [2, !Split [".", !Ref VpcCidrBlock]]
+        ZoneName:
+          - !Ref ZoneName
+
+  DnsServerAddBastionCnameRecordSSMAssociation:
+    Type: AWS::SSM::Association
+    DeletionPolicy: Delete
+    DependsOn:
+      - DnsServerSSMDocument
+      - DnsServerSSMAssociation
+      - DnsServerAddARecordSSMDocument
+      - DnsServerAddCnameRecordSSMDocument
+    UpdateReplacePolicy: Delete
+    Properties:
+      AssociationName: DnsServerAddBastionCnameRecordSSMAssociation
+      Name: BindServerAddCnameRecordSSMDocument
+      Targets:
+        - Key: InstanceIds
+          Values:
+            - !Ref DnsInstanceId
+      OutputLocation:
+        S3Location:
+          OutputS3BucketName: !Ref OutputS3BucketName
+          OutputS3KeyPrefix: !Ref OutputS3KeyPrefix
+      Parameters:
+        RecordAlias:
+          - !Ref BastionInstanceShortName
+        RecordHostname:
+          - !Ref BastionInstanceName
+        ZoneName:
+          - !Ref ZoneName
+
+  DnsServerAddDatabaseARecordSSMAssociation:
+    Type: AWS::SSM::Association
+    DeletionPolicy: Delete
+    DependsOn:
+      - DnsServerSSMDocument
+      - DnsServerSSMAssociation
+      - DnsServerAddARecordSSMDocument
+      - DnsServerAddCnameRecordSSMDocument
+    UpdateReplacePolicy: Delete
+    Properties:
+      AssociationName: DnsServerAddDatabaseARecordSSMAssociation
+      Name: BindServerAddARecordSSMDocument
+      Targets:
+        - Key: InstanceIds
+          Values:
+            - !Ref DnsInstanceId
+      OutputLocation:
+        S3Location:
+          OutputS3BucketName: !Ref OutputS3BucketName
+          OutputS3KeyPrefix: !Ref OutputS3KeyPrefix
+      Parameters:
+        DomainName:
+          - !Ref DomainName
+        RecordHostname:
+          - !Ref DatabaseInstanceName
+        RecordIp:
+          - !Ref DatabaseInstanceIp
+        RecordShortIp:
+          - !Select [3, !Split [".", !Ref DatabaseInstanceIp]]
+        ZoneBaseCidr:
+          - !Join
+            - "."
+            - - !Select [0, !Split [".", !Ref VpcCidrBlock]]
+              - !Select [1, !Split [".", !Ref VpcCidrBlock]]
+              - !Select [2, !Split [".", !Ref VpcCidrBlock]]
+        ZoneName:
+          - !Ref ZoneName
+
+  DnsServerAddDatabaseCnameRecordSSMAssociation:
+    Type: AWS::SSM::Association
+    DeletionPolicy: Delete
+    DependsOn:
+      - DnsServerSSMDocument
+      - DnsServerSSMAssociation
+      - DnsServerAddARecordSSMDocument
+      - DnsServerAddCnameRecordSSMDocument
+    UpdateReplacePolicy: Delete
+    Properties:
+      AssociationName: DnsServerAddDatabaseCnameRecordSSMAssociation
+      Name: BindServerAddCnameRecordSSMDocument
+      Targets:
+        - Key: InstanceIds
+          Values:
+            - !Ref DnsInstanceId
+      OutputLocation:
+        S3Location:
+          OutputS3BucketName: !Ref OutputS3BucketName
+          OutputS3KeyPrefix: !Ref OutputS3KeyPrefix
+      Parameters:
+        RecordAlias:
+          - !Ref DatabaseInstanceShortName
+        RecordHostname:
+          - !Ref DatabaseInstanceName
+        ZoneName:
+          - !Ref ZoneName

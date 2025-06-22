@@ -142,6 +142,8 @@ Resources:
           Value: !Ref EnvironmentName
         - Key: Name
           Value: !Sub "${ProjectName}-${EnvironmentName}-${InstanceName}"
+        - Key: ManagedBy
+          Value: "CloudFormation"
         - Key: ProjectName
           Value: !Ref ProjectName
       UserData: !If

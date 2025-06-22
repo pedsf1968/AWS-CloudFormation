@@ -1,0 +1,203 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create bastion and application Instances and Security Groups
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "33_VPCDNSWithRoute53PrivateHostedZone"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: ["dev", "test", "staging", "prod"]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String    
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+  
+  # Stack parameters
+  KeyName:
+    Default: "dso-paris"
+    Description: "Instances Key name"
+    Type: String
+
+  # Bastion parameters
+  BastionInstanceImageId:
+    Default: ami-08461dc8cd9e834e0
+    Description: "Bastion Instance AMI"
+    Type: AWS::EC2::Image::Id
+  BastionInstanceName:
+    Default: "Bastion"
+    Description: "Bastion Instances name"
+    Type: String
+  BastionInstanceType:
+    Default: t2.micro
+    Description: "Bastion Instances type"
+    Type: String
+  BastionInstanceSecurityGroup:
+    Description: "Bastion Security Group"
+    Type: String
+  BastionInstanceSubnetId:
+    Description: "Bastion Subnet ID"
+    Type: String
+
+  # Appplication parameters
+  ApplicationInstanceImageId:
+    Default: ami-08461dc8cd9e834e0
+    Description: "Application Instance AMI"
+    Type: AWS::EC2::Image::Id
+  ApplicationInstanceName:
+    Default: "Application"
+    Description: "Application Instances name"
+    Type: String
+  ApplicationInstanceType:
+    Default: t2.micro
+    Description: "Application Instances type"
+    Type: String
+  ApplicationInstanceProfile:
+    Description: "Profile of the Application"
+    Type: String
+  ApplicationInstanceSecurityGroup:
+    Description: "Application Security Group"
+    Type: String
+  ApplicationInstanceSubnetId:
+    Description: "Application Subnet ID"
+    Type: String
+
+  # Database parameters
+  DatabaseInstanceImageId:
+    Default: ami-08461dc8cd9e834e0
+    Description: "Database Instance AMI"
+    Type: AWS::EC2::Image::Id
+  DatabaseInstanceName:
+    Default: "Database"
+    Description: "Database Instances name"
+    Type: String
+  DatabaseInstanceType:
+    Default: t2.micro
+    Description: "Database Instances type"
+    Type: String
+  DatabaseInstanceSecurityGroup:
+    Description: "Database Security Group"
+    Type: String
+  DatabaseInstanceSubnetId:
+    Description: "Database Subnet ID"
+    Type: String
+
+Resources:
+  BastionInstance:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/EC2/Instance.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        AvailabilityZone: !Select [0, !GetAZs ]
+        ElasticIP: "true"
+        ImageId: !Ref BastionInstanceImageId
+        InstanceName: !Ref BastionInstanceName
+        InstanceType: !Ref BastionInstanceType
+        KeyName: !Ref KeyName
+        SecurityGroupIds: !Ref BastionInstanceSecurityGroup
+        SubnetId: !Ref BastionInstanceSubnetId
+
+  ApplicationInstance:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/EC2/Instance.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        AvailabilityZone: !Select [0, !GetAZs ]
+        ElasticIP: "true"
+        IamInstanceProfile: !Ref ApplicationInstanceProfile
+        ImageId: !Ref ApplicationInstanceImageId
+        InstanceName: !Ref ApplicationInstanceName
+        InstanceType: !Ref ApplicationInstanceType
+        KeyName: !Ref KeyName
+        SecurityGroupIds: !Ref ApplicationInstanceSecurityGroup
+        SubnetId: !Ref ApplicationInstanceSubnetId
+
+  DatabaseInstance:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/EC2/Instance.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        AvailabilityZone: !Select [0, !GetAZs ]
+        ImageId: !Ref DatabaseInstanceImageId
+        InstanceName: !Ref DatabaseInstanceName
+        InstanceType: !Ref DatabaseInstanceType
+        KeyName: !Ref KeyName
+        SecurityGroupIds: !Ref DatabaseInstanceSecurityGroup
+        SubnetId: !Ref DatabaseInstanceSubnetId
+
+Outputs:
+  ApplicationInstanceId:
+    Description: "Id of the Application Instance"
+    Value: !GetAtt ApplicationInstance.Outputs.InstanceId
+  ApplicationInstancePrivateIP:
+    Description: "Private IP of the Application Instance"
+    Value: !GetAtt ApplicationInstance.Outputs.InstancePrivateIP
+  ApplicationInstancePublicIP:
+    Description: "Public IP of the Application Instance"
+    Value: !GetAtt ApplicationInstance.Outputs.InstancePublicIP
+
+  BastionInstanceId:
+    Description: "Id of the Bastion Instance"
+    Value: !GetAtt BastionInstance.Outputs.InstanceId
+  BastionInstancePrivateIP:
+    Description: "Private IP of the Bastion Instance"
+    Value: !GetAtt BastionInstance.Outputs.InstancePrivateIP
+  BastionInstancePublicIP:
+    Description: "Public IP of the Bastion Instance"
+    Value: !GetAtt BastionInstance.Outputs.InstancePublicIP
+
+  DatabaseInstanceId:
+    Description: "Id of the Database Instance"
+    Value: !GetAtt DatabaseInstance.Outputs.InstanceId
+  DatabaseInstancePrivateIP:
+    Description: "Private IP of the Database Instance"
+    Value: !GetAtt DatabaseInstance.Outputs.InstancePrivateIP
+  DatabasePublicIP:
+    Description: "Public IP of the Database Instance"
+    Value: !GetAtt DatabaseInstance.Outputs.InstancePublicIP

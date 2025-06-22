@@ -1,0 +1,152 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create Tables and Route Tables
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "25_EgressOnlyInternetGatewayForIpV6"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: ["dev", "test", "staging", "prod"]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String    
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+  
+  # Stack parameters
+  InternetGatewayId:
+    Description: "Internet Gateway ID"
+    Type: String
+  EgressOnlyInternetGatewayId:
+    Description: "Egress Only Internet Gateway ID"
+    Type: String
+  RouteTableNames:
+    Description: "Names of all Route Tables"
+    Type: CommaDelimitedList
+  SubnetPrivateId:
+    Description: "Private Subnets ID"
+    Type: String
+  SubnetPublicId:
+    Description: "Public Subnets ID"
+    Type: String
+  VpcId:
+    Description: "VPC ID"
+    Type: String
+
+Resources:  
+  # Route, Route Table and Associations
+  SubnetPublicRouteTableStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/RouteTable.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        VpcId: !Ref VpcId
+        RouteTableName: !Select [ 0, !Ref RouteTableNames ]
+        SubnetId: !Ref SubnetPublicId
+
+  SubnetPublicRouteStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/Route.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        DestinationCidrBlock: "0.0.0.0/0"
+        TargetType: "InternetGateway"
+        TargetId: !Ref InternetGatewayId
+        RouteTableId: !GetAtt SubnetPublicRouteTableStack.Outputs.RouteTableId
+        RouteTableName: !Select [ 0, !Ref RouteTableNames ]
+
+  SubnetPrivateRouteTableStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/RouteTable.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        RouteTableName: !Select [ 1, !Ref RouteTableNames ]
+        SubnetId: !Ref SubnetPrivateId
+        VpcId: !Ref VpcId
+
+  SubnetPrivateRouteStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/Route.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        DestinationIpv6CidrBlock: "::/0"
+        TargetType: "EgressOnlyInternetGateway"
+        TargetId: !Ref EgressOnlyInternetGatewayId
+        RouteTableId: !GetAtt SubnetPrivateRouteTableStack.Outputs.RouteTableId
+        RouteTableName: !Select [ 1, !Ref RouteTableNames ]
+
+Outputs:
+  SubnetPrivateRouteId:
+    Description: "Private Subnet Route ID"
+    Value: !GetAtt SubnetPrivateRouteStack.Outputs.RouteId
+  SubnetPrivateRouteTableAssociationId:
+    Description: "Private Route Table Association ID"
+    Value: SubnetPrivateRouteTableStack.Outputs.SubnetRouteTableAssociationId
+  SubnetPrivateRouteTableId:
+    Description: "Private Subnet Route Table ID"
+    Value: !GetAtt SubnetPrivateRouteTableStack.Outputs.RouteTableId
+
+  SubnetPublicRouteId:
+    Description: "Public Subnet Route IDs"
+    Value: !GetAtt SubnetPublicRouteStack.Outputs.RouteId
+  SubnetPublicRouteTableAssociationId:
+    Description: "Public Route Table Association ID"
+    Value: !GetAtt SubnetPublicRouteTableStack.Outputs.SubnetRouteTableAssociationId
+  SubnetPublicRouteTableId:
+    Description: "Public Subnet Route Table ID"
+    Value: !GetAtt SubnetPublicRouteTableStack.Outputs.RouteTableId
