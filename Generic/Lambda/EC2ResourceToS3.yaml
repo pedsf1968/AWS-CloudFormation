@@ -356,7 +356,7 @@ Resources:
       BucketObject: !Ref BucketObject
       Region: !Ref AWS::Region
       ResourceType: "Role"
-      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:IAM:Role:${FunctionName}Role"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:IAM:Role:${FunctionName}"
       Value: !Ref LambdaFunctionRole
 
 Outputs:

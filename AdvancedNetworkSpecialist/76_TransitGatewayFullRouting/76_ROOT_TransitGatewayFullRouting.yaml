@@ -1,0 +1,241 @@
+# aws cloudformation validate-template --template-body file:/76_ROOT_TransitGateway.yaml
+# aws cloudformation create-stack --stack-name ANS-76 --template-body file:/76_ROOT_TransitGateway.yaml --region eu-west-3 --capabilities CAPABILITY_IAM
+# aws cloudformation delete-stack --stack-name ANS-76 --region eu-west-3
+#
+AWSTemplateFormatVersion: "2010-09-09"
+Description: This template deploys a 3 VPC and Transit Gateway with no route between A to C
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Project Configuration"
+        Parameters:
+          - ProjectName
+          - EnvironmentName
+      - Label:
+          default: "Configuration"
+        Parameters:
+          - Bucket
+          - BucketKey
+          - BucketObject
+          - SaveInS3File
+      - Label:
+          default: "VPC configuration"
+        Parameters:
+          - VpcNames
+          - VpcCidrBlocks
+      - Label:
+          default: "Subnets configuration"
+        Parameters:
+          - SubnetNames
+          - SubnetPrivateCidrBlocks
+          - SubnetPublicCidrBlocks
+      - Label:
+          default: "Instances"
+        Parameters:
+          - InstanceImageId
+          - InstanceKeyName
+          - InstanceType
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Description: CloudFormation buket URL
+    Type: String
+    Default: "hawkfund-cloudformation"
+  BucketKey:
+    Description: Key to find object in the bucket
+    Type: String
+    Default: "76_TransitGatewayFullRouting"
+  BucketObject:
+    Description: "File to store data in the bucket"
+    Type: String
+    Default: "Data.json"
+  EnvironmentName:
+    Description: "Environment name that prefix all resources"
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+  ProjectName:
+    Description: "Project name that prefix all resources"
+    Type: String
+    Default: "ANS"
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "true"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+  # Network parameters
+  SubnetNames:
+    Description: "Subnet names"
+    Type: String
+    Default: "A,B,C"
+  SubnetPrivateCidrBlocks:
+    Description: "Subnet CIDRs"
+    Type: String
+    Default: "10.0.1.0/24,10.1.1.0/24,10.2.1.0/24"
+  SubnetPublicCidrBlocks:
+    Description: "Subnet CIDRs"
+    Type: String
+    Default: "10.0.0.0/24"
+  VpcCidrBlocks:
+    Description: "VPC CIDRs"
+    Type: String
+    Default: "10.0.0.0/16,10.1.0.0/16,10.2.0.0/16"
+  VpcNames:
+    Description: "VPC names"
+    Type: String
+    Default: "A,B,C"
+
+  # Instances parameters
+  InstanceImageId:
+    Description: "Instance AMI"
+    Type: AWS::EC2::Image::Id
+    Default: ami-08461dc8cd9e834e0
+  InstanceKeyName:
+    Description: Instance Key name
+    Type: String
+    Default: "dso-paris"
+  InstanceType:
+    Description: "Instance type"
+    Type: String
+    Default: t2.micro
+
+Resources:
+  Lambdas:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/76_Lambdas.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+
+  VpcAndSubnets:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/76_VpcAndSubnets.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        SubnetPrivateCidrBlocks: !Ref SubnetPrivateCidrBlocks
+        SubnetPublicCidrBlocks: !Ref SubnetPublicCidrBlocks
+        SubnetNames: !Ref SubnetNames
+        VpcCidrBlocks: !Ref VpcCidrBlocks
+        VpcNames: !Ref VpcNames
+
+  SecurityGroups:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/76_SecurityGroups.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        BastionInstanceIngressCidrIp: "0.0.0.0/0"
+        BastionInstanceVpcId:
+          !Select [0, !Split [",", !GetAtt VpcAndSubnets.Outputs.VpcIds]]
+        ApplicationInstanceIngressCidrIp: "10.0.0.0/8"
+        ApplicationInstanceVpcIds: !GetAtt VpcAndSubnets.Outputs.VpcIds
+
+  Gateway:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/76_Gateways.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        IgwName: "Default"
+        TgwName: "Default"
+        SubnetIds: !GetAtt VpcAndSubnets.Outputs.SubnetPrivateIds
+        VpcIds: !GetAtt VpcAndSubnets.Outputs.VpcIds
+
+  RouteTables:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/76_RouteTables.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        SaveInS3File: !Ref SaveInS3File
+        ProjectName: !Ref ProjectName
+        DestinationCidrBlock: "10.0.0.0/8"
+        VpcIds: !GetAtt VpcAndSubnets.Outputs.VpcIds
+        SubnetPrivateIds: !GetAtt VpcAndSubnets.Outputs.SubnetPrivateIds
+        SubnetPublicId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId
+        RouteTableNames: "A,B,C"
+        InternetGatewayId: !GetAtt Gateway.Outputs.InternetGatewayId
+        TransitGatewayId: !GetAtt Gateway.Outputs.TransitGatewayId
+
+  Instances:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - Lambdas
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/76_Instances.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        KeyName: !Ref InstanceKeyName
+        ApplicationInstanceImageId: !Ref InstanceImageId
+        ApplicationInstanceName: "Application"
+        ApplicationInstanceType: !Ref InstanceType
+        ApplicationInstanceSecurityGroups: !GetAtt SecurityGroups.Outputs.ApplicationInstanceSecurityGroupIds
+        ApplicationInstanceSubnetIds: !GetAtt VpcAndSubnets.Outputs.SubnetPrivateIds
+        BastionInstanceImageId: !Ref InstanceImageId
+        BastionInstanceName: "Bastion"
+        BastionInstanceType: !Ref InstanceType
+        BastionInstanceSecurityGroup: !GetAtt SecurityGroups.Outputs.BastionInstanceSecurityGroupId
+        BastionInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId

@@ -334,7 +334,7 @@ Resources:
       - Lambdas
     UpdateReplacePolicy: Retain
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/91_SSM_Documents.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/96_SSM_Documents.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket

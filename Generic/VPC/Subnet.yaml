@@ -35,7 +35,6 @@ Parameters:
   # Stack parameters
   EnableIpv6:
     AllowedValues: [ "false", "true" ]
-    ConstraintDescription: "Must be false"
     Default: "false"
     Description: |
       Indicates whether a network interface created in this subnet receives an
@@ -60,6 +59,7 @@ Parameters:
     Type: String
   MapPublicIpOnLaunch:
     AllowedValues: [ "false", "true" ]
+    Default: "false"
     Description: "Subnet by default is public"
     Type: String
   SubnetName:

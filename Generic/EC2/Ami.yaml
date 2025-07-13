@@ -8,7 +8,7 @@ Parameters:
     Description: CloudFormation buket URL
     Type: String
   BucketKey:
-    Default: "63_VPCPrivateLink"
+    Default: "64_VPCEndpointServiceAndAccessThroughVPCEndpoint"
     Description: Key to find object in the bucket
     Type: String
   BucketObject:
@@ -31,68 +31,119 @@ Parameters:
     Description: "Save resources information in s3 file"
     Type: String
 
-# Stack parameters
-  AvailabilityZone:
-    Description: "Instance AZ"
+  # Stack parameters
+  AvailabilityZone: # Required: No
+    Description: >-
+      The Availability Zone of the instance. If not specified, an Availability
+      Zone will be automatically chosen for you based on the load balancing
+      criteria for the Region. This parameter is not supported by
+      DescribeImageAttribute.
     Type: String
-  ImageId:
-    Description: "Instance AMI"
-    Type: AWS::EC2::Image::Id
-    Default: ami-0d3f86bfba5ee6472
-  InstanceType: 
-    Description: "Type of Instance"
-    Type: String
-    Default: t2.micro
+  ElasticIP:
     AllowedValues:
-         - t2.micro
-         - t2.small
-         - t2.large
-  KeyName: 
-    Description: "Instance Key name"
+      - "false"
+      - "true"
+    Default: "false"
+    Description: "Create elastic IP for the instance"
     Type: String
-  SecurityGroup:
-    Description: "Instance Security Group ID"
-    Type: String
-  SubnetId:
-    Description: "Instance Subnet ID"
-    Type: String
-  UserData:
-    Description: "Script to launch on the first start"
-    Type: String
+  IamInstanceProfile: # Required: No
     Default: ""
+    Description: >-
+      The name of an IAM instance profile. To create a new IAM instance profile,
+      use the AWS::IAM::InstanceProfile resource.
+    Type: String
+  ImageId: # Required: Conditional
+    Default: ami-08461dc8cd9e834e0
+    Description: >-
+      The ID of the AMI. An AMI ID is required to launch an instance and must
+      be specified here or in a launch template.
+    Type: AWS::EC2::Image::Id
+  InstanceName:
+    Description: "Instance name"
+    Type: String
+  InstanceType: # Required: No
+    AllowedValues:
+      - t2.micro
+      - t2.small
+      - t2.large
+    Default: t2.micro
+    Description: >-
+      The instance type. For more information, see Instance types in the Amazon
+      EC2 User Guide. When you change your EBS-backed instance type, instance
+      restart or replacement behavior depends on the instance type
+      compatibility between the old and new types. An instance with an instance
+      store volume as the root volume is always replaced. For more information,
+      see Change the instance type in the Amazon EC2 User Guide.
+    Type: String
+  KeyName: # Required: No
+    Default: "dso-paris"
+    Description: >-
+      The name of the key pair. You can create a key pair using CreateKeyPair
+      or ImportKeyPair.
+    Type: String
+  SecurityGroupIds: # Required: Conditional
+    Default: ""
+    Description: >-
+      The IDs of the security groups. You can specify the IDs of existing
+      security groups and references to resources created by the stack
+      template. If you specify a network interface, you must specify any
+      security groups as part of the network interface.
+    Type: CommaDelimitedList
+  SourceDestCheck: # Required: No
+    AllowedValues:
+      - "false"
+      - "true"
+    Default: "true"
+    Description: >-
+      Enable or disable source/destination checks, which ensure that the
+      instance is either the source or the destination of any traffic that it
+      receives. If the value is true, source/destination checks are enabled;
+      otherwise, they are disabled. The default value is true. You must
+      disable source/destination checks if the instance runs services such as
+      network address translation, routing, or firewalls.
+    Type: String
+  SubnetId: # Required: No
+    Description: >-
+      The ID of the subnet to launch the instance into. If you specify a
+      network interface, you must specify any subnets as part of the network
+      interface instead of using this parameter.
+    Type: String
+  UserData: # Required: No
+    Default: ""
+    Description: >-
+      The parameters or scripts to store as user data. Any scripts in user data
+      are run when you launch the instance. User data is limited to 16 KB. You
+      must provide base64-encoded text. For more information, see Fn::Base64.
+      If the root volume is an EBS volume and you update user data,
+      CloudFormation restarts the instance. If the root volume is an instance
+      store volume and you update user data, the instance is replaced.
+    Type: String
 
 Resources:
   # Completes when the instance is fully provisioned and ready for AMI creation.
-  AMICreate:
-    Type: AWS::CloudFormation::WaitCondition
-    CreationPolicy:
-      ResourceSignal:
-        Timeout: PT10M
-
-  Instance:
-    Type: AWS::EC2::Instance
+  InstanceForAmi:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
     Properties:
-      AvailabilityZone:  !Ref AvailabilityZone
-      ImageId: !Ref ImageId
-      InstanceType: !Ref InstanceType
-      KeyName: !Ref KeyName
-      SecurityGroupIds: 
-        - !Ref SecurityGroup
-      SubnetId: !Ref SubnetId
-      UserData:
-        "Fn::Base64": !Sub |
-          #!/bin/bash -x
-          yum update -y
-          yum install -y httpd
-          systemctl start httpd
-          systemctl enable httpd
-          echo "This is a service hosted behind AWS private link" > /var/www/html/index.html
-          /opt/aws/bin/cfn-signal \
-            -e $? \
-            --stack ${AWS::StackName} \
-            --region ${AWS::Region} \
-            --resource AMICreate
-          shutdown -h now
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/EC2/Instance.yaml"
+      TimeoutInMinutes: 10
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: "false"
+        AvailabilityZone: !Select [0, !GetAZs ]
+        IamInstanceProfile: !Ref IamInstanceProfile
+        ImageId: !Ref ImageId
+        InstanceName: !Ref InstanceName
+        InstanceType: !Ref InstanceType
+        KeyName: !Ref KeyName
+        SecurityGroupIds: !Ref SecurityGroupIds
+        SubnetId: !Ref SubnetId
+        UserData: !Ref UserData
 
   AMI:
     Type: Custom::AMI

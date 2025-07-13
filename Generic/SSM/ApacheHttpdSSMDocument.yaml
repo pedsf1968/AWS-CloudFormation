@@ -42,77 +42,168 @@ Resources:
     UpdateReplacePolicy: Delete
     Properties:
       Content:
-        description: "Install Apache Httpd with OS detection"
-        mainSteps:
-        - name: ApacheHttpdInstall
-          action: "aws:runShellScript"
-          inputs:
-            runCommand:
-            - |
-              #!/bin/bash
-              set -eux
-              
-              # Function to determine OS and install Apache Httpd
-              install_apache() {
-                if command -v yum &>/dev/null; then
-                  echo "Installing Apache Httpd using yum..."
-                  yum update -y
-                  yum install -y httpd
-                elif command -v apt-get &>/dev/null; then
-                  echo "Installing Apache Httpd using apt-get..."
-                  apt update -y
-                  apt install -y apache2
-                else
-                  echo "Unsupported OS: Cannot determine package manager."
-                  exit 1
-                fi
-              }
-              
-              # Check OS and install
-              if [[ -f /etc/os-release ]]; then
-                source /etc/os-release
-                if [[ "$ID" == "amzn" ]]; then
-                  echo "Detected Amazon Linux"
-                  install_apache
-                elif [[ "$ID" == "ubuntu" ]]; then
-                  echo "Detected Ubuntu"
-                  install_apache
-                elif [[ "$ID" == "centos" || "$ID" == "rhel" ]]; then
-                  echo "Detected CentOS/RHEL"
-                  install_apache
-                elif [[ "$ID" == "debian" ]]; then
-                  echo "Detected Debian"
-                  install_apache
-                else
-                  echo "Warning: OS '$ID' is not explicitly supported, attempting install."
-                  install_apache
-                fi
-              else
-                echo "Cannot determine OS from /etc/os-release, attempting install."
-                install_apache
-              fi
-              
-              # Start and enable the httpd service
-              echo "Starting and enabling httpd service..."
-              if command -v systemctl &>/dev/null; then
-                systemctl start httpd
-                systemctl enable httpd
-              else
-                echo "Warning: systemctl not found.  Please start and enable httpd service manually."
-              fi
-              
-              # Optional: Create a default index.html
-              echo "Creating a default index.html..."
-              echo "<h1>{{Message}} from $(hostname -f)/<h1>" > /var/www/html/index.html
+        description: "Install Apache Httpd with OS detection and CloudFormation signaling"
+        schemaVersion: "1.2"
         parameters:
           Message:
             type: "String"
             description: "Welcome Message"
             default: "Hello World"
-        schemaVersion: "2.2"
+          WaitHandleUrl:
+            type: "String"
+            description: "CloudFormation WaitCondition URL for signaling completion"
+            default: ""
+          StackName:
+            type: "String"
+            description: "CloudFormation Stack Name"
+            default: ""
+          Region:
+            type: "String"
+            description: "AWS Region"
+            default: ""
+          ResourceName:
+            type: "String"
+            description: "CloudFormation Resource Name for signaling"
+            default: ""
+        runtimeConfig:
+          "aws:runShellScript":
+            properties:
+            - id: "0.aws:runShellScript"
+              runCommand:
+              - |
+                #!/bin/bash
+                set -eux
+                
+                # Get parameters
+                MESSAGE="{{Message}}"
+                WAIT_HANDLE_URL="{{WaitHandleUrl}}"
+                STACK_NAME="{{StackName}}"
+                REGION="{{Region}}"
+                RESOURCE_NAME="{{ResourceName}}"
+                
+                # Function to signal CloudFormation
+                signal_cloudformation() {
+                  local exit_code=$1
+                  local message="$2"
+                  
+                  if [[ -n "$WAIT_HANDLE_URL" ]]; then
+                    echo "Signaling CloudFormation via WaitCondition URL..."
+                    curl -X PUT -H 'Content-Type:' \
+                      --data-binary "{\"Status\": \"$([ $exit_code -eq 0 ] && echo SUCCESS || echo FAILURE)\", \"Reason\": \"$message\", \"UniqueId\": \"$(date +%s)\", \"Data\": \"Apache installation completed\"}" \
+                      "$WAIT_HANDLE_URL" || echo "Failed to signal via WaitCondition URL"
+                  elif [[ -n "$STACK_NAME" && -n "$REGION" && -n "$RESOURCE_NAME" ]]; then
+                    echo "Signaling CloudFormation via cfn-signal..."
+                    /opt/aws/bin/cfn-signal -e $exit_code --stack "$STACK_NAME" --resource "$RESOURCE_NAME" --region "$REGION" || echo "Failed to signal via cfn-signal"
+                  else
+                    echo "No CloudFormation signaling configured"
+                  fi
+                }
+                
+                # Trap to ensure we signal on exit
+                trap 'signal_cloudformation $? "Apache installation script completed with exit code $?"' EXIT
+                
+                # Function to determine OS and install Apache Httpd
+                install_apache() {
+                  if command -v yum &>/dev/null; then
+                    echo "Installing Apache Httpd using yum..."
+                    yum update -y
+                    yum install -y httpd
+                    SERVICE_NAME="httpd"
+                  elif command -v apt-get &>/dev/null; then
+                    echo "Installing Apache Httpd using apt-get..."
+                    apt update -y
+                    apt install -y apache2
+                    SERVICE_NAME="apache2"
+                  else
+                    echo "Unsupported OS: Cannot determine package manager."
+                    exit 1
+                  fi
+                }
+                
+                # Check OS and install
+                if [[ -f /etc/os-release ]]; then
+                  source /etc/os-release
+                  if [[ "$ID" == "amzn" ]]; then
+                    echo "Detected Amazon Linux"
+                    install_apache
+                  elif [[ "$ID" == "ubuntu" ]]; then
+                    echo "Detected Ubuntu"
+                    install_apache
+                  elif [[ "$ID" == "centos" || "$ID" == "rhel" ]]; then
+                    echo "Detected CentOS/RHEL"
+                    install_apache
+                  elif [[ "$ID" == "debian" ]]; then
+                    echo "Detected Debian"
+                    install_apache
+                  else
+                    echo "Warning: OS '$ID' is not explicitly supported, attempting install."
+                    install_apache
+                  fi
+                else
+                  echo "Cannot determine OS from /etc/os-release, attempting install."
+                  install_apache
+                fi
+                
+                # Start and enable the service
+                echo "Starting and enabling $SERVICE_NAME service..."
+                if command -v systemctl &>/dev/null; then
+                  systemctl start $SERVICE_NAME
+                  systemctl enable $SERVICE_NAME
+                  systemctl status $SERVICE_NAME
+                else
+                  echo "Warning: systemctl not found. Please start and enable $SERVICE_NAME service manually."
+                fi
+                
+                # Create document root directory if it doesn't exist
+                if [[ "$SERVICE_NAME" == "httpd" ]]; then
+                  DOC_ROOT="/var/www/html"
+                else
+                  DOC_ROOT="/var/www/html"
+                fi
+                
+                mkdir -p $DOC_ROOT
+                
+                # Create a default index.html with the message parameter
+                echo "Creating a default index.html..."
+                cat > $DOC_ROOT/index.html << EOF
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Apache Test Page</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
+                        h1 { color: #333; }
+                        p { color: #666; }
+                    </style>
+                </head>
+                <body>
+                    <h1>$MESSAGE from $(hostname -f)</h1>
+                    <p>Apache HTTP Server is running successfully!</p>
+                    <p>Server: $(hostname -f)</p>
+                    <p>Date: $(date)</p>
+                </body>
+                </html>
+                EOF
+                
+                # Set proper permissions
+                chown -R www-data:www-data $DOC_ROOT 2>/dev/null || chown -R apache:apache $DOC_ROOT 2>/dev/null || true
+                chmod -R 755 $DOC_ROOT
+                
+                # Test the installation
+                echo "Testing Apache installation..."
+                if command -v curl &>/dev/null; then
+                  sleep 5
+                  curl -s localhost || echo "Warning: Could not test Apache via curl"
+                fi
+                
+                echo "Apache Httpd installation completed successfully!"
+                
+                # Manual signal if trap doesn't work
+                signal_cloudformation 0 "Apache installation completed successfully"
+                
       DocumentFormat: YAML
       DocumentType: Command
-      Name: ApacheHttpdSSMDocument
+      Name: !Sub "${ProjectName}-${EnvironmentName}-ApacheHttpd-SSMDocument"
       Tags:
       - Key: EnvironmentName
         Value: !Ref EnvironmentName
@@ -124,3 +215,16 @@ Resources:
         Value: !Ref ProjectName
       TargetType: "/AWS::EC2::Instance"
       UpdateMethod: Replace
+
+Outputs:
+  SSMDocumentName:
+    Description: "Name of the created SSM Document"
+    Value: !Ref ApacheHttpdSSMDocument
+    Export:
+      Name: !Sub "${ProjectName}-${EnvironmentName}-ApacheHttpd-SSMDocument-Name"
+  
+  SSMDocumentArn:
+    Description: "ARN of the created SSM Document"
+    Value: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:document/${ApacheHttpdSSMDocument}"
+    Export:
+      Name: !Sub "${ProjectName}-${EnvironmentName}-ApacheHttpd-SSMDocument-Arn"

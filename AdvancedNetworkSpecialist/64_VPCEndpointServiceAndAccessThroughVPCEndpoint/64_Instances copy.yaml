@@ -1,0 +1,351 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: This template generate AMI from Instance and create application Instance from the AMI
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "64_VPCEndpointServiceAndAccessThroughVPCEndpoint"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: ["dev", "test", "staging", "prod"]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String    
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+  # Stack parameters
+  KeyName:
+    Default: "dso-paris"
+    Description: "Instances Key name"
+    Type: String
+
+  # Bastion parameters
+  BastionInstanceImageId:
+    Default: ami-08461dc8cd9e834e0
+    Description: "Bastion Instance AMI"
+    Type: AWS::EC2::Image::Id
+  BastionInstanceName:
+    Default: "Bastion"
+    Description: "Bastion Instances name"
+    Type: String
+  BastionInstanceType:
+    Default: t2.micro
+    Description: "Bastion Instances type"
+    Type: String
+  BastionInstanceSecurityGroup:
+    Description: "Bastion Security Group"
+    Type: String
+  BastionInstanceSubnetId:
+    Description: "Bastion Subnet ID"
+    Type: String
+
+  # Consumer parameters
+  ConsumerImageId:
+    Default: ami-08461dc8cd9e834e0
+    Description: "Consumer Instance AMI"
+    Type: AWS::EC2::Image::Id
+  ConsumerInstanceName:
+    Default: "Consumer"
+    Description: "Consumer Instances name"
+    Type: String
+  ConsumerInstanceType:
+    Default: t2.micro
+    Description: "Consumer Instances type"
+    Type: String
+  ConsumerSecurityGroup:
+    Description: "Consumer Security Group"
+    Type: String
+  ConsumerSubnetIds:
+    Description: "Consumer Subnet IDs"
+    Type: CommaDelimitedList
+
+  # WebServer parameters
+  WebServerInstanceImageId:
+    Default: ""
+    Description: "Web Server AMI"
+    Type: String
+  WebServerInstanceName:
+    Default: "WebServer"
+    Description: "WebServer Instances name"
+    Type: String
+  WebServerInstanceType:
+    Default: t2.micro
+    Description: "WebServer Instances type"
+    Type: String
+  WebServerInstanceSecurityGroup:
+    Description: "WebServer Security Group"
+    Type: String
+  WebServerInstanceSubnetIds:
+    Description: "WebServer Subnet IDs"
+    Type: CommaDelimitedList
+
+Conditions:
+  noWebServerInstanceImageId: !Equals [ !Ref WebServerInstanceImageId, ""]
+  hasWebServerInstanceImageId: !Not [ !Equals [ !Ref WebServerInstanceImageId, "" ] ]
+
+Resources:
+  # Create Instance in Public Subnet to get WebServer package for the Application Instance
+  CreateInstanceForAmi:
+    Type: AWS::CloudFormation::Stack
+    Condition: noWebServerInstanceImageId
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/EC2/Instance.yaml"
+      TimeoutInMinutes: 10
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: "false"
+        AvailabilityZone: !Select [0, !GetAZs ]
+        UserData: !Base64 
+          |
+            #!/bin/bash
+            # Use this for your user data (script from top to bottom)
+            # install httpd (Linux 2 version)
+            yum update -y
+            yum install -y httpd
+            systemctl start httpd
+            systemctl enable httpd
+            echo "<h1>Hello World from $(hostname -f)</h1>" > /var/www/html/index.html
+        ImageId: !Ref BastionInstanceImageId
+        InstanceName: "Default"
+        InstanceType: !Ref WebServerInstanceType
+        KeyName: !Ref KeyName
+        SecurityGroupIds: !Ref WebServerInstanceSecurityGroup
+        SubnetId: !Ref BastionInstanceSubnetId
+
+  WaitHandle:
+    Type: AWS::CloudFormation::WaitConditionHandle
+    Condition: noWebServerInstanceImageId
+
+  # Create AMI from the previous Instance
+  CreateAmi:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: noWebServerInstanceImageId
+    DeletionPolicy: Retain
+    DependsOn: CreateInstanceForAmi  # Explicit dependency on instance creation
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:CreateAmiFromInstanceId"]]
+      InstanceId: !GetAtt CreateInstanceForAmi.Outputs.InstanceId
+      Name: !Sub "${WebServerInstanceName}-AMI"
+      WaitHandleUrl: !Ref WaitHandle  # Pass the WaitHandle URL to Lambda
+
+  WaitCondition:
+    Type: AWS::CloudFormation::WaitCondition
+    Condition: noWebServerInstanceImageId
+    DependsOn: CreateAmi
+    Properties:
+      Count: 1
+      Handle: !Ref WaitHandle
+      Timeout: 1200
+
+  BastionInstance:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/EC2/Instance.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        AvailabilityZone: !Select [0, !GetAZs ]
+        ElasticIP: "true"
+        ImageId: !Ref BastionInstanceImageId
+        InstanceName: !Ref BastionInstanceName
+        InstanceType: !Ref BastionInstanceType
+        KeyName: !Ref KeyName
+        SecurityGroupIds: !Ref BastionInstanceSecurityGroup
+        SubnetId: !Ref BastionInstanceSubnetId
+
+  ConsumerInstance:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/EC2/Instance.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        AvailabilityZone: !Select [0, !GetAZs ]
+        ImageId: !Ref ConsumerImageId
+        InstanceName: !Ref ConsumerInstanceName
+        InstanceType: !Ref ConsumerInstanceType
+        KeyName: !Ref KeyName
+        SecurityGroupIds: !Ref ConsumerSecurityGroup
+        SubnetId: !Select [ 1, !Ref ConsumerSubnetIds ]
+
+  # Application Instance 1 - when AMI needs to be created
+  ApplicationInstance1WithAMI:
+    Type: AWS::CloudFormation::Stack
+    Condition: noWebServerInstanceImageId
+    DeletionPolicy: Delete
+    DependsOn: WaitCondition
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/EC2/Instance.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        AvailabilityZone: !Select [0, !GetAZs ]
+        ImageId: !GetAtt CreateAmi.ImageId
+        InstanceName: !Sub "${WebServerInstanceName}-1"
+        InstanceType: !Ref WebServerInstanceType
+        KeyName: !Ref KeyName
+        SecurityGroupIds: !Ref WebServerInstanceSecurityGroup
+        SubnetId: !Select [1, !Ref WebServerInstanceSubnetIds]
+
+  # Application Instance 1 - when AMI already exists
+  ApplicationInstance1WithoutAMI:
+    Type: AWS::CloudFormation::Stack
+    Condition: hasWebServerInstanceImageId
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/EC2/Instance.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        AvailabilityZone: !Select [0, !GetAZs ]
+        ImageId: !Ref WebServerInstanceImageId
+        InstanceName: !Sub "${WebServerInstanceName}-1"
+        InstanceType: !Ref WebServerInstanceType
+        KeyName: !Ref KeyName
+        SecurityGroupIds: !Ref WebServerInstanceSecurityGroup
+        SubnetId: !Select [1, !Ref WebServerInstanceSubnetIds]
+
+  # Application Instance 2 - when AMI needs to be created
+  ApplicationInstance2WithAMI:
+    Type: AWS::CloudFormation::Stack
+    Condition: noWebServerInstanceImageId
+    DeletionPolicy: Delete
+    DependsOn: WaitCondition
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/EC2/Instance.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        AvailabilityZone: !Select [1, !GetAZs ]
+        ImageId: !GetAtt CreateAmi.ImageId
+        InstanceName: !Sub "${WebServerInstanceName}-2"
+        InstanceType: !Ref WebServerInstanceType
+        KeyName: !Ref KeyName
+        SecurityGroupIds: !Ref WebServerInstanceSecurityGroup
+        SubnetId: !Select [ 3, !Ref WebServerInstanceSubnetIds]
+
+  # Application Instance 2 - when AMI already exists
+  ApplicationInstance2WithoutAMI:
+    Type: AWS::CloudFormation::Stack
+    Condition: hasWebServerInstanceImageId
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/EC2/Instance.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        AvailabilityZone: !Select [1, !GetAZs ]
+        ImageId: !Ref WebServerInstanceImageId
+        InstanceName: !Sub "${WebServerInstanceName}-2"
+        InstanceType: !Ref WebServerInstanceType
+        KeyName: !Ref KeyName
+        SecurityGroupIds: !Ref WebServerInstanceSecurityGroup
+        SubnetId: !Select [ 3, !Ref WebServerInstanceSubnetIds]
+
+Outputs:
+  BastionInstancesId:
+    Description: "Id of the Bastion Instance"
+    Value: !GetAtt BastionInstance.Outputs.InstanceId
+  BastionPrivateIP:
+    Description: "Private IP of the Bastion Instance"
+    Value: !GetAtt BastionInstance.Outputs.InstancePrivateIP
+  BastionPublicIP:
+    Description: "Public IP of the Bastion Instance"
+    Value: !GetAtt BastionInstance.Outputs.InstancePublicIP
+
+  ConsumerInstancesId:
+    Description: "Id of the Consumer Instance"
+    Value: !GetAtt ConsumerInstance.Outputs.InstanceId
+  ConsumerPrivateIP:
+    Description: "Private IP of the Consumer Instance"
+    Value: !GetAtt ConsumerInstance.Outputs.InstancePrivateIP
+
+  ApplicationInstanceIds:
+    Description: "Application Instances IDs"
+    Value: !If
+      - noWebServerInstanceImageId
+      - !Join
+        - ","
+        - - !GetAtt ApplicationInstance1WithAMI.Outputs.InstanceId
+          - !GetAtt ApplicationInstance2WithAMI.Outputs.InstanceId
+      - !Join
+        - ","
+        - - !GetAtt ApplicationInstance1WithoutAMI.Outputs.InstanceId
+          - !GetAtt ApplicationInstance2WithoutAMI.Outputs.InstanceId
+          
+  ApplicationInstancePrivateIPs:
+    Description: "Application Instance IPs"
+    Value: !If
+      - noWebServerInstanceImageId
+      - !Join
+        - ","
+        - - !GetAtt ApplicationInstance1WithAMI.Outputs.InstancePrivateIP
+          - !GetAtt ApplicationInstance2WithAMI.Outputs.InstancePrivateIP
+      - !Join
+        - ","
+        - - !GetAtt ApplicationInstance1WithoutAMI.Outputs.InstancePrivateIP
+          - !GetAtt ApplicationInstance2WithoutAMI.Outputs.InstancePrivateIP

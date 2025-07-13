@@ -117,10 +117,10 @@ Outputs:
 
   SubnetPublicRouteId:
     Description: "Public Subnet Route IDs"
-    Value: !GetAtt SubnetPublicRouteStack.Outputs.GatewayRouteId
-  SubnetPublicRouteTableId:
-    Description: "Public Subnet Route Table ID"
-    Value: !GetAtt SubnetPublicRouteTableStack.Outputs.RouteTableId
+    Value: !GetAtt SubnetPublicRouteStack.Outputs.RouteId
   SubnetPublicRouteTableAssociationId:
     Description: "Public Route Table Association ID"
     Value: !GetAtt SubnetPublicRouteTableStack.Outputs.SubnetRouteTableAssociationId
+  SubnetPublicRouteTableId:
+    Description: "Public Subnet Route Table ID"
+    Value: !GetAtt SubnetPublicRouteTableStack.Outputs.RouteTableId

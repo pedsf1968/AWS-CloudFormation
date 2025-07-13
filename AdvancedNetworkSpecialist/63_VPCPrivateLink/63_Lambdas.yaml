@@ -9,7 +9,7 @@ Parameters:
     Description: CloudFormation buket URL
     Type: String
   BucketKey:
-    Default: "63_VPCPrivateLink"
+    Default: "64_VPCEndpointServiceAndAccessThroughVPCEndpoint"
     Description: Key to find object in the bucket
     Type: String
   BucketObject:
@@ -92,6 +92,16 @@ Resources:
       TimeoutInMinutes: 5
 
 Outputs:
+  CreateAmiFromInstanceIdLambdaFunctionArn:
+    Description: "ARN of CreateAmiFromInstanceId Lambda"
+    Value: !GetAtt CreateAmiFromInstanceIdStack.Outputs.LambdaFunctionArn
+  CreateAmiFromInstanceIdRoleArn:
+    Description: "CreateAmiFromInstanceId Lambda Role Arn"
+    Value: !GetAtt CreateAmiFromInstanceIdStack.Outputs.RoleArn
+  CreateAmiFromInstanceIdLogGroupId:
+    Description: CreateAmiFromInstanceId Lambda Log Group Id
+    Value: !GetAtt CreateAmiFromInstanceIdStack.Outputs.LogGroupId
+    
   EC2ResourceToS3LambdaFunctionArn:
     Description: "EC2ResourceToS3 Lambda Arn"
     Value: !GetAtt EC2ResourceToS3Stack.Outputs.LambdaFunctionArn
@@ -111,13 +121,3 @@ Outputs:
   UpdateParametersFromS3LogGroupId:
     Description: UpdateParametersFromS3 Lambda Log Group Id
     Value: !GetAtt UpdateParametersFromS3Stack.Outputs.LogGroupId
-
-  CreateAmiFromInstanceIdLambdaFunctionArn:
-    Description: "ARN of CreateAmiFromInstanceId Lambda"
-    Value: !GetAtt CreateAmiFromInstanceIdStack.Outputs.LambdaFunctionArn
-  CreateAmiFromInstanceIdRoleArn:
-    Description: "CreateAmiFromInstanceId Lambda Role Arn"
-    Value: !GetAtt CreateAmiFromInstanceIdStack.Outputs.RoleArn
-  CreateAmiFromInstanceIdLogGroupId:
-    Description: CreateAmiFromInstanceId Lambda Log Group Id
-    Value: !GetAtt CreateAmiFromInstanceIdStack.Outputs.LogGroupId

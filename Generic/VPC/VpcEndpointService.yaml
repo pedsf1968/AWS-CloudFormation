@@ -35,7 +35,7 @@ Parameters:
   # Stack parameters
   AcceptanceRequired:
     AllowedValues: [ "true", "false" ]
-    Default: "false"
+    Default: "true"
     Description: "Indicates whether requests from service consumers to create an endpoint to your service must be accepted."
     Type: String
   GatewayLoadBalancerArn:
@@ -118,3 +118,11 @@ Outputs:
       - isNetworkType
       - !Ref NLBEndpointService
       - !Ref GLBEndpointService
+
+  VPCEndpointServiceName:
+    Description: "Returns the name of the VPC endpoint service."
+    Value: !If
+      - isNetworkType
+      - !Join [".", ["com.amazonaws.vpce", !Ref "AWS::Region" , !Ref NLBEndpointService]]
+      - !Join [".", ["com.amazonaws.vpce", !Ref "AWS::Region" , !Ref GLBEndpointService]]
+

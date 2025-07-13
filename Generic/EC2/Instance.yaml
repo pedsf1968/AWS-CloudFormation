@@ -32,6 +32,17 @@ Parameters:
     Type: String
 
   # Stack parameters
+  AssociatePublicIpAddress:
+    AllowedValues:
+      - "false"
+      - "true"
+    Default: "false"
+    Description: >-
+      Indicates whether to assign a public IPv4 address to an instance. Applies
+      only if creating a network interface when launching an instance. The
+      network interface must be the primary network interface. If launching
+      into a default subnet, the default value is true.
+    Type: String
   AvailabilityZone: # Required: No
     Description: >-
       The Availability Zone of the instance. If not specified, an Availability
@@ -133,9 +144,14 @@ Resources:
       InstanceType: !Ref InstanceType
       IamInstanceProfile: !Ref IamInstanceProfile
       KeyName: !Ref KeyName
-      SecurityGroupIds: 
-        - !Select [0, !Ref SecurityGroupIds]
-      SubnetId: !Ref SubnetId
+      # Network interfaces with security groups specified within
+      NetworkInterfaces:
+        - DeviceIndex: 0
+          SubnetId: !Ref SubnetId
+          AssociatePublicIpAddress: !Ref AssociatePublicIpAddress
+          DeleteOnTermination: true
+          GroupSet: !Ref SecurityGroupIds
+      # Remove the separate SecurityGroupIds property
       SourceDestCheck: !Ref SourceDestCheck
       Tags:
         - Key: EnvironmentName

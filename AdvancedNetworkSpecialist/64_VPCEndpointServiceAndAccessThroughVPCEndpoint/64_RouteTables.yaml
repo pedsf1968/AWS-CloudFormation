@@ -1,0 +1,193 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create Tables and Route Tables
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "64_VPCEndpointServiceAndAccessThroughVPCEndpoint"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: ["dev", "test", "staging", "prod"]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String    
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+  # Stack parameters
+  InternetGatewayId:
+    Description: "Internet Gateway ID"
+    Type: String
+  RouteTableNames:
+    Description: "Names of all Route Tables"
+    Type: CommaDelimitedList
+  VpcASubnetPrivateIds:
+    Description: "VPC A Private Subnets IDs"
+    Type: CommaDelimitedList
+  VpcBSubnetPrivateIds:
+    Description: "VPC B Private Subnets IDs"
+    Type: CommaDelimitedList
+  SubnetPublicId:
+    Description: "Public Subnets ID"
+    Type: String
+  VpcIds:
+    Description: "VPC IDs"
+    Type: CommaDelimitedList
+
+Resources:
+  # VPC A Route Tables, Routes and associations
+  VpcARouteTableStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/RouteTable.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        VpcId: !Select [ 0, !Ref VpcIds ]
+        RouteTableName: !Select [ 0, !Ref RouteTableNames]
+        SubnetId: !Ref SubnetPublicId
+
+  VpcASubnetPrivateARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !GetAtt VpcARouteTableStack.Outputs.RouteTableId
+      SubnetId: !Select [0, !Ref VpcASubnetPrivateIds]
+
+  VpcASubnetPrivateBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !GetAtt VpcARouteTableStack.Outputs.RouteTableId
+      SubnetId: !Select [1, !Ref VpcASubnetPrivateIds]
+
+  VpcASubnetPrivateCRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !GetAtt VpcARouteTableStack.Outputs.RouteTableId
+      SubnetId: !Select [2, !Ref VpcASubnetPrivateIds]
+
+  VpcASubnetPrivateDRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !GetAtt VpcARouteTableStack.Outputs.RouteTableId
+      SubnetId: !Select [3, !Ref VpcASubnetPrivateIds]
+
+  VpcARouteStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/Route.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        DestinationCidrBlock: "0.0.0.0/0"
+        RouteTableId: !GetAtt VpcARouteTableStack.Outputs.RouteTableId
+        RouteTableName: !Select [0, !Ref RouteTableNames]
+        TargetType: "InternetGateway"
+        TargetId: !Ref InternetGatewayId
+
+  # VPC B Route Tables, Routes and associations
+  VpcBRouteTableStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/RouteTable.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        RouteTableName: !Select [ 1, !Ref RouteTableNames ]
+        SubnetId: !Select [ 0, !Ref VpcBSubnetPrivateIds ]
+        VpcId: !Select [ 1, !Ref VpcIds ]
+       
+  VpcBSubnetPrivateBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !GetAtt VpcBRouteTableStack.Outputs.RouteTableId
+      SubnetId: !Select [1, !Ref VpcBSubnetPrivateIds]
+    
+  VpcBSubnetPrivateCRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !GetAtt VpcBRouteTableStack.Outputs.RouteTableId
+      SubnetId: !Select [2, !Ref VpcBSubnetPrivateIds]
+    
+  VpcBSubnetPrivateDRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !GetAtt VpcBRouteTableStack.Outputs.RouteTableId
+      SubnetId: !Select [3, !Ref VpcBSubnetPrivateIds]
+
+Outputs:
+  VpcARouteTableAssociationIds:
+    Description: "VPC A Private Subnet Route Table Association IDs"
+    Value: !Join
+      - ","
+      - - !GetAtt VpcARouteTableStack.Outputs.SubnetRouteTableAssociationId
+        - !Ref VpcASubnetPrivateARouteTableAssociation
+        - !Ref VpcASubnetPrivateBRouteTableAssociation
+        - !Ref VpcASubnetPrivateCRouteTableAssociation
+        - !Ref VpcASubnetPrivateDRouteTableAssociation
+
+  VpcARouteTableId:
+    Description: "VPC A Route Table ID"
+    Value: !GetAtt VpcARouteTableStack.Outputs.RouteTableId
+
+  VpcARouteIds:
+    Description: "Public Subnet Route IDs"
+    Value: !Ref VpcARouteStack
+
+  VpcASubnetPublicRouteTableAssociationIds:
+    Description: "Public Route Table Association IDs"
+    Value: !GetAtt VpcARouteTableStack.Outputs.SubnetRouteTableAssociationId
+
+  VpcASubnetPublicRouteTableIds:
+    Description: "Public Subnet Route Table IDs"
+    Value: !GetAtt VpcARouteTableStack.Outputs.RouteTableId
+
+  VpcBRouteTableAssociationIds:
+    Description: "VPC B Private Subnet Route Table Association IDs"
+    Value: !Join
+      - ","
+      - - !Ref VpcBSubnetPrivateBRouteTableAssociation
+        - !Ref VpcBSubnetPrivateCRouteTableAssociation
+        - !Ref VpcBSubnetPrivateDRouteTableAssociation
+
+  VpcBRouteTableId:
+    Description: "VPC B Route Table ID"
+    Value: !GetAtt VpcBRouteTableStack.Outputs.RouteTableId

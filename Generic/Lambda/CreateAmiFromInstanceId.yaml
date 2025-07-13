@@ -121,6 +121,7 @@ Resources:
               - 'ec2:DeregisterImage'
               - 'ec2:DescribeSnapshots'
               - 'ec2:DeleteSnapshot'
+              - 'ec2:ModifySnapshotAttribute'
             Resource: ['*']
       RoleName: !Sub "${FunctionName}Role"
       Tags:
@@ -151,44 +152,174 @@ Resources:
           import boto3
           import cfnresponse
           import json
+          import logging
+          import urllib3
+          import urllib.parse
+          import time
+
+          # Set up logging
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
 
           ec2_client = boto3.client("ec2")
+          http = urllib3.PoolManager()
 
           def lambda_handler(event, context):
-            response_data  = {}
-            print("event:", event)
-            instanceId =  event["ResourceProperties"]["InstanceId"]
-            amiName =  event["ResourceProperties"]["Name"]
-            waitHandleUrl = event['WaitHandleUrl']
+              logger.info(f"Event: {json.dumps(event)}")
+              response_data = {}
+              
+              try:
+                  instanceId = event["ResourceProperties"]["InstanceId"]
+                  amiName = event["ResourceProperties"]["Name"]
+                  wait_handle_url = event["ResourceProperties"].get("WaitHandleUrl")
+                  
+                  logger.info(f"Creating AMI '{amiName}' from instance '{instanceId}'")
+                  
+                  # Search for existing AMIs with the same name
+                  filters = [
+                      {
+                          'Name': 'name',
+                          'Values': [amiName]
+                      }
+                  ]
+                  
+                  # Get existing images
+                  response = ec2_client.describe_images(Owners=['self'], Filters=filters)
+                  
+                  # Clean up existing AMIs with the same name
+                  for image in response['Images']:
+                      logger.info(f"Found existing AMI - ID: {image['ImageId']}, Name: {image['Name']}")
+                      
+                      # Get snapshots associated with this AMI before deregistering
+                      snapshots = []
+                      if 'BlockDeviceMappings' in image:
+                          for block_device in image['BlockDeviceMappings']:
+                              if 'Ebs' in block_device and 'SnapshotId' in block_device['Ebs']:
+                                  snapshots.append(block_device['Ebs']['SnapshotId'])
+                      
+                      # Deregister the AMI
+                      ec2_client.deregister_image(ImageId=image['ImageId'])
+                      logger.info(f"Deregistered AMI: {image['ImageId']}")
+                      
+                      # Delete associated snapshots
+                      for snapshot_id in snapshots:
+                          try:
+                              ec2_client.delete_snapshot(SnapshotId=snapshot_id)
+                              logger.info(f"Deleted snapshot: {snapshot_id}")
+                          except Exception as snap_err:
+                              logger.warning(f"Failed to delete snapshot {snapshot_id}: {str(snap_err)}")
+                  
+                  # Create new AMI
+                  logger.info(f"Creating new AMI from instance {instanceId}")
+                  create_response = ec2_client.create_image(
+                      InstanceId=instanceId,
+                      Name=amiName,
+                      NoReboot=True,
+                      Description=f"AMI created from instance {instanceId}"
+                  )
+                  
+                  image_id = create_response["ImageId"]
+                  logger.info(f"AMI creation initiated: {image_id}")
+                  
+                  # CRITICAL: Wait for AMI to be available
+                  logger.info(f"Waiting for AMI {image_id} to become available...")
+                  wait_for_ami_available(image_id)
+                  logger.info(f"AMI {image_id} is now available!")
+                  
+                  response_data["ImageId"] = image_id
+                  response_data["Message"] = f"Successfully created and verified AMI {image_id}"
+                  
+                  # Send signal to WaitCondition if URL provided
+                  if wait_handle_url:
+                      send_wait_signal(wait_handle_url, "SUCCESS", f"AMI {image_id} is available")
+                  
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data, f"AMI-{image_id}")
+                  
+              except KeyError as ke:
+                  error_msg = f"Missing required parameter: {str(ke)}"
+                  logger.error(error_msg)
+                  response_data["Error"] = error_msg
+                  
+                  # Send failure signal to WaitCondition if URL provided
+                  wait_handle_url = event["ResourceProperties"].get("WaitHandleUrl")
+                  if wait_handle_url:
+                      send_wait_signal(wait_handle_url, "FAILURE", error_msg)
+                  
+                  cfnresponse.send(event, context, cfnresponse.FAILED, response_data, "CustomResourcePhysicalID")
+                  
+              except Exception as err:
+                  error_msg = f"Unexpected error: {str(err)}"
+                  logger.error(error_msg)
+                  response_data["Error"] = error_msg
+                  
+                  # Send failure signal to WaitCondition if URL provided
+                  wait_handle_url = event["ResourceProperties"].get("WaitHandleUrl")
+                  if wait_handle_url:
+                      send_wait_signal(wait_handle_url, "FAILURE", error_msg)
+                  
+                  cfnresponse.send(event, context, cfnresponse.FAILED, response_data, "CustomResourcePhysicalID")
 
-            # Search AMI with the same name
-            filters = [
-                {
-                    'Name': 'name',
-                    'Values': [amiName]
-                }
-            ]
+          def wait_for_ami_available(image_id, max_wait_time=900):  # 15 minutes max
+              """
+              Wait for AMI to reach 'available' state
+              """
+              start_time = time.time()
+              
+              while True:
+                  try:
+                      # Check current time to avoid Lambda timeout
+                      elapsed_time = time.time() - start_time
+                      if elapsed_time > max_wait_time:
+                          raise Exception(f"Timeout waiting for AMI {image_id} to become available after {max_wait_time} seconds")
+                      
+                      # Check AMI status
+                      response = ec2_client.describe_images(ImageIds=[image_id])
+                      
+                      if not response['Images']:
+                          raise Exception(f"AMI {image_id} not found")
+                      
+                      ami_state = response['Images'][0]['State']
+                      logger.info(f"AMI {image_id} state: {ami_state}")
+                      
+                      if ami_state == 'available':
+                          logger.info(f"AMI {image_id} is available!")
+                          return True
+                      elif ami_state == 'failed':
+                          raise Exception(f"AMI {image_id} creation failed")
+                      elif ami_state in ['pending', 'transient']:
+                          logger.info(f"AMI {image_id} still in {ami_state} state, waiting...")
+                          time.sleep(30)  # Wait 30 seconds before next check
+                      else:
+                          raise Exception(f"AMI {image_id} in unexpected state: {ami_state}")
+                          
+                  except Exception as e:
+                      if "Timeout waiting" in str(e) or "creation failed" in str(e) or "unexpected state" in str(e):
+                          raise e
+                      else:
+                          logger.warning(f"Error checking AMI status: {str(e)}, retrying...")
+                          time.sleep(30)
 
-            # Call EC2 to describe images with the filter applied
-            response = ec2_client.describe_images(Owners=['self'], Filters=filters)
-
-            for image in response['Images']:
-              print(f"Image ID: {image['ImageId']}, Name: {image['Name']}")
-              # Deregister Ami and delete snapshot
-              ec2_client.deregister_image(ImageId=image['ImageId'])
-
-            try:
-              # Create AMI
-              response = ec2_client.create_image(
-                InstanceId=instanceId,
-                Name=amiName, 
-                NoReboot=True)
-              response_data["ImageId"] = response["ImageId"]
-              cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data, "CustomResourcePhysicalID")
-            except Exception as err:
-              print("ERROR: ", err)
-              response_data["Data"] = str(err)
-              cfnresponse.send(event, context, cfnresponse.FAILED, response_data, "CustomResourcePhysicalID")
+          def send_wait_signal(wait_handle_url, status, reason):
+              """Send signal to CloudFormation WaitCondition"""
+              try:
+                  signal_data = {
+                      "Status": status,
+                      "Reason": reason,
+                      "UniqueId": "AMICreation",
+                      "Data": reason
+                  }
+                  
+                  response = http.request(
+                      'PUT',
+                      wait_handle_url,
+                      body=json.dumps(signal_data),
+                      headers={'Content-Type': 'application/json'}
+                  )
+                  
+                  logger.info(f"Wait signal sent. Status: {response.status}")
+                  
+              except Exception as e:
+                  logger.error(f"Failed to send wait signal: {str(e)}")
       Description: Function to create AMI from created instance
       FunctionName: !Ref FunctionName
       Handler: index.lambda_handler
@@ -197,12 +328,13 @@ Resources:
         LogFormat: !Ref LogFormat
         LogGroup: !Sub "/aws/lambda/${FunctionName}"
         SystemLogLevel: !Ref SystemLogLevel
-      MemorySize: 128      
+      MemorySize: 128
       Role: !If 
       - CreateRole
       - !GetAtt LambdaFunctionRole.Arn
       - !Join [ ":", [ "arn:aws:iam:", !Ref "AWS::AccountId", !Sub "role/${FunctionName}Role" ] ]
       Runtime: python3.12
+      Timeout: 900  # Increased to 15 minutes to allow AMI creation time
     UpdateReplacePolicy: Delete
 
   LambdaFunctionRoleToS3:

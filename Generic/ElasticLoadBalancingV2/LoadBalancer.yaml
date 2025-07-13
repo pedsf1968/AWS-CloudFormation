@@ -125,9 +125,9 @@ Resources:
           Value: !Ref LoadBalancingCrossZoneEnabled
       Name: !Sub "${ProjectName}-${EnvironmentName}-${Name}-NLB"
       Scheme: !Ref Scheme
-      SecurityGroups:
+      SecurityGroups: 
         - !Select [ 0, !Ref SecurityGroups ]
-      Subnets:
+      Subnets: 
         - !Select [ 0, !Ref Subnets ]
       Tags:
         - Key: EnvironmentName
@@ -138,7 +138,7 @@ Resources:
           Value: "CloudFormation"
         - Key: ProjectName
           Value: !Ref ProjectName
-      Type: network
+      Type: !Ref Type
 
   NetworkLoadBalancerToS3:
     Type: AWS::CloudFormation::CustomResource
