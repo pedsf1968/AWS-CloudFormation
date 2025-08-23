@@ -1,0 +1,269 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template for creating Delay
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "Datas"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: ["dev", "test", "staging", "prod"]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String    
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+  # Stack parameters
+  ApplicationLogLevel:
+    AllowedValues: [ TRACE, DEBUG, INFO, WARN, ERROR, FATAL ]
+    Default: ERROR
+    Description: |
+      Set this property to filter the application logs for your function that Lambda sends to CloudWatch. 
+      Lambda only sends application logs at the selected level of detail and lower, 
+      where TRACE is the highest level and FATAL is the lowest.
+    Type: String
+  CreateRole:
+    AllowedValues: [ "false", "true" ]
+    Default: "true"
+    Description: "Save resources information in s3 file"
+    Type: String
+  FunctionName:
+    Default: CreateDelay
+    Type: String
+  LogFormat:
+    AllowedValues: [ Text, JSON ]
+    Default: JSON
+    Description: |
+      The format in which Lambda sends your function's application and system logs to CloudWatch.
+      Select between plain text and structured JSON.
+    Type: String
+  LogGroupClass:
+    AllowedValues: [ STANDARD, INFREQUENT_ACCESS ]
+    Default: STANDARD
+    Description: Specifies the log group class for this log group. 
+    Type: String
+  RetentionInDays:
+    AllowedValues: [ 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557, 2922, 3288, 3653 ]
+    Default: 1
+    Description: |
+      The number of days to retain the log events in the specified log group.
+      Possible values are: 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557, 2922, 3288, and 3653.
+    Type: String
+  SystemLogLevel:
+    AllowedValues: [ DEBUG, INFO, WARN ]
+    Default: WARN
+    Description: |
+      Set this property to filter the system logs for your function that Lambda sends to CloudWatch.
+      Lambda only sends system logs at the selected level of detail and lower,
+      where DEBUG is the highest level and WARN is the lowest.
+    Type: String
+
+Conditions:
+  CreateRole: !Equals [!Ref CreateRole, "true" ]
+  SaveInS3File: !And 
+    - !Equals [!Ref CreateRole, "true" ]
+    - !Equals [ !Ref SaveInS3File, "true"]
+
+Resources:
+  LambdaFunctionRole:
+    Type: AWS::IAM::Role
+    Condition: CreateRole
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaRole
+      Path: "/"
+      RoleName: !Sub "${FunctionName}Role"
+      Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: ManagedBy
+          Value: "CloudFormation"
+        - Key: ProjectName
+          Value: !Ref ProjectName
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${FunctionName}"
+        - Key: StackName
+          Value: !Ref AWS::StackName
+
+  LambdaFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupClass: !Ref LogGroupClass
+      LogGroupName: !Sub "/aws/lambda/${FunctionName}"
+      RetentionInDays: !Ref RetentionInDays
+    UpdateReplacePolicy: Delete
+
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    DeletionPolicy: Delete
+    Properties:
+      Code:
+        ZipFile: |
+          import json
+          import time
+          import boto3
+          import urllib3
+
+          def lambda_handler(event, context):
+              """
+              Lambda function to create a delay in CloudFormation stack execution
+              Useful for waiting for services to be ready (like SSM agent)
+              """
+              
+              print(f"Received event: {json.dumps(event)}")
+              
+              request_type = event.get('RequestType')
+              properties = event.get('ResourceProperties', {})
+              delay_seconds = int(properties.get('DelaySeconds', 30))
+              
+              response_url = event.get('ResponseURL')
+              stack_id = event.get('StackId')
+              request_id = event.get('RequestId')
+              logical_resource_id = event.get('LogicalResourceId')
+              
+              response_status = 'SUCCESS'
+              response_reason = 'Delay completed successfully'
+              
+              try:
+                  if request_type in ['Create', 'Update']:
+                      print(f"Starting delay of {delay_seconds} seconds...")
+                      time.sleep(delay_seconds)
+                      print(f"Delay of {delay_seconds} seconds completed")
+                      response_reason = f'Successfully delayed for {delay_seconds} seconds'
+                  elif request_type == 'Delete':
+                      print("Delete request - no delay needed")
+                      response_reason = 'Delete completed - no delay required'
+                  
+              except Exception as e:
+                  print(f"Error during delay: {str(e)}")
+                  response_status = 'FAILED'
+                  response_reason = f'Delay failed: {str(e)}'
+              
+              # Send response back to CloudFormation
+              response_data = {
+                  'DelaySeconds': delay_seconds,
+                  'Message': response_reason
+              }
+              
+              send_response(
+                  event, 
+                  context, 
+                  response_status, 
+                  response_data, 
+                  logical_resource_id,
+                  reason=response_reason
+              )
+              
+              return {
+                  'statusCode': 200,
+                  'body': json.dumps(response_reason)
+              }
+
+          def send_response(event, context, response_status, response_data, physical_resource_id, reason=None):
+              """Send response to CloudFormation"""
+              
+              response_url = event['ResponseURL']
+              
+              response_body = {
+                  'Status': response_status,
+                  'Reason': reason or f'See CloudWatch Log Stream: {context.log_stream_name}',
+                  'PhysicalResourceId': physical_resource_id,
+                  'StackId': event['StackId'],
+                  'RequestId': event['RequestId'],
+                  'LogicalResourceId': event['LogicalResourceId'],
+                  'Data': response_data
+              }
+              
+              json_response_body = json.dumps(response_body)
+              
+              print(f"Response body: {json_response_body}")
+              
+              headers = {
+                  'content-type': '',
+                  'content-length': str(len(json_response_body))
+              }
+              
+              try:
+                  http = urllib3.PoolManager()
+                  response = http.request(
+                      'PUT',
+                      response_url,
+                      body=json_response_body,
+                      headers=headers
+                  )
+                  print(f"Status code: {response.status}")
+              except Exception as e:
+                  print(f"send_response failed executing http.request(): {e}")
+      Description: Function to wait
+      FunctionName: !Ref FunctionName
+      Handler: index.lambda_handler
+      LoggingConfig:
+        ApplicationLogLevel: !Ref ApplicationLogLevel
+        LogFormat: !Ref LogFormat
+        LogGroup: !Sub "/aws/lambda/${FunctionName}"
+        SystemLogLevel: !Ref SystemLogLevel
+      MemorySize: 128
+      Role: !If 
+      - CreateRole
+      - !GetAtt LambdaFunctionRole.Arn
+      - !Join [ ":", [ "arn:aws:iam:", !Ref "AWS::AccountId", !Sub "role/${FunctionName}Role" ] ]
+      Runtime: python3.12
+      Timeout: 900  # Increased to 15 minutes to allow AMI creation time
+    UpdateReplacePolicy: Delete
+
+  LambdaFunctionRoleToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: SaveInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:IAMResourceToS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Region: !Ref AWS::Region
+      ResourceType: "Role"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:IAM:Role:${FunctionName}Role"
+      Value: !Ref LambdaFunctionRole
+
+Outputs:
+  LambdaFunctionArn:
+    Description: ARN of the Lambda Function
+    Value: !GetAtt LambdaFunction.Arn
+  LogGroupId:
+    Description: Lambda Function Log Group Id
+    Value: !Ref LambdaFunctionLogGroup
+  RoleArn:
+    Description: Lambda Function Role Arn
+    Value: !If [ CreateRole, !GetAtt LambdaFunctionRole.Arn, "" ]

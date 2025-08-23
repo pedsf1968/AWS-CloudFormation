@@ -38,6 +38,13 @@ Parameters:
     Default: "true"
     Description: "Indicates whether requests from service consumers to create an endpoint to your service must be accepted."
     Type: String
+  ContributorInsightsEnabled:
+    AllowedValues: [ "true", "false" ]
+    Default: "false"
+    Description: >-
+      Indicates whether to enable the built-in Contributor Insights rules
+      provided by AWS PrivateLink.
+    Type: String 
   GatewayLoadBalancerArn:
     Default: ""
     Description: "The Amazon Resource Names (ARNs) of the Gateway Load Balancers."
@@ -46,15 +53,23 @@ Parameters:
     Default: ""
     Description: "The Amazon Resource Names (ARNs) of the Network Load Balancers."
     Type: String
-  VpcESType:
+  PayerResponsibility:
+    AllowedValues: ["", ServiceOwner]
+    Default: ""
+    Description: >-
+      The entity that is responsible for the endpoint costs. The default is the
+      endpoint owner. If you set the payer responsibility to the service owner,
+      you cannot set it back to the endpoint owner.
+    Type: String
+  VpcEndpointServiceType:
     AllowedValues: [ "network", "gateway" ]
     Default: "network"
     Type: String
+
 Conditions:
-  isNetworkType: !Equals [ !Ref VpcESType, "network" ]
-  isGatewayType: !Equals [ !Ref VpcESType, "gateway" ]
-  networkTypeServiceIsSavedInS3File: !And [ !Equals [ !Ref VpcESType, "network" ], !Equals [ !Ref SaveInS3File, "true"] ]
-  gatewayTypeServiceIsSavedInS3File: !And [ !Equals [ !Ref VpcESType, "gateway" ], !Equals [ !Ref SaveInS3File, "true"] ]
+  isNetworkType: !Equals [ !Ref VpcEndpointServiceType, "network" ]
+  isGatewayType: !Equals [ !Ref VpcEndpointServiceType, "gateway" ]
+  hasNoPayerResponsibility: !Equals [ !Ref PayerResponsibility, ""]
   SaveInS3File: !Equals [ !Ref SaveInS3File, "true"]
 
 Resources:
@@ -63,8 +78,13 @@ Resources:
     Condition: isNetworkType
     Properties:
       AcceptanceRequired: !Ref AcceptanceRequired
+      # ContributorInsightsEnabled: !Ref ContributorInsightsEnabled
       NetworkLoadBalancerArns: 
         - !Ref NetworkLoadBalancerArn
+      # PayerResponsibility: !If
+      #   - hasNoPayerResponsibility
+      #   - "AWS::NoValue"
+      #   - !Ref PayerResponsibility
       Tags:
         - Key: EnvironmentName
           Value: !Ref EnvironmentName
@@ -105,7 +125,7 @@ Resources:
       BucketObject: !Ref BucketObject
       Region: !Ref AWS::Region
       ResourceType: "VpcEndpointService"
-      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:VPCEndpointService:${VpcESType}"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:VPCEndpointService:${VpcEndpointServiceType}"
       Value: !If
         - isNetworkType
         - !Ref NLBEndpointService

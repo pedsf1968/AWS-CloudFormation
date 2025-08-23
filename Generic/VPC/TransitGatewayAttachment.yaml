@@ -70,6 +70,8 @@ Resources:
           Value: "CloudFormation"
         - Key: ProjectName
           Value: !Ref ProjectName
+        - Key: StackName
+          Value: !Ref AWS::StackName
       TransitGatewayId: !Ref TransitGatewayId
       VpcId: !Ref VpcId
 

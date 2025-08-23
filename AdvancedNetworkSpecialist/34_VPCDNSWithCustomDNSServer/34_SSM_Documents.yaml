@@ -16,6 +16,11 @@ Parameters:
     Description: "File to store data in the bucket"
     Type: String
     Default: "Data.json"
+  BucketRegion:
+    AllowedValues: ["eu-west-3", "eu-central-1"]
+    Default: "eu-west-3"
+    Description: "Region where is the Bucket"
+    Type: String
   EnvironmentName:
     Description: "Environment name that prefix all resources"
     Type: String
@@ -117,7 +122,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/SSM/ApacheHttpdSSMDocument.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/SSM/ApacheHttpdSSMDocument.yaml"
       TimeoutInMinutes: 10
       Parameters:
         Bucket: !Ref Bucket
@@ -133,7 +138,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/SSM/BindServerSSMDocument.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/SSM/BindServerSSMDocument.yaml"
       TimeoutInMinutes: 10
       Parameters:
         Bucket: !Ref Bucket
@@ -148,7 +153,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/SSM/BindServerAddARecordSSMDocument.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/SSM/BindServerAddARecordSSMDocument.yaml"
       TimeoutInMinutes: 10
       Parameters:
         Bucket: !Ref Bucket
@@ -163,7 +168,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/SSM/BindServerAddCnameRecordSSMDocument.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/SSM/BindServerAddCnameRecordSSMDocument.yaml"
       TimeoutInMinutes: 10
       Parameters:
         Bucket: !Ref Bucket

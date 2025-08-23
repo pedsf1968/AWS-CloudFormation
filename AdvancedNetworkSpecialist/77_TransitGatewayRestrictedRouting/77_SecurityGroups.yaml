@@ -16,6 +16,11 @@ Parameters:
     Description: "File to store data in the bucket"
     Type: String
     Default: "Data.json"
+  BucketRegion:
+    AllowedValues: ["eu-west-3", "eu-central-1"]
+    Default: "eu-west-3"
+    Description: "Region where is the Bucket"
+    Type: String
   EnvironmentName:
     Description: "Environment name that prefix all resources"
     Type: String

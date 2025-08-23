@@ -219,12 +219,14 @@ Resources:
       Tags:
         - Key: EnvironmentName
           Value: !Ref EnvironmentName
-        - Key: Name
-          Value: !Sub "${ProjectName}-${EnvironmentName}-${Name}-TG"
         - Key: ManagedBy
           Value: "CloudFormation"
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${Name}-TG"
         - Key: ProjectName
           Value: !Ref ProjectName
+        - Key: StackName
+          Value: !Ref AWS::StackName
       TargetGroupAttributes:
         - Key: deregistration_delay.timeout_seconds
           Value: "30"

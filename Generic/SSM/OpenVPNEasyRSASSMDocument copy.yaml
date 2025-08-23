@@ -1,0 +1,240 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CloudFormation template to create an SSM Document for installing Apache Httpd - IMPROVED VERSION"
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Description: "CloudFormation bucket URL"
+    Type: String
+    Default: "hawkfund-cloudformation"
+  BucketKey:
+    Description: "Key to find object in the bucket"
+    Type: String
+    Default: "110_AWSClientVpn"
+  BucketObject:
+    Description: "File to store data in the bucket"
+    Type: String
+    Default: "Data.json"
+  BucketRegion:
+    AllowedValues: ["eu-west-3", "eu-central-1"]
+    Default: "eu-west-3"
+    Description: "Region where is the Bucket"
+    Type: String
+  EnvironmentName:
+    Description: "Environment name that prefix all resources"
+    Type: String
+    Default: "dev"
+    AllowedValues:
+      - "dev"
+      - "test"
+      - "prod"
+    ConstraintDescription: Must specify dev, test or prod
+  ProjectName:
+    Description: "Project name that prefix all resources"
+    Type: String
+    Default: "ANS"
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+  
+  # Stack parameters
+  DocumentName:
+    Default: OpenVPNEasyRSASSMDocument
+    Type: String
+
+Resources:
+  SSMDocument:
+    Type: "AWS::SSM::Document"
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Content:
+        description: "Create OpenVPN RSA Key Pair"
+        schemaVersion: "1.2"
+        parameters:
+          CaName:
+            type: "String"
+            description: "Certificate name"
+            default: "Demo CA"
+          ClientBaseName:
+            type: "String"
+            description: "Client base name"
+            default: "client1.domain.kr"
+          WaitHandleUrl:
+            type: "String"
+            description: "CloudFormation WaitCondition URL for signaling completion"
+            default: ""
+          StackName:
+            type: "String"
+            description: "CloudFormation Stack Name"
+            default: ""
+          Region:
+            type: "String"
+            description: "AWS Region"
+            default: ""
+          ResourceName:
+            type: "String"
+            description: "CloudFormation Resource Name for signaling"
+            default: ""
+        runtimeConfig:
+          "aws:runShellScript":
+            properties:
+            - id: "0.aws:runShellScript"
+              runCommand:
+              - |
+                #!/bin/bash
+                # Get parameters
+                WAIT_HANDLE_URL="{{WaitHandleUrl}}"
+                STACK_NAME="{{StackName}}"
+                REGION="{{Region}}"
+                RESOURCE_NAME="{{ResourceName}}"
+                CA_NAME="{{CaName}}"
+                CLIENT_BASE_NAME="{{ClientBaseName}}"
+
+                echo "Parameters received:"
+                echo "  WAIT_HANDLE_URL: $WAIT_HANDLE_URL"
+                echo "  STACK_NAME: $STACK_NAME"
+                echo "  REGION: $REGION"
+                echo "  RESOURCE_NAME: $RESOURCE_NAME"
+                echo "  CA_NAME: $CA_NAME"
+                echo "  CLIENT_BASE_NAME: $CLIENT_BASE_NAME"
+
+                # Function to signal CloudFormation
+                signal_cloudformation() {
+                  local exit_code=$1
+                  local message="$2"
+                  local success_status=$([ $exit_code -eq 0 ] && echo "SUCCESS" || echo "FAILURE")
+                  
+                  echo "Signaling CloudFormation: Status=$success_status, Message=$message"
+                  
+                  if [[ -n "$WAIT_HANDLE_URL" ]]; then
+                    echo "Signaling CloudFormation via WaitCondition URL..."
+                    local response=$(curl -w "%{http_code}" -s -X PUT -H 'Content-Type:' \
+                      --data-binary "{\"Status\": \"$success_status\", \"Reason\": \"$message\", \"UniqueId\": \"$(date +%s)\", \"Data\": \"Apache installation completed with exit code $exit_code\"}" \
+                      "$WAIT_HANDLE_URL" 2>/dev/null || echo "000")
+                    echo "CloudFormation signal response code: $response"
+                    if [[ "$response" =~ ^2[0-9][0-9]$ ]]; then
+                      echo "Successfully signaled CloudFormation via WaitCondition URL"
+                    else
+                      echo "Warning: Failed to signal via WaitCondition URL (HTTP: $response)"
+                    fi
+                  elif [[ -n "$STACK_NAME" && -n "$REGION" && -n "$RESOURCE_NAME" ]]; then
+                    echo "Signaling CloudFormation via cfn-signal..."
+                    if command -v /opt/aws/bin/cfn-signal &>/dev/null; then
+                      /opt/aws/bin/cfn-signal -e $exit_code --stack "$STACK_NAME" --resource "$RESOURCE_NAME" --region "$REGION" || echo "Warning: Failed to signal via cfn-signal"
+                    else
+                      echo "Warning: cfn-signal not found, cannot signal CloudFormation"
+                    fi
+                  else
+                    echo "Warning: No CloudFormation signaling configured"
+                  fi
+                }
+                
+                # Enhanced error handling
+                handle_error() {
+                  local exit_code=$?
+                  local line_number=$1
+                  echo "ERROR: Script failed at line $line_number with exit code $exit_code"
+                  signal_cloudformation $exit_code "OpenVPN EasyRSA installation failed at line $line_number"
+                  exit $exit_code
+                }
+                
+                # Set up error trap
+                trap 'handle_error $LINENO' ERR
+
+                # Function to determine OS and install EasyRSA
+                install_easy_rsa() {
+                  echo "Detecting package manager and installing Git..."
+
+                  if command -v yum &>/dev/null; then
+                    echo "Installing Git using yum (Amazon Linux/RHEL/CentOS)..."
+                    yum update -y
+                    yum install -y --skip broken git
+                  elif command -v apt-get &>/dev/null; then
+                    echo "Installing Git using apt-get (Ubuntu/Debian)..."
+                    export DEBIAN_FRONTEND=noninteractive
+                    apt-get update -y
+                    apt-get install -y git
+                  else
+                    echo "ERROR: Unsupported OS - Cannot determine package manager"
+                    exit 1
+                  fi
+
+                  echo "Clone repository https://github.com/OpenVPN/easy-rsa.git"
+                  git clone https://github.com/OpenVPN/easy-rsa.git
+                  cd easy-rsa/easyrsa3
+                  echo "Create CA certificate"
+                  ./easyrsa init-pki
+                  ./easyrsa build-ca nopass <<< $CA_NAME
+                  echo "Create server and client certificates"
+                  ./easyrsa build-server-full server nopass <<< yes
+                  ./easyrsa build-client-full $CLIENT_BASE_NAME nopass <<< yes
+                  mkdir ~/crt
+                  cp pki/ca.crt ~/crt/
+                  cp pki/issued/server.crt ~/crt/
+                  cp pki/private/server.key ~/crt/
+                  cp pki/issued/$CLIENT_BASE_NAME.crt ~/crt/
+                  cp pki/private/$CLIENT_BASE_NAME.key ~/crt/
+                  cd ~/crt
+                  aws acm import-certificate --certificate file://server.crt --private-key file://server.key --certificate-chain file://ca.crt --region $REGION
+                  aws acm import-certificate --certificate file://$CLIENT_BASE_NAME.crt --private-key file://$CLIENT_BASE_NAME.key --certificate-chain file://ca.crt --region $REGION
+                }
+
+                # Check OS and install
+                echo "Checking OS version..."
+                if [[ -f /etc/os-release ]]; then
+                  source /etc/os-release
+                  echo "Detected OS: $ID $VERSION_ID"
+                  case "$ID" in
+                    "amzn"|"centos"|"rhel"|"fedora")
+                      echo "Detected Red Hat family OS"
+                      install_easy_rsa
+                      ;;
+                    "ubuntu"|"debian")
+                      echo "Detected Debian family OS"
+                      install_easy_rsa
+                      ;;
+                    *)
+                      echo "Warning: OS '$ID' is not explicitly supported, attempting install..."
+                      install_easy_rsa
+                      ;;
+                  esac
+                else
+                  echo "Warning: Cannot determine OS from /etc/os-release, attempting install..."
+                  install_easy_rsa
+                fi
+                
+                # Signal success
+                signal_cloudformation 0 "OpenVPN EasyRSA installation and configuration completed successfully"
+      DocumentFormat: YAML
+      DocumentType: Command
+      Name: !Sub "${ProjectName}-${EnvironmentName}-${DocumentName}"
+      Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: ManagedBy
+          Value: "CloudFormation"
+        - Key: ProjectName
+          Value: !Ref ProjectName
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${DocumentName}"
+        - Key: StackName
+          Value: !Ref AWS::StackName
+      TargetType: "/AWS::EC2::Instance"
+      UpdateMethod: Replace
+
+Outputs:
+  SSMDocumentName:
+    Description: "Name of the created SSM Document"
+    Value: !Ref SSMDocument
+    Export:
+      Name: !Sub "${ProjectName}-${EnvironmentName}-${DocumentName}-Name"
+  
+  SSMDocumentArn:
+    Description: "ARN of the created SSM Document"
+    Value: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:document/${SSMDocument}"
+    Export:
+      Name: !Sub "${ProjectName}-${EnvironmentName}-ApacheHttpd-${DocumentName}-Arn"

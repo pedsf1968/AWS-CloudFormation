@@ -83,12 +83,14 @@ Resources:
       Tags:
         - Key: EnvironmentName
           Value: !Ref EnvironmentName
-        - Key: Name
-          Value: !Sub "${ProjectName}-${EnvironmentName}-${RoleName}"
         - Key: ManagedBy
           Value: "CloudFormation"
         - Key: ProjectName
           Value: !Ref ProjectName
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${RoleName}"
+        - Key: StackName
+          Value: !Ref AWS::StackName
 
 Outputs:
   RoleArn:

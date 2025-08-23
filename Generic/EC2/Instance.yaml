@@ -156,12 +156,14 @@ Resources:
       Tags:
         - Key: EnvironmentName
           Value: !Ref EnvironmentName
-        - Key: Name
-          Value: !Sub "${ProjectName}-${EnvironmentName}-${InstanceName}"
         - Key: ManagedBy
           Value: "CloudFormation"
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${InstanceName}"
         - Key: ProjectName
           Value: !Ref ProjectName
+        - Key: StackName
+          Value: !Ref AWS::StackName
       UserData: !If
         - hasNoUserData
         - !Base64 |

@@ -9,12 +9,17 @@ Parameters:
     Description: CloudFormation buket URL
     Type: String
   BucketKey:
-    Default: "96_SiteToSiteVpn"
+    Default: "97_SiteToSiteVpn"
     Description: Key to find object in the bucket
     Type: String
   BucketObject:
     Default: "Data.json"
     Description: "File to store data in the bucket"
+    Type: String
+  BucketRegion:
+    AllowedValues: ["eu-west-3", "eu-central-1"]
+    Default: "eu-west-3"
+    Description: "Region where is the Bucket"
     Type: String
   EnvironmentName:
     AllowedValues: ["dev", "test", "staging", "prod"]
@@ -57,7 +62,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/RouteTable.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/VPC/RouteTable.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -75,7 +80,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/Route.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/VPC/Route.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -101,4 +106,4 @@ Outputs:
 
   GatewayRouteIds:
     Description: "Gateway Route ID"
-    Value: !GetAtt SubnetRouteStack.Outputs.GatewayRouteId
+    Value: !GetAtt SubnetRouteStack.Outputs.RouteId

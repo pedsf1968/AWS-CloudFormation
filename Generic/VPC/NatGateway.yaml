@@ -58,17 +58,19 @@ Conditions:
 
 Resources:
   NatGatewayEIP:
-   Type: AWS::EC2::EIP
-   Condition: hasElasticIP
-   Properties:
-    Domain: vpc
-    Tags:
-      - Key: EnvironmentName
-        Value: !Ref EnvironmentName
-      - Key: Name
-        Value: !Sub "${ProjectName}-${EnvironmentName}-${Name}-EIP"
-      - Key: ProjectName
-        Value: !Ref ProjectName
+    Type: AWS::EC2::EIP
+    Condition: hasElasticIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${Name}-EIP"
+        - Key: ProjectName
+          Value: !Ref ProjectName
+        - Key: StackName
+          Value: !Ref AWS::StackName
 
   NatGateway:
     Type: AWS::EC2::NatGateway
@@ -84,6 +86,8 @@ Resources:
           Value: "CloudFormation"
         - Key: ProjectName
           Value: !Ref ProjectName
+        - Key: StackName
+          Value: !Ref AWS::StackName
 
   NatGatewayParametersToS3:
     Type: AWS::CloudFormation::CustomResource

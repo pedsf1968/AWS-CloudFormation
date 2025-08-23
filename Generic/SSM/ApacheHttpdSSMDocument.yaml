@@ -1,6 +1,6 @@
 ---
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "CloudFormation template to create an SSM Document for installing Apache Httpd"
+Description: "CloudFormation template to create an SSM Document for installing Apache Httpd - IMPROVED VERSION"
 
 Parameters:
   # Global parameters
@@ -34,15 +34,20 @@ Parameters:
     Default: "false"
     Description: "Save resources information in s3 file"
     Type: String
+  
+  # Stack parameters
+  DocumentName:
+    Default: ApacheHttpdSSMDocument
+    Type: String
 
 Resources:
-  ApacheHttpdSSMDocument:
+  SSMDocument:
     Type: "AWS::SSM::Document"
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
       Content:
-        description: "Install Apache Httpd with OS detection and CloudFormation signaling"
+        description: "Install Apache Httpd with OS detection and CloudFormation signaling - IMPROVED VERSION"
         schemaVersion: "1.2"
         parameters:
           Message:
@@ -72,7 +77,11 @@ Resources:
               runCommand:
               - |
                 #!/bin/bash
-                set -eux
+                set -e  # Exit on any error
+                
+                # Enhanced logging
+                exec > >(tee /var/log/apache-install.log) 2>&1
+                echo "=== Apache Installation Script Started at $(date) ==="
                 
                 # Get parameters
                 MESSAGE="{{Message}}"
@@ -81,150 +90,290 @@ Resources:
                 REGION="{{Region}}"
                 RESOURCE_NAME="{{ResourceName}}"
                 
+                echo "Parameters received:"
+                echo "  MESSAGE: $MESSAGE"
+                echo "  WAIT_HANDLE_URL: $WAIT_HANDLE_URL"
+                echo "  STACK_NAME: $STACK_NAME"
+                echo "  REGION: $REGION"
+                echo "  RESOURCE_NAME: $RESOURCE_NAME"
+                
                 # Function to signal CloudFormation
                 signal_cloudformation() {
                   local exit_code=$1
                   local message="$2"
+                  local success_status=$([ $exit_code -eq 0 ] && echo "SUCCESS" || echo "FAILURE")
+                  
+                  echo "Signaling CloudFormation: Status=$success_status, Message=$message"
                   
                   if [[ -n "$WAIT_HANDLE_URL" ]]; then
                     echo "Signaling CloudFormation via WaitCondition URL..."
-                    curl -X PUT -H 'Content-Type:' \
-                      --data-binary "{\"Status\": \"$([ $exit_code -eq 0 ] && echo SUCCESS || echo FAILURE)\", \"Reason\": \"$message\", \"UniqueId\": \"$(date +%s)\", \"Data\": \"Apache installation completed\"}" \
-                      "$WAIT_HANDLE_URL" || echo "Failed to signal via WaitCondition URL"
+                    local response=$(curl -w "%{http_code}" -s -X PUT -H 'Content-Type:' \
+                      --data-binary "{\"Status\": \"$success_status\", \"Reason\": \"$message\", \"UniqueId\": \"$(date +%s)\", \"Data\": \"Apache installation completed with exit code $exit_code\"}" \
+                      "$WAIT_HANDLE_URL" 2>/dev/null || echo "000")
+                    echo "CloudFormation signal response code: $response"
+                    if [[ "$response" =~ ^2[0-9][0-9]$ ]]; then
+                      echo "Successfully signaled CloudFormation via WaitCondition URL"
+                    else
+                      echo "Warning: Failed to signal via WaitCondition URL (HTTP: $response)"
+                    fi
                   elif [[ -n "$STACK_NAME" && -n "$REGION" && -n "$RESOURCE_NAME" ]]; then
                     echo "Signaling CloudFormation via cfn-signal..."
-                    /opt/aws/bin/cfn-signal -e $exit_code --stack "$STACK_NAME" --resource "$RESOURCE_NAME" --region "$REGION" || echo "Failed to signal via cfn-signal"
+                    if command -v /opt/aws/bin/cfn-signal &>/dev/null; then
+                      /opt/aws/bin/cfn-signal -e $exit_code --stack "$STACK_NAME" --resource "$RESOURCE_NAME" --region "$REGION" || echo "Warning: Failed to signal via cfn-signal"
+                    else
+                      echo "Warning: cfn-signal not found, cannot signal CloudFormation"
+                    fi
                   else
-                    echo "No CloudFormation signaling configured"
+                    echo "Warning: No CloudFormation signaling configured"
                   fi
                 }
                 
-                # Trap to ensure we signal on exit
-                trap 'signal_cloudformation $? "Apache installation script completed with exit code $?"' EXIT
+                # Enhanced error handling
+                handle_error() {
+                  local exit_code=$?
+                  local line_number=$1
+                  echo "ERROR: Script failed at line $line_number with exit code $exit_code"
+                  signal_cloudformation $exit_code "Apache installation failed at line $line_number"
+                  exit $exit_code
+                }
+                
+                # Set up error trap
+                trap 'handle_error $LINENO' ERR
                 
                 # Function to determine OS and install Apache Httpd
                 install_apache() {
+                  local service_name=""
+                  
+                  echo "Detecting package manager and installing Apache..."
+                  
                   if command -v yum &>/dev/null; then
-                    echo "Installing Apache Httpd using yum..."
+                    echo "Installing Apache Httpd using yum (Amazon Linux/RHEL/CentOS)..."
                     yum update -y
-                    yum install -y httpd
-                    SERVICE_NAME="httpd"
+                    yum install -y --skip broken httpd curl
+                    service_name="httpd"
                   elif command -v apt-get &>/dev/null; then
-                    echo "Installing Apache Httpd using apt-get..."
-                    apt update -y
-                    apt install -y apache2
-                    SERVICE_NAME="apache2"
+                    echo "Installing Apache Httpd using apt-get (Ubuntu/Debian)..."
+                    export DEBIAN_FRONTEND=noninteractive
+                    apt-get update -y
+                    apt-get install -y apache2 curl
+                    service_name="apache2"
                   else
-                    echo "Unsupported OS: Cannot determine package manager."
+                    echo "ERROR: Unsupported OS - Cannot determine package manager"
                     exit 1
                   fi
+                  
+                  echo "Apache installed successfully. Service name: $service_name"
+                  echo "$service_name" > /tmp/apache_service_name
                 }
                 
+                # Wait for package manager locks to clear (common issue)
+                echo "Waiting for package manager to be available..."
+                for i in {1..30}; do
+                  if command -v yum &>/dev/null; then
+                    if yum check-update &>/dev/null || [[ $? -eq 100 ]]; then
+                      echo "Package manager is ready"
+                      break
+                    fi
+                  elif command -v apt-get &>/dev/null; then
+                    if apt-get update -qq &>/dev/null; then
+                      echo "Package manager is ready"
+                      break
+                    fi
+                  fi
+                  echo "Waiting for package manager... ($i/30)"
+                  sleep 30
+                done
+                
                 # Check OS and install
+                echo "Checking OS version..."
                 if [[ -f /etc/os-release ]]; then
                   source /etc/os-release
-                  if [[ "$ID" == "amzn" ]]; then
-                    echo "Detected Amazon Linux"
-                    install_apache
-                  elif [[ "$ID" == "ubuntu" ]]; then
-                    echo "Detected Ubuntu"
-                    install_apache
-                  elif [[ "$ID" == "centos" || "$ID" == "rhel" ]]; then
-                    echo "Detected CentOS/RHEL"
-                    install_apache
-                  elif [[ "$ID" == "debian" ]]; then
-                    echo "Detected Debian"
-                    install_apache
-                  else
-                    echo "Warning: OS '$ID' is not explicitly supported, attempting install."
-                    install_apache
-                  fi
+                  echo "Detected OS: $ID $VERSION_ID"
+                  case "$ID" in
+                    "amzn"|"centos"|"rhel"|"fedora")
+                      echo "Detected Red Hat family OS"
+                      install_apache
+                      ;;
+                    "ubuntu"|"debian")
+                      echo "Detected Debian family OS"
+                      install_apache
+                      ;;
+                    *)
+                      echo "Warning: OS '$ID' is not explicitly supported, attempting install..."
+                      install_apache
+                      ;;
+                  esac
                 else
-                  echo "Cannot determine OS from /etc/os-release, attempting install."
+                  echo "Warning: Cannot determine OS from /etc/os-release, attempting install..."
                   install_apache
                 fi
+                
+                # Get the service name
+                SERVICE_NAME=$(cat /tmp/apache_service_name)
+                echo "Using service name: $SERVICE_NAME"
                 
                 # Start and enable the service
                 echo "Starting and enabling $SERVICE_NAME service..."
                 if command -v systemctl &>/dev/null; then
                   systemctl start $SERVICE_NAME
                   systemctl enable $SERVICE_NAME
-                  systemctl status $SERVICE_NAME
+                  
+                  # Wait for service to be fully started
+                  echo "Waiting for $SERVICE_NAME to be fully started..."
+                  for i in {1..30}; do
+                    if systemctl is-active $SERVICE_NAME &>/dev/null; then
+                      echo "$SERVICE_NAME is active"
+                      break
+                    fi
+                    echo "Waiting for $SERVICE_NAME to start... ($i/30)"
+                    sleep 2
+                  done
+                  
+                  systemctl status $SERVICE_NAME || true
                 else
-                  echo "Warning: systemctl not found. Please start and enable $SERVICE_NAME service manually."
+                  echo "Warning: systemctl not found. Using service command..."
+                  service $SERVICE_NAME start || true
+                  chkconfig $SERVICE_NAME on 2>/dev/null || true
                 fi
                 
-                # Create document root directory if it doesn't exist
+                # Determine document root
                 if [[ "$SERVICE_NAME" == "httpd" ]]; then
                   DOC_ROOT="/var/www/html"
+                  WEB_USER="apache"
+                  WEB_GROUP="apache"
                 else
                   DOC_ROOT="/var/www/html"
+                  WEB_USER="www-data"
+                  WEB_GROUP="www-data"
                 fi
                 
+                echo "Using document root: $DOC_ROOT"
                 mkdir -p $DOC_ROOT
                 
                 # Create a default index.html with the message parameter
-                echo "Creating a default index.html..."
+                echo "Creating default index.html..."
                 cat > $DOC_ROOT/index.html << EOF
                 <!DOCTYPE html>
                 <html>
                 <head>
                     <title>Apache Test Page</title>
                     <style>
-                        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
-                        h1 { color: #333; }
-                        p { color: #666; }
+                        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; background: #f4f4f4; }
+                        .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+                        h1 { color: #333; margin-bottom: 20px; }
+                        p { color: #666; margin: 10px 0; }
+                        .success { color: #28a745; font-weight: bold; }
+                        .info { background: #e9ecef; padding: 15px; border-radius: 5px; margin: 20px 0; }
                     </style>
                 </head>
                 <body>
-                    <h1>$MESSAGE from $(hostname -f)</h1>
-                    <p>Apache HTTP Server is running successfully!</p>
-                    <p>Server: $(hostname -f)</p>
-                    <p>Date: $(date)</p>
+                    <div class="container">
+                        <h1>$MESSAGE</h1>
+                        <p class="success">✅ Apache HTTP Server is running successfully!</p>
+                        <div class="info">
+                            <p><strong>Server:</strong> $(hostname -f)</p>
+                            <p><strong>Date:</strong> $(date)</p>
+                            <p><strong>Service:</strong> $SERVICE_NAME</p>
+                            <p><strong>Document Root:</strong> $DOC_ROOT</p>
+                        </div>
+                    </div>
                 </body>
                 </html>
                 EOF
                 
                 # Set proper permissions
-                chown -R www-data:www-data $DOC_ROOT 2>/dev/null || chown -R apache:apache $DOC_ROOT 2>/dev/null || true
+                echo "Setting file permissions..."
+                if id "$WEB_USER" &>/dev/null; then
+                  chown -R $WEB_USER:$WEB_GROUP $DOC_ROOT 2>/dev/null || echo "Warning: Could not change ownership to $WEB_USER:$WEB_GROUP"
+                else
+                  echo "Warning: User $WEB_USER does not exist, skipping ownership change"
+                fi
                 chmod -R 755 $DOC_ROOT
                 
-                # Test the installation
+                # Test the installation thoroughly
                 echo "Testing Apache installation..."
+                
+                # Wait a bit for Apache to be fully ready
+                sleep 30
+                
+                # Test local connection
                 if command -v curl &>/dev/null; then
-                  sleep 5
-                  curl -s localhost || echo "Warning: Could not test Apache via curl"
+                  echo "Testing local HTTP connection..."
+                  for i in {1..10}; do
+                    if curl -s --connect-timeout 5 --max-time 10 localhost > /tmp/curl_test.html 2>/dev/null; then
+                      echo "✅ Local HTTP test successful"
+                      echo "Response preview:"
+                      head -n 5 /tmp/curl_test.html | sed 's/^/  /'
+                      break
+                    else
+                      echo "HTTP test attempt $i/10 failed, retrying..."
+                      sleep 2
+                    fi
+                  done
+                else
+                  echo "Warning: curl not available for testing"
                 fi
                 
-                echo "Apache Httpd installation completed successfully!"
+                # Check if Apache is listening on port 80
+                if command -v netstat &>/dev/null; then
+                  echo "Checking if Apache is listening on port 80..."
+                  netstat -tlnp | grep :80 || echo "Warning: Port 80 not found in netstat output"
+                elif command -v ss &>/dev/null; then
+                  echo "Checking if Apache is listening on port 80..."
+                  ss -tlnp | grep :80 || echo "Warning: Port 80 not found in ss output"
+                fi
                 
-                # Manual signal if trap doesn't work
-                signal_cloudformation 0 "Apache installation completed successfully"
+                # Check index.html size
+                INDEX_SIZE=$(stat -c%s /var/www/html/index.html)
                 
+                if (( $INDEX_SIZE < 1000 )); then 
+                  echo "Warning: index.html is not ready..."
+                else
+                  echo "index.html is complete..."
+                fi
+
+                # Final service status check
+                if command -v systemctl &>/dev/null; then
+                  echo "Final service status check:"
+                  systemctl status $SERVICE_NAME --no-pager || echo "Service status check completed"
+                fi
+                
+                # Ensure all pending disk writes are flushed before AMI creation (if this script triggers it)
+                echo "Synchronizing file system to ensure all changes are written to disk..."
+                sync
+
+                echo "=== Apache Installation Script Completed Successfully at $(date) ==="
+                
+                # Signal success
+                signal_cloudformation 0 "Apache HTTP Server installation and configuration completed successfully"
+                
+                echo "Apache installation script finished with success"
       DocumentFormat: YAML
       DocumentType: Command
-      Name: !Sub "${ProjectName}-${EnvironmentName}-ApacheHttpd-SSMDocument"
+      Name: !Sub "${ProjectName}-${EnvironmentName}-${DocumentName}"
       Tags:
-      - Key: EnvironmentName
-        Value: !Ref EnvironmentName
-      - Key: Name
-        Value: !Sub "${ProjectName}-${EnvironmentName}-ApacheHttpd-SSMDocument"
-      - Key: ManagedBy
-        Value: "CloudFormation"
-      - Key: ProjectName
-        Value: !Ref ProjectName
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: ManagedBy
+          Value: "CloudFormation"
+        - Key: ProjectName
+          Value: !Ref ProjectName
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${DocumentName}"
+        - Key: StackName
+          Value: !Ref AWS::StackName
       TargetType: "/AWS::EC2::Instance"
       UpdateMethod: Replace
 
 Outputs:
   SSMDocumentName:
     Description: "Name of the created SSM Document"
-    Value: !Ref ApacheHttpdSSMDocument
+    Value: !Ref SSMDocument
     Export:
-      Name: !Sub "${ProjectName}-${EnvironmentName}-ApacheHttpd-SSMDocument-Name"
+      Name: !Sub "${ProjectName}-${EnvironmentName}-${DocumentName}-Name"
   
   SSMDocumentArn:
     Description: "ARN of the created SSM Document"
-    Value: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:document/${ApacheHttpdSSMDocument}"
+    Value: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:document/${SSMDocument}"
     Export:
-      Name: !Sub "${ProjectName}-${EnvironmentName}-ApacheHttpd-SSMDocument-Arn"
+      Name: !Sub "${ProjectName}-${EnvironmentName}-ApacheHttpd-${DocumentName}-Arn"

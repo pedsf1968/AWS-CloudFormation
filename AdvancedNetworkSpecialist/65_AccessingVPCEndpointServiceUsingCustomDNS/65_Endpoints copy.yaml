@@ -1,0 +1,329 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create a SQS Interface Endpoint
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "65_AccessingVPCEndpointServiceUsingCustomDNS"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  BucketRegion:
+    AllowedValues: ["eu-west-3", "eu-central-1"]
+    Default: "eu-west-3"
+    Description: "Region where is the Bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: ["dev", "test", "staging", "prod"]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String    
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+  # Stack parameters
+  AcceptanceRequired:
+    AllowedValues: [ "true", "false" ]
+    Default: "false"
+    Description: "Indicates whether requests from service consumers to create an endpoint to your service must be accepted."
+    Type: String
+
+  # DNS Parameters
+  # HostedZoneId:
+  #   Description: "The ID of the hosted zone where DNS records will be created"
+  #   Type: String
+  HostedZoneName:
+    Default: "corp.internal"
+    Description: "The name of the hosted zone"
+    MaxLength: 32
+    Type: String
+  ServiceName:
+    Description: "Custom service name for DNS record (e.g., api, web, database)"
+    Type: String
+    Default: "app"
+  RecordTTL:
+    Description: "TTL for DNS records in seconds"
+    Type: Number
+    Default: 300
+    MinValue: 60
+    MaxValue: 86400
+
+  # Infrastructure Parameters
+  NetworkLoadBalancerArn:
+    Description: "The Amazon Resource Names (ARNs) of the Network Load Balancers."
+    Type: String
+    Default: ""
+  VpcEpSecurityGroupIds:
+    Description: "The Security Group for VPC Endpoint."
+    Type: String
+  VpcEpSubnetIds:
+    Type: String
+  VPCEndpointId:
+    Type: String
+
+Resources:
+  ServicesVPCEndpointService:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/VPC/VpcEndpointService.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        AcceptanceRequired: !Ref AcceptanceRequired
+        ContributorInsightsEnabled: "true"
+        NetworkLoadBalancerArn: !Ref NetworkLoadBalancerArn
+        PayerResponsibility: ServiceOwner
+        VpcEndpointServiceType: network
+
+  # Route 53 Record for custom DNS name
+  EndpointServiceDNSRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: "Z0134420XFVUNDM1VBZH"
+      Name: "toto.corp.internal"
+      Type: CNAME
+      TTL: 300
+      ResourceRecords:
+        - !GetAtt ServicesVPCEndpointService.Outputs.VPCEndpointServiceName
+
+  ConsumerVPCEndpoint:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/VPC/VpcEndpoint.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        DnsRecordIpType: ipv4
+        PrivateDnsEnabled: "true"
+        SecurityGroupIds: !Ref VpcEpSecurityGroupIds
+        ServiceName: !GetAtt ServicesVPCEndpointService.Outputs.VPCEndpointServiceName
+        SubnetIds: !Ref VpcEpSubnetIds
+        VpcId: !Ref VPCEndpointId
+        VpcEndpointType: "Interface"
+
+  # Custom resource to get VPC Endpoint DNS names and IPs
+  VPCEndpointInfo:
+    Type: AWS::CloudFormation::CustomResource
+    Properties:
+      ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:VPCEndpointDNSResolver"
+      ServiceTimeout: 60
+      VPCEndpointId: !GetAtt ConsumerVPCEndpoint.Outputs.VpcEndpointId
+      Region: !Ref AWS::Region
+
+  # ApplicationRecordSetStack:
+  #   Type: AWS::CloudFormation::Stack
+  #   DeletionPolicy: Delete
+  #   UpdateReplacePolicy: Delete
+  #   Properties:
+  #     TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/Route53/RecordSet.yaml"
+  #     TimeoutInMinutes: 5
+  #     Parameters:
+  #       Bucket: !Ref Bucket
+  #       BucketKey: !Ref BucketKey
+  #       BucketObject: !Ref BucketObject
+  #       EnvironmentName: !Ref EnvironmentName
+  #       ProjectName: !Ref ProjectName
+  #       SaveInS3File: !Ref SaveInS3File
+  #       HostedZoneName: !Ref HostedZoneName
+  #       RecordName: !Join [".", ["App", !Ref HostedZoneName]]
+  #       Type: "A"
+  #       TTL : "300"
+  #       ResourceRecords: !GetAtt VPCEndpointInfo.DNSEntries
+  #       VPCEndpointType: "Interface"
+
+# Primary service DNS record (A record)
+  # PrimaryServiceRecord:
+  #   Type: AWS::Route53::RecordSet
+  #   Properties:
+  #     HostedZoneId: !Ref HostedZoneId
+  #     Name: !Sub "${ServiceName}.${HostedZoneName}"
+  #     Type: A
+  #     TTL: !Ref RecordTTL
+  #     ResourceRecords: !GetAtt VPCEndpointInfo.IPAddresses
+  #     Comment: !Sub "Primary DNS record for ${ServiceName} VPC endpoint service"
+
+  # # Environment-specific service DNS record
+  # EnvironmentServiceRecord:
+  #   Type: AWS::Route53::RecordSet
+  #   Properties:
+  #     HostedZoneId: !Ref HostedZoneId
+  #     Name: !Sub "${ServiceName}-${EnvironmentName}.${HostedZoneName}"
+  #     Type: A
+  #     TTL: !Ref RecordTTL
+  #     ResourceRecords: !GetAtt VPCEndpointInfo.IPAddresses
+  #     Comment: !Sub "Environment-specific DNS record for ${ServiceName} in ${EnvironmentName}"
+
+  # # CNAME record for service discovery
+  # ServiceDiscoveryRecord:
+  #   Type: AWS::Route53::RecordSet
+  #   Properties:
+  #     HostedZoneId: !Ref HostedZoneId
+  #     Name: !Sub "${ProjectName}-${ServiceName}.${HostedZoneName}"
+  #     Type: CNAME
+  #     TTL: !Ref RecordTTL
+  #     ResourceRecords: 
+  #       - !Sub "${ServiceName}.${HostedZoneName}"
+  #     Comment: !Sub "Service discovery CNAME for ${ProjectName} ${ServiceName}"
+
+  # # VPC Endpoint Service alias record
+  # VPCEndpointServiceAliasRecord:
+  #   Type: AWS::Route53::RecordSet
+  #   Properties:
+  #     HostedZoneId: !Ref HostedZoneId
+  #     Name: !Sub "vpce-${ServiceName}.${HostedZoneName}"
+  #     Type: A
+  #     TTL: !Ref RecordTTL
+  #     ResourceRecords: !GetAtt VPCEndpointInfo.IPAddresses
+  #     Comment: !Sub "VPC endpoint service alias for ${ServiceName}"
+
+  # # TXT record for service metadata
+  # ServiceMetadataRecord:
+  #   Type: AWS::Route53::RecordSet
+  #   Properties:
+  #     HostedZoneId: !Ref HostedZoneId
+  #     Name: !Sub "_metadata.${ServiceName}.${HostedZoneName}"
+  #     Type: TXT
+  #     TTL: !Ref RecordTTL
+  #     ResourceRecords: 
+  #       - !Sub |
+  #         "service=${ServiceName}" "environment=${EnvironmentName}" "project=${ProjectName}" "endpoint-service=${ServicesVPCEndpointService.Outputs.VPCEndpointServiceName}" "endpoint-id=${ConsumerVPCEndpoint.Outputs.VpcEndpointId}"
+  #     Comment: !Sub "Metadata TXT record for ${ServiceName} service"
+
+  # # Legacy record set for backward compatibility
+  # LegacyApplicationRecordSet:
+  #   Type: AWS::Route53::RecordSet
+  #   Properties:
+  #     HostedZoneId: !Ref HostedZoneId
+  #     Name: !Sub "App.${HostedZoneName}"
+  #     Type: A
+  #     TTL: !Ref RecordTTL
+  #     ResourceRecords: !GetAtt VPCEndpointInfo.IPAddresses
+  #     Comment: "Legacy DNS record for backward compatibility"
+
+  # # Health check for the service
+  # ServiceHealthCheck:
+  #   Type: AWS::Route53::HealthCheck
+  #   Properties:
+  #     Type: CALCULATED
+  #     CallerReference: !Sub "${ProjectName}-${EnvironmentName}-${ServiceName}-healthcheck-${AWS::AccountId}"
+  #     HealthCheckConfig:
+  #       Type: CALCULATED
+  #       InsufficientDataHealthStatus: Failure
+  #       ChildHealthChecks: []
+  #       CloudWatchAlarmRegion: !Ref AWS::Region
+  #       Inverted: false
+  #     HealthCheckTags:
+  #       - Key: Name
+  #         Value: !Sub "${ProjectName}-${EnvironmentName}-${ServiceName}-healthcheck"
+  #       - Key: Environment
+  #         Value: !Ref EnvironmentName
+  #       - Key: Service
+  #         Value: !Ref ServiceName
+
+
+Outputs:
+  ServicesVPCEndpointServiceId:
+    Description: "Returns the ID of the VPC endpoint service configuration."
+    Value: !GetAtt ServicesVPCEndpointService.Outputs.VPCEndpointServiceId
+
+  VPCEndpointServiceName:
+    Value: !GetAtt ServicesVPCEndpointService.Outputs.VPCEndpointServiceName
+
+# Outputs:
+#   # VPC Endpoint Service Outputs
+#   ServicesVPCEndpointServiceId:
+#     Description: "Returns the ID of the VPC endpoint service configuration."
+#     Value: !GetAtt ServicesVPCEndpointService.Outputs.VPCEndpointServiceId
+#     Export:
+#       Name: !Sub "${ProjectName}-${EnvironmentName}-VPCEndpointService-Id"
+
+#   VPCEndpointServiceName:
+#     Description: "Returns the name of the VPC endpoint service."
+#     Value: !GetAtt ServicesVPCEndpointService.Outputs.VPCEndpointServiceName
+#     Export:
+#       Name: !Sub "${ProjectName}-${EnvironmentName}-VPCEndpointService-Name"
+
+#   VPCEndpointId:
+#     Description: "Returns the ID of the VPC endpoint."
+#     Value: !GetAtt ConsumerVPCEndpoint.Outputs.VpcEndpointId
+#     Export:
+#       Name: !Sub "${ProjectName}-${EnvironmentName}-VPCEndpoint-Id"
+
+#   # DNS Record Outputs
+#   PrimaryServiceDNSName:
+#     Description: "Primary DNS name for the service"
+#     Value: !Sub "${ServiceName}.${HostedZoneName}"
+#     Export:
+#       Name: !Sub "${ProjectName}-${EnvironmentName}-${ServiceName}-PrimaryDNS"
+
+#   EnvironmentServiceDNSName:
+#     Description: "Environment-specific DNS name for the service"
+#     Value: !Sub "${ServiceName}-${EnvironmentName}.${HostedZoneName}"
+#     Export:
+#       Name: !Sub "${ProjectName}-${EnvironmentName}-${ServiceName}-EnvironmentDNS"
+
+#   ServiceDiscoveryDNSName:
+#     Description: "Service discovery DNS name"
+#     Value: !Sub "${ProjectName}-${ServiceName}.${HostedZoneName}"
+#     Export:
+#       Name: !Sub "${ProjectName}-${EnvironmentName}-${ServiceName}-ServiceDiscoveryDNS"
+
+#   VPCEndpointAliasDNSName:
+#     Description: "VPC endpoint service alias DNS name"
+#     Value: !Sub "vpce-${ServiceName}.${HostedZoneName}"
+#     Export:
+#       Name: !Sub "${ProjectName}-${EnvironmentName}-${ServiceName}-VPCEndpointAlias"
+
+#   ServiceMetadataDNSName:
+#     Description: "Service metadata DNS name"
+#     Value: !Sub "_metadata.${ServiceName}.${HostedZoneName}"
+#     Export:
+#       Name: !Sub "${ProjectName}-${EnvironmentName}-${ServiceName}-MetadataDNS"
+
+#   LegacyDNSName:
+#     Description: "Legacy DNS name for backward compatibility"
+#     Value: !Sub "App.${HostedZoneName}"
+#     Export:
+#       Name: !Sub "${ProjectName}-${EnvironmentName}-App-LegacyDNS"
+
+#   ServiceIPAddresses:
+#     Description: "IP addresses of the VPC endpoint service"
+#     Value: !Join [",", !GetAtt VPCEndpointInfo.IPAddresses]
+#     Export:
+#       Name: !Sub "${ProjectName}-${EnvironmentName}-${ServiceName}-IPAddresses"
+
+#   HealthCheckId:
+#     Description: "Health check ID for the service"
+#     Value: !Ref ServiceHealthCheck
+#     Export:
+#      Name: !Sub "${ProjectName}-${EnvironmentName}-${ServiceName}-HealthCheckId"

@@ -16,6 +16,11 @@ Parameters:
     Default: "Data.json"
     Description: "File to store data in the bucket"
     Type: String
+  BucketRegion:
+    AllowedValues: ["eu-west-3", "eu-central-1"]
+    Default: "eu-west-3"
+    Description: "Region where is the Bucket"
+    Type: String
   EnvironmentName:
     AllowedValues: ["dev", "test", "staging", "prod"]
     ConstraintDescription: "Must specify dev, test or prod"
@@ -36,13 +41,6 @@ Parameters:
   KeyName:
     Default: "dso-paris"
     Description: "Instances Key name"
-    Type: String
-  OutputS3BucketName:
-    Description: "The Bucket name for logs"
-    Type: String
-  OutputS3KeyPrefix:
-    Default: "logs/"
-    Description: "Logs prefix"
     Type: String
 
   # Base Instance parameters
@@ -129,17 +127,16 @@ Parameters:
     Type: CommaDelimitedList
 
 Conditions:
-  noWebServerInstanceImageId: !Equals [ !Ref WebServerInstanceImageId, ""]
+  HasNoWebServerInstanceImageId: !Equals [ !Ref WebServerInstanceImageId, "" ]
 
 Resources:
-  # Create Instance in Public Subnet to get WebServer package for the Application Instance
-  InstanceForAmi:
+  CreateAmi:
     Type: AWS::CloudFormation::Stack
-    Condition: noWebServerInstanceImageId
+    Condition: HasNoWebServerInstanceImageId
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/EC2/Instance.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/EC2/Ami.yaml"
       TimeoutInMinutes: 10
       Parameters:
         Bucket: !Ref Bucket
@@ -147,86 +144,23 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
-        SaveInS3File: "false"
-        AssociatePublicIpAddress: "true"
-        AvailabilityZone: !Select [0, !GetAZs ]
-        IamInstanceProfile: !Ref BaseInstanceProfile
+        AmiName: "WebServerInstance-AMI"
+        AvailabilityZone: !Select [0 , !GetAZs ]
         ImageId: !Ref BaseInstanceImageId
         InstanceName: !Ref BaseInstanceName
+        IamInstanceProfile: !Ref BaseInstanceProfile
         InstanceType: !Ref BaseInstanceType
-        KeyName: !Ref KeyName
         SecurityGroupIds: !Ref BaseInstanceSecurityGroup
+        KeyName: !Ref KeyName
+        SSMDocumentName: !Sub "${ProjectName}-${EnvironmentName}-ApacheHttpdSSMDocument"
         SubnetId: !Ref BaseInstanceSubnetId
-
-  # Wait condition for Apache installation
-  ApacheInstallWaitHandle:
-    Type: AWS::CloudFormation::WaitConditionHandle
-    Condition: noWebServerInstanceImageId
-
-  ApacheInstallWaitCondition:
-    Type: AWS::CloudFormation::WaitCondition
-    Condition: noWebServerInstanceImageId
-    DependsOn: ApacheHttpdInstallSSMAssociation
-    Properties:
-      Count: 1
-      Handle: !Ref ApacheInstallWaitHandle
-      Timeout: 1200  # 20 minutes timeout
-
-  ApacheHttpdInstallSSMAssociation:
-    Type: AWS::SSM::Association
-    Condition: noWebServerInstanceImageId
-    DependsOn: InstanceForAmi
-    Properties:
-      Name: !Join ["-", [!Ref ProjectName, !Ref EnvironmentName, "ApacheHttpd", "SSMDocument"]]
-      Parameters:
-        Message: 
-          - "Instance behind a Load Balancer"
-        WaitHandleUrl:
-          - !Ref ApacheInstallWaitHandle
-        StackName:
-          - !Ref AWS::StackName
-        Region:
-          - !Ref AWS::Region
-        ResourceName:
-          - "ApacheInstallWaitCondition"
-      Targets:
-        - Key: InstanceIds
-          Values:
-          - !GetAtt InstanceForAmi.Outputs.InstanceId
-
-  # Create AMI from the previous Instance - now waits for Apache installation
-  CreateAmi:
-    Type: AWS::CloudFormation::CustomResource
-    Condition: noWebServerInstanceImageId
-    DeletionPolicy: Retain
-    DependsOn:
-      - ApacheInstallWaitCondition  # Now properly waits for Apache installation
-    UpdateReplacePolicy: Retain
-    Properties:
-      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:CreateAmiFromInstanceId"]]
-      InstanceId: !GetAtt InstanceForAmi.Outputs.InstanceId
-      Name: !Sub "${WebServerInstanceName}-AMI"
-      WaitHandleUrl: !Ref WaitHandle  # Pass the WaitHandle URL to Lambda
-
-  WaitHandle:
-    Type: AWS::CloudFormation::WaitConditionHandle
-    Condition: noWebServerInstanceImageId
-
-  WaitCondition:
-    Type: AWS::CloudFormation::WaitCondition
-    Condition: noWebServerInstanceImageId
-    DependsOn: CreateAmi
-    Properties:
-      Count: 1
-      Handle: !Ref WaitHandle
-      Timeout: 1200
 
   BastionInstance:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/EC2/Instance.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/EC2/Instance.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -249,7 +183,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/EC2/Instance.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/EC2/Instance.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -272,7 +206,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/EC2/Instance.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/EC2/Instance.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -283,8 +217,8 @@ Resources:
         SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Select [0, !GetAZs ]
         ImageId: !If 
-          - noWebServerInstanceImageId
-          - !GetAtt CreateAmi.ImageId
+          - HasNoWebServerInstanceImageId
+          - !GetAtt CreateAmi.Outputs.ImageId
           - !Ref WebServerInstanceImageId
         InstanceName: !Sub "${WebServerInstanceName}-1"
         InstanceType: !Ref WebServerInstanceType
@@ -297,7 +231,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/EC2/Instance.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/EC2/Instance.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -308,8 +242,8 @@ Resources:
         SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Select [1, !GetAZs ]
         ImageId: !If 
-          - noWebServerInstanceImageId
-          - !GetAtt CreateAmi.ImageId
+          - HasNoWebServerInstanceImageId
+          - !GetAtt CreateAmi.Outputs.ImageId
           - !Ref WebServerInstanceImageId
         InstanceName: !Sub "${WebServerInstanceName}-2"
         InstanceType: !Ref WebServerInstanceType

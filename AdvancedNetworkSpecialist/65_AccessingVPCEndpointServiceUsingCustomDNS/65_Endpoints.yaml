@@ -1,0 +1,218 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create a SQS Interface Endpoint
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "65_AccessingVPCEndpointServiceUsingCustomDNS"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  BucketRegion:
+    AllowedValues: ["eu-west-3", "eu-central-1"]
+    Default: "eu-west-3"
+    Description: "Region where is the Bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: ["dev", "test", "staging", "prod"]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+  # Stack parameters
+  AcceptanceRequired:
+    AllowedValues: [ "true", "false" ]
+    Default: "false"
+    Description: "Indicates whether requests from service consumers to create an endpoint to your service must be accepted."
+    Type: String
+  Phase:
+    AllowedValues: [ "Before VPC Endpoint accepted", "After VPC Endpoint accepted" ]
+    Default: "Before VPC Endpoint accepted"
+    Description: "Phases before VPC Endpoint accepted and after VPC Endpoint accepted"
+    Type: String
+
+# DNS Parameters
+  # HostedZoneId:
+  #   Description: "The ID of the hosted zone where DNS records will be created"
+  #   Type: String
+  HostedZoneName:
+    Default: "corp.internal"
+    Description: "The name of the hosted zone"
+    MaxLength: 32
+    Type: String
+  ServiceName:
+    Description: "Custom service name for DNS record (e.g., api, web, database)"
+    Type: String
+    Default: "app"
+  RecordTTL:
+    Description: "TTL for DNS records in seconds"
+    Type: Number
+    Default: 300
+    MinValue: 60
+    MaxValue: 86400
+
+  NetworkLoadBalancerArn:
+    Description: "The Amazon Resource Names (ARNs) of the Network Load Balancers."
+    Type: String
+    Default: ""
+  VpcEndpointSecurityGroupIds:
+    Description: "The Security Group for VPC Endpoint."
+    Type: String
+  VpcEndpointSubnetIds:
+    Type: CommaDelimitedList
+  VpcEndpointVpcId:
+    Type: String
+
+# Add these new parameters for private DNS
+  EnablePrivateDns:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: "Enable private DNS name for the VPC endpoint service"
+  
+  PrivateDnsName:
+    Type: String
+    Default: "corp.internal"
+    Description: "Private DNS name for the endpoint service (e.g., api.example.com)"
+
+
+Conditions:
+  VpcEndpointAccepted: !Equals [!Ref Phase, "After VPC Endpoint accepted"]
+  HasPrivateDns: !And
+    - !Equals [!Ref EnablePrivateDns, "true"]
+    - !Not [!Equals [!Ref PrivateDnsName, ""]]
+  UsePrivateDns: !Equals [!Ref EnablePrivateDns, "true"]
+  UseFallbackDns: !Not [!Condition UsePrivateDns]
+
+Resources:
+  # ServicesVPCEndpointService:
+  #   Type: AWS::CloudFormation::Stack
+  #   DeletionPolicy: Delete
+  #   UpdateReplacePolicy: Delete
+  #   Properties:
+  #     TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/VPC/VpcEndpointService.yaml"
+  #     TimeoutInMinutes: 10
+  #     Parameters:
+  #       Bucket: !Ref Bucket
+  #       BucketKey: !Ref BucketKey
+  #       BucketObject: !Ref BucketObject
+  #       EnvironmentName: !Ref EnvironmentName
+  #       ProjectName: !Ref ProjectName
+  #       SaveInS3File: !Ref SaveInS3File
+  #       AcceptanceRequired:  !If
+  #         - VpcEndpointAccepted
+  #         - true
+  #         - false
+  #       NetworkLoadBalancerArn: !Ref NetworkLoadBalancerArn
+  #       VpcEndpointServiceType: network
+  ServicesVPCEndpointService:
+    Type: AWS::EC2::VPCEndpointService
+    Properties:
+      AcceptanceRequired: !If
+          - VpcEndpointAccepted
+          - true
+          - false
+      # Add private DNS configuration
+      NetworkLoadBalancerArns:
+        - !Ref NetworkLoadBalancerArn
+      PrivateDnsName: !If
+        - HasPrivateDns
+        - !Ref PrivateDnsName
+        - !Ref AWS::NoValue
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-vpc-endpoint-service"
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Project
+          Value: !Ref ProjectName
+
+  ConsumerVPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      # DnsOptions:
+      #   DnsRecordIpType: ipv4
+      #   PrivateDnsOnlyForInboundResolverEndpoint: Disabled
+      PrivateDnsEnabled: !If
+        - VpcEndpointAccepted
+        - !If [UsePrivateDns, true, false]
+        - false
+      SecurityGroupIds:
+        - !Ref VpcEndpointSecurityGroupIds
+      # ServiceName: !Join [".", ["com.amazonaws.vpce", !Ref "AWS::Region" , !Ref ServicesVPCEndpointService]]
+      ServiceName: !Sub "${ServiceName}.${HostedZoneName}"
+      SubnetIds:
+        - !Select [0, !Ref VpcEndpointSubnetIds]
+        - !Select [1, !Ref VpcEndpointSubnetIds]
+      Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: ManagedBy
+          Value: "CloudFormation"
+        - Key: ProjectName
+          Value: !Ref ProjectName
+        - Key: VpcEndpointType
+          Value: Interface
+      VpcEndpointType: Interface
+      VpcId: !Ref VpcEndpointVpcId
+
+  CustomDNSRecord:
+    Type: AWS::Route53::RecordSet
+    Condition: UseFallbackDns
+    Properties:
+      HostedZoneName: !Sub "${HostedZoneName}."
+      Name: !Sub "${ServiceName}.${HostedZoneName}"
+      Type: CNAME
+      TTL: !Ref RecordTTL
+      ResourceRecords: 
+        - !Select [0, !Split [":", !Select [0, !GetAtt ConsumerVPCEndpoint.DnsEntries]]]
+      Comment: !Sub "Custom DNS record for ${ProjectName} VPC Endpoint"
+
+Outputs:
+  # VPCEndpointServiceName:
+  #   Description: "Name of the VPC Endpoint Service"
+  #   Value: !GetAtt ServicesVPCEndpointService.Outputs.VPCEndpointServiceName
+  #   Export:
+  #     Name: !Sub "${AWS::StackName}-VPCEndpointServiceName"
+
+  VPCEndpointId:
+    Description: "ID of the Consumer VPC Endpoint"
+    Value: !Ref ConsumerVPCEndpoint
+    Export:
+      Name: !Sub "${AWS::StackName}-VPCEndpointId"
+
+  VPCEndpointDNSEntries:
+    Description: "DNS entries for the VPC Endpoint"
+    Value: !Join [",", !GetAtt ConsumerVPCEndpoint.DnsEntries]
+    Export:
+      Name: !Sub "${AWS::StackName}-VPCEndpointDNSEntries"
+
+  PrivateDNSName:
+    Description: "Private DNS name for the service (if enabled)"
+    Value: !If [UsePrivateDns, !Ref PrivateDnsName, "Not configured"]
+    Export:
+      Name: !Sub "${AWS::StackName}-PrivateDNSName"
+
+  CustomDNSName:
+    Description: "Custom DNS name for the service (fallback)"
+    Value: !If [UseFallbackDns, !Sub "${ServiceName}.${HostedZoneName}", "Not configured - using private DNS"]
+    Export:
+      Name: !Sub "${AWS::StackName}-CustomDNSName"

@@ -1,0 +1,401 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Deploy VPCEndpointDNSResolver Lambda function"
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "Datas"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: ["dev", "test", "prod"]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: ["false", "true"]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+  # Stack parameters
+  ApplicationLogLevel:
+    AllowedValues: [TRACE,DEBUG,INFO,WARN,ERROR,FATAL]
+    Default: TRACE
+    Description: |
+      Set this property to filter the application logs for your function that Lambda sends to CloudWatch. 
+      Lambda only sends application logs at the selected level of detail and lower, 
+      where TRACE is the highest level and FATAL is the lowest.
+    Type: String
+  CreateRole:
+    AllowedValues: [ "false", "true" ]
+    Default: "true"
+    Description: "Save resources information in s3 file"
+    Type: String
+  FunctionName:
+    Default: "VPCEndpointDNSResolver"
+    Description: "Name for the Lambda function"
+    Type: String
+  LogFormat:
+    AllowedValues: [Text, JSON]
+    Default: JSON
+    Description: |
+      The format in which Lambda sends your function's application and system logs to CloudWatch.
+      Select between plain text and structured JSON.
+    Type: String
+  LogGroupClass:
+    AllowedValues: [STANDARD, INFREQUENT_ACCESS]
+    Default: STANDARD
+    Description: Specifies the log group class for this log group.
+    Type: String
+  RetentionInDays:
+    AllowedValues:
+      [1,3,5,7,14,30,60,90,120,150,180,365,400,545,731,1096,1827,2192,2557,2922,3288,3653]
+    Default: 1
+    Description: |
+      The number of days to retain the log events in the specified log group.
+      Possible values are: 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557, 2922, 3288, and 3653.
+    Type: String
+  Runtime:
+    Type: String
+    Default: "python3.12"
+    AllowedValues: ["python3.8", "python3.9", "python3.10", "python3.11", "python3.12"]
+    Description: "Python runtime version"
+  SystemLogLevel:
+    AllowedValues: [DEBUG, INFO, WARN]
+    Default: WARN
+    Description: |
+      Set this property to filter the system logs for your function that Lambda sends to CloudWatch.
+      Lambda only sends system logs at the selected level of detail and lower,
+      where DEBUG is the highest level and WARN is the lowest.
+    Type: String
+
+Conditions:
+  CreateRole: !Equals [!Ref CreateRole, "true" ]
+  SaveInS3File: !And 
+    - !Equals [!Ref CreateRole, "true" ]
+    - !Equals [ !Ref SaveInS3File, "true"]
+
+Resources:
+  # IAM Role for Lambda function
+  LambdaFunctionRole:
+    Type: AWS::IAM::Role
+    Condition: CreateRole
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Path: "/"
+      Policies:
+        - PolicyName: VPCEndpointAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:DescribeVpcEndpoints
+                  - ec2:DescribeNetworkInterfaces
+                  - ec2:DescribeSubnets
+                  - ec2:DescribeRouteTables
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
+      RoleName: !Sub "${FunctionName}Role"
+      Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: ManagedBy
+          Value: "CloudFormation"
+        - Key: ProjectName
+          Value: !Ref ProjectName
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${FunctionName}"
+        - Key: StackName
+          Value: !Ref AWS::StackName
+
+  LambdaFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupClass: !Ref LogGroupClass
+      LogGroupName: !Sub "/aws/lambda/${FunctionName}"
+      RetentionInDays: !Ref RetentionInDays
+    UpdateReplacePolicy: Delete
+
+  # Lambda function
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import logging
+          from botocore.exceptions import ClientError
+          import urllib3
+
+          # Configure logging
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          # Initialize AWS clients
+          ec2 = boto3.client('ec2')
+          http = urllib3.PoolManager()
+
+          def lambda_handler(event, context):
+              """
+              Lambda function to resolve VPC Endpoint DNS information
+              Returns IP addresses for Interface endpoints and DNS names for Gateway endpoints
+              """
+              
+              logger.info(f"Received event: {json.dumps(event)}")
+              
+              # Extract parameters from CloudFormation custom resource event
+              request_type = event.get('RequestType')
+              vpc_endpoint_id = event.get('ResourceProperties', {}).get('VPCEndpointId')
+              region = event.get('ResourceProperties', {}).get('Region', 'eu-west-3')
+              
+              response_data = {}
+              physical_resource_id = f"vpc-endpoint-dns-{vpc_endpoint_id}"
+              
+              try:
+                  if request_type in ['Create', 'Update']:
+                      # Get VPC Endpoint information
+                      endpoint_info = get_vpc_endpoint_info(vpc_endpoint_id, region)
+                      
+                      if endpoint_info:
+                          response_data = endpoint_info
+                          logger.info(f"Successfully retrieved endpoint info: {response_data}")
+                      else:
+                          raise Exception(f"Could not retrieve information for VPC Endpoint {vpc_endpoint_id}")
+                  
+                  elif request_type == 'Delete':
+                      # Nothing to do on delete
+                      logger.info(f"Delete request for VPC Endpoint {vpc_endpoint_id}")
+                      response_data = {"Status": "Deleted"}
+                  
+                  # Send success response
+                  send_response(event, context, "SUCCESS", response_data, physical_resource_id)
+                  
+              except Exception as e:
+                  logger.error(f"Error processing request: {str(e)}")
+                  send_response(event, context, "FAILED", {"Error": str(e)}, physical_resource_id)
+
+          def get_vpc_endpoint_info(vpc_endpoint_id, region):
+              """
+              Get VPC Endpoint information including DNS entries and IP addresses
+              """
+              try:
+                  # Describe the VPC Endpoint
+                  response = ec2.describe_vpc_endpoints(VpcEndpointIds=[vpc_endpoint_id])
+                  
+                  if not response['VpcEndpoints']:
+                      raise Exception(f"VPC Endpoint {vpc_endpoint_id} not found")
+                  
+                  endpoint = response['VpcEndpoints'][0]
+                  endpoint_type = endpoint.get('VpcEndpointType', 'Interface')
+                  
+                  logger.info(f"Processing {endpoint_type} VPC Endpoint: {vpc_endpoint_id}")
+                  
+                  if endpoint_type == 'Interface':
+                      return process_interface_endpoint(endpoint)
+                  elif endpoint_type == 'Gateway':
+                      return process_gateway_endpoint(endpoint)
+                  else:
+                      raise Exception(f"Unsupported VPC Endpoint type: {endpoint_type}")
+                      
+              except ClientError as e:
+                  logger.error(f"AWS API error: {e}")
+                  raise Exception(f"Failed to describe VPC Endpoint: {e}")
+
+          def process_interface_endpoint(endpoint):
+              """
+              Process Interface VPC Endpoint and extract IP addresses
+              """
+              dns_entries = []
+              network_interface_ids = []
+              
+              # Get network interface IDs
+              for network_interface in endpoint.get('NetworkInterfaceIds', []):
+                  network_interface_ids.append(network_interface)
+              
+              logger.info(f"Network Interface IDs: {network_interface_ids}")
+              
+              # Get IP addresses from network interfaces
+              if network_interface_ids:
+                  ip_addresses = get_network_interface_ips(network_interface_ids)
+                  dns_entries.extend(ip_addresses)
+              
+              # If no IPs found from network interfaces, try to resolve DNS entries
+              if not dns_entries and endpoint.get('DnsEntries'):
+                  dns_entries = resolve_dns_entries(endpoint['DnsEntries'])
+              
+              return {
+                  'DNSEntries': dns_entries,
+                  'EndpointType': 'Interface',
+                  'NetworkInterfaceIds': network_interface_ids,
+                  'ServiceName': endpoint.get('ServiceName', ''),
+                  'VpcId': endpoint.get('VpcId', ''),
+                  'RouteTableIds': endpoint.get('RouteTableIds', []),
+                  'SubnetIds': endpoint.get('SubnetIds', [])
+              }
+
+          def process_gateway_endpoint(endpoint):
+              """
+              Process Gateway VPC Endpoint (S3, DynamoDB)
+              """
+              service_name = endpoint.get('ServiceName', '')
+              
+              # Gateway endpoints don't have IP addresses, they use route tables
+              return {
+                  'DNSEntries': [service_name],  # Return the service name for CNAME
+                  'EndpointType': 'Gateway',
+                  'ServiceName': service_name,
+                  'VpcId': endpoint.get('VpcId', ''),
+                  'RouteTableIds': endpoint.get('RouteTableIds', []),
+                  'PolicyDocument': endpoint.get('PolicyDocument', '')
+              }
+
+          def get_network_interface_ips(network_interface_ids):
+              """
+              Get private IP addresses from network interfaces
+              """
+              ip_addresses = []
+              
+              try:
+                  response = ec2.describe_network_interfaces(
+                      NetworkInterfaceIds=network_interface_ids
+                  )
+                  
+                  for interface in response['NetworkInterfaces']:
+                      # Get primary private IP
+                      private_ip = interface.get('PrivateIpAddress')
+                      if private_ip:
+                          ip_addresses.append(private_ip)
+                          logger.info(f"Found IP address: {private_ip}")
+                      
+                      # Get secondary private IPs
+                      for private_ip_address in interface.get('PrivateIpAddresses', []):
+                          if not private_ip_address.get('Primary', False):
+                              secondary_ip = private_ip_address.get('PrivateIpAddress')
+                              if secondary_ip:
+                                  ip_addresses.append(secondary_ip)
+                                  logger.info(f"Found secondary IP address: {secondary_ip}")
+              
+              except ClientError as e:
+                  logger.error(f"Error getting network interface IPs: {e}")
+                  raise Exception(f"Failed to get network interface information: {e}")
+              
+              return ip_addresses
+
+          def resolve_dns_entries(dns_entries):
+              """
+              Resolve DNS entries to IP addresses using socket (fallback method)
+              """
+              import socket
+              ip_addresses = []
+              
+              for dns_entry in dns_entries:
+                  dns_name = dns_entry.get('DnsName')
+                  if dns_name:
+                      try:
+                          # Resolve DNS name to IP addresses
+                          result = socket.getaddrinfo(dns_name, None, socket.AF_INET)
+                          for addr_info in result:
+                              ip = addr_info[4][0]
+                              if ip not in ip_addresses:
+                                  ip_addresses.append(ip)
+                                  logger.info(f"Resolved {dns_name} to {ip}")
+                      except socket.gaierror as e:
+                          logger.warning(f"Could not resolve DNS name {dns_name}: {e}")
+                      except Exception as e:
+                          logger.error(f"Error resolving DNS name {dns_name}: {e}")
+              
+              return ip_addresses
+
+          def send_response(event, context, response_status, response_data, physical_resource_id):
+              """
+              Send response back to CloudFormation
+              """
+              response_url = event['ResponseURL']
+              
+              response_body = {
+                  'Status': response_status,
+                  'Reason': f'See the details in CloudWatch Log Stream: {context.log_stream_name}',
+                  'PhysicalResourceId': physical_resource_id,
+                  'StackId': event['StackId'],
+                  'RequestId': event['RequestId'],
+                  'LogicalResourceId': event['LogicalResourceId'],
+                  'Data': response_data
+              }
+              
+              json_response_body = json.dumps(response_body)
+              
+              logger.info(f"Response body: {json_response_body}")
+              
+              headers = {
+                  'content-type': '',
+                  'content-length': str(len(json_response_body))
+              }
+              
+              try:
+                  response = http.request(
+                      'PUT',
+                      response_url,
+                      body=json_response_body,
+                      headers=headers
+                  )
+                  logger.info(f"Status code: {response.status}")
+              except Exception as e:
+                  logger.error(f"Error sending response: {e}")
+                  raise
+      Description: "Resolves VPC Endpoint DNS information for CloudFormation"
+      FunctionName: !Ref FunctionName
+      Handler: index.lambda_handler
+      LoggingConfig:
+        ApplicationLogLevel: !Ref ApplicationLogLevel
+        LogFormat: !Ref LogFormat
+        LogGroup: !Sub "/aws/lambda/${FunctionName}"
+        SystemLogLevel: !Ref SystemLogLevel
+      MemorySize: 256
+      Role: !If 
+      - CreateRole
+      - !GetAtt LambdaFunctionRole.Arn
+      - !Join [ ":", [ "arn:aws:iam:", !Ref "AWS::AccountId", !Sub "role/${FunctionName}Role" ] ]
+      Runtime: !Ref Runtime
+      Timeout: 60
+
+Outputs:
+  LambdaFunctionArn:
+    Description: ARN of the Lambda Function
+    Value: !GetAtt LambdaFunction.Arn
+  LogGroupId:
+    Description: Lambda Function Log Group Id
+    Value: !Ref LambdaFunctionLogGroup
+  RoleArn:
+    Description: Lambda Function Role Arn
+    Value: !If [ CreateRole, !GetAtt LambdaFunctionRole.Arn, "" ]

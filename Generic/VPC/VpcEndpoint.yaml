@@ -33,6 +33,16 @@ Parameters:
     Type: String
 
   # Stack parameters
+  DnsRecordIpType:
+    AllowedValues: ["ipv4", "ipv6", "dualstack", "service-defined", "not-specified"]
+    Default: "ipv4"
+    Description: "The DNS records created for the endpoint."
+    Type: String
+  IpAddressType:
+    AllowedValues: ["ipv4","ipv6","dualstack","not-specified"]
+    Default: "not-specified"
+    Description: The supported IP address types.
+    Type: String
   PolicyDocument:
     Default: ""
     Description: |
@@ -48,6 +58,16 @@ Parameters:
       The private hosted zone contains a record set for the default public DNS name 
       for the service for the Region, which resolves to the private IP addresses 
       of the endpoint network interfaces in the VPC.
+    Type: String
+  PrivateDnsOnlyForInboundResolverEndpoint:
+    AllowedValues: [OnlyInboundResolver, AllResolvers, NotSpecified]
+    Default: NotSpecified
+    Description: >-
+      Indicates whether to enable private DNS only for inbound endpoints. This
+      option is available only for services that support both gateway and
+      interface endpoints. It routes traffic that originates from the VPC to
+      the gateway endpoint and traffic that originates from on-premises to the
+      interface endpoint.
     Type: String
   ResourceConfigurationArn:
     Default: ""
@@ -101,12 +121,18 @@ Resources:
   VpcEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
+      DnsOptions:
+        DnsRecordIpType: !Ref DnsRecordIpType
+        PrivateDnsOnlyForInboundResolverEndpoint: !Ref PrivateDnsOnlyForInboundResolverEndpoint
       PolicyDocument: !If [hasPolicyDocument, !Ref PolicyDocument, !Ref "AWS::NoValue"]
       PrivateDnsEnabled: !If 
-        - isGatewayType
-        - !Ref "AWS::NoValue"
+        - isInterfaceType
         - !Ref PrivateDnsEnabled
-      ResourceConfigurationArn: !If [hasResourceConfigurationArn, !Ref ResourceConfigurationArn, !Ref "AWS::NoValue"]
+        - "false"
+      ResourceConfigurationArn: !If 
+        - hasResourceConfigurationArn
+        - !Ref ResourceConfigurationArn
+        - !Ref "AWS::NoValue"
       RouteTableIds: !If
         - isGatewayType
         - !If [hasRouteTableIds, !Ref RouteTableIds, !Ref "AWS::NoValue"]

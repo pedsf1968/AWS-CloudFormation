@@ -1,0 +1,110 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create a SQS Interface Endpoint
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "110_AWSClientVpn"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  BucketRegion:
+    AllowedValues: ["eu-west-3", "eu-central-1"]
+    Default: "eu-west-3"
+    Description: "Region where is the Bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: ["dev", "staging", "test", "prod"]
+    ConstraintDescription: "Must specify dev, staging, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: ["false", "true"]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+  # Stack parameters
+  ClientVpnEndpointName:
+    Default: "MyClientVPNEndpoint"
+    Description: "The name of the Client VPN endpoint"
+    MaxLength: 50
+    MinLength: 1
+    Type: String
+  ClientCidrBlock:
+    Type: String
+    Description: "IPv4 address range in CIDR notation for client IP addresses (must be between /22 and /12)"
+    AllowedPattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\/(?:1[2-9]|2[0-2])$"
+    ConstraintDescription: "Must be a valid CIDR block between /12 and /22"
+  Description:
+    Default: "My Client VPN Endpoint"
+    Description: "A brief description of the Client VPN endpoint"
+    MaxLength: 255
+    Type: String
+  SecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: "Security group ID to apply to the target network"
+  ServerCertificateArn:
+    AllowedPattern: "^arn:aws:acm:[a-z0-9-]+:[0-9]{12}:certificate\/[a-f0-9-]+$"
+    ConstraintDescription: "Must be a valid ACM certificate ARN"
+    Description: "The ARN of the server certificate"
+    Type: String
+  TransportProtocol:
+    Default: "udp"
+    Description: "The transport protocol for the VPN connection"
+    AllowedValues: ["udp", "tcp"]
+    Type: String
+  VpcId:
+    Description: "The ID of the VPC"
+    Type: AWS::EC2::VPC::Id
+  VpnPort:
+    Default: 443
+    Description: "The port for the VPN connection"
+    MinValue: 1
+    MaxValue: 65535
+    Type: Number
+
+Resources:
+  ClientVpnEndpoint:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/VPC/ClientVpnEndpoint.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        ClientCidrBlock: "10.0.0.0/22"
+        ClientRootCertificateChainArn: !Ref ClientRootCertificateChainArn
+        ClientVpnEndpointType: "certificate-authentication"
+        Description: "My Client VPN Endpoint"
+        SecurityGroupId: !Ref SecurityGroupId
+        ServerCertificateArn: !Ref ServerCertificateArn
+        VpcId: !Ref VpcId
+        VpnPort: !Ref VpnPort
+
+  # ClientVPNAuthorizationRule:
+  #   Type: AWS::EC2::ClientVpnAuthorizationRule
+  #   Properties:
+  #     ClientVpnEndpointId: !Ref ClientVpnEndpoint
+  #     TargetNetworkCidr: 192.168.1.0/24 # Your VPC subnet
+  #     AuthorizeAllGroups: true
+  #     Description: Allow access to VPC subnet

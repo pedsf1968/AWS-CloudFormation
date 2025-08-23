@@ -7,7 +7,7 @@
 # 2 - Copy SSH key on bastion
 # 3 - SSH on consumer with ssh key
 # 4 - Get DNS name of endpoint
-# 5 - curl DNS endpoint
+# 5 - curl DNS endpoint (wget http://vpce-05d6cae77fafdea8c-ai09civd.vpce-svc-02a2e8fa28cd70ab7.eu-west-3.vpce.amazonaws.com)
 
 AWSTemplateFormatVersion: "2010-09-09"
 Description: This template deploys a 2 VPC, Public and Private Subnets, Bastion, consumer and web servers, NLB and Private Link
@@ -28,7 +28,7 @@ Metadata:
           - BucketObject
           - SaveInS3File
       - Label:
-          default: "VPC configuration"
+          default: "Network configuration"
         Parameters:
           - VpcNames
           - VpcCidrBlocks
@@ -68,6 +68,11 @@ Parameters:
   BucketObject:
     Default: "Data.json"
     Description: "File to store data in the bucket"
+    Type: String
+  BucketRegion:
+    AllowedValues: ["eu-west-3", "eu-central-1"]
+    Default: "eu-west-3"
+    Description: "Region where is the Bucket"
     Type: String
   EnvironmentName:
     AllowedValues: ["dev", "test", "staging", "prod"]
@@ -140,13 +145,16 @@ Parameters:
     Description: "WebServer Instance type"
     Type: String
 
+Conditions:
+  HasNoWebServerInstanceImageId: !Equals [ !Ref WebServerInstanceImageId, "" ]
+
 Resources:
   Lambdas:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Retain
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/64_Lambdas.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/64_Lambdas.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -159,12 +167,13 @@ Resources:
 
   SSMDocuments:
     Type: AWS::CloudFormation::Stack
+    Condition: HasNoWebServerInstanceImageId
     DeletionPolicy: Delete
     DependsOn:
       - Lambdas
     UpdateReplacePolicy: Retain
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/64_SSM_Documents.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/64_SSM_Documents.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -180,7 +189,7 @@ Resources:
       - Lambdas
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/64_Roles.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/64_Roles.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -197,7 +206,7 @@ Resources:
       - Lambdas
     UpdateReplacePolicy: Retain
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/64_VpcAndSubnets.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/64_VpcAndSubnets.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -216,7 +225,7 @@ Resources:
       - Lambdas
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/64_SecurityGroups.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/64_SecurityGroups.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -250,7 +259,7 @@ Resources:
       - Lambdas
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/64_Gateways.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/64_Gateways.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -269,7 +278,7 @@ Resources:
       - Lambdas
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/64_RouteTables.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/64_RouteTables.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -290,10 +299,9 @@ Resources:
     DeletionPolicy: Delete
     DependsOn:
       - Lambdas
-      - SSMDocuments
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/64_Instances.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/64_Instances.yaml"
       TimeoutInMinutes: 10
       Parameters:
         Bucket: !Ref Bucket
@@ -316,7 +324,6 @@ Resources:
         ConsumerInstanceType: !Ref ConsumerInstanceType
         ConsumerSecurityGroup: !GetAtt SecurityGroups.Outputs.ConsumerSecurityGroupId
         ConsumerSubnetIds: !GetAtt VpcAndSubnets.Outputs.VpcASubnetPrivateIds
-        OutputS3BucketName: !Ref Bucket
         WebServerInstanceImageId: !Ref WebServerInstanceImageId
         WebServerInstanceName: !Ref WebServerInstanceName
         WebServerInstanceType: !Ref WebServerInstanceType
@@ -330,7 +337,7 @@ Resources:
       - Lambdas
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/64_LoadBalancers.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/64_LoadBalancers.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -352,7 +359,7 @@ Resources:
       - Lambdas
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/64_Endpoints.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/64_Endpoints.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -362,15 +369,15 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         NetworkLoadBalancerArn: !GetAtt LoadBalancers.Outputs.NetworkLoadBalancerArn
-        VpcEpSubnetIds: !Join 
+        VpcEndpointSubnetIds: !Join 
           - ","
           - - !Select
               - 1
               - !Split [ ",", !GetAtt VpcAndSubnets.Outputs.VpcASubnetPrivateIds ]
             - !Select
               - 3
-              - !Split [ ",", !GetAtt VpcAndSubnets.Outputs.VpcASubnetPrivateIds ]          
-        VpcEpVpcId: !Select
+              - !Split [ ",", !GetAtt VpcAndSubnets.Outputs.VpcASubnetPrivateIds ]
+        VpcEndpointVpcId: !Select
           - 0
           - !Split [ ",", !GetAtt VpcAndSubnets.Outputs.VpcIds ]
-        VpcEpSecurityGroupIds: !GetAtt SecurityGroups.Outputs.VpcEndpointServiceSecurityGroupId
+        VpcEndpointSecurityGroupIds: !GetAtt SecurityGroups.Outputs.VpcEndpointServiceSecurityGroupId

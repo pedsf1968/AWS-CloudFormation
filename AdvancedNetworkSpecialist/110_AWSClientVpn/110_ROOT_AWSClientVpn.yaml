@@ -1,0 +1,322 @@
+# aws cloudformation validate-template --template-body file:/110_ROOT_SiteToSiteVpn.yaml
+# aws cloudformation create-stack --stack-name ANS-110 --template-body file:/110_ROOT_SiteToSiteVpn.yaml --region ${BucketRegion} --capabilities CAPABILITY_IAM
+# aws cloudformation delete-stack --stack-name ANS-110 --region ${BucketRegion}
+
+AWSTemplateFormatVersion: "2010-09-09"
+Description: This template create a VPN between two accounts
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Project Configuration"
+        Parameters:
+          - ProjectName
+          - EnvironmentName
+      - Label:
+          default: "Configuration"
+        Parameters:
+          - BucketRegion
+          - Bucket
+          - BucketKey
+          - BucketObject
+          - SaveInS3File
+      - Label:
+          default: "Network"
+        Parameters:
+          - VpcCidrBlock
+          - VpcName
+          - SubnetCidrBlocks
+          - SubnetNames
+      - Label:
+          default: "Instances"
+        Parameters:
+          - KeyName
+          - BastionInstanceImageId
+          - BastionInstanceName
+          - BastionInstanceType
+          - ApplicationInstanceImageId
+          - ApplicationInstanceName
+          - ApplicationInstanceType
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "110_AWSClientVpn"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  BucketRegion:
+    AllowedValues: ["eu-west-3", "eu-central-1"]
+    Default: "eu-west-3"
+    Description: "Region where is the Bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: ["dev", "staging", "test", "prod"]
+    ConstraintDescription: "Must specify dev, staging, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: ["false", "true"]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+  # Network parameters
+  InternetGatewayName:
+    Default: "VPC-IGW"
+    Type: String
+
+  SubnetCidrBlocks:
+    Default: "192.168.200.0/24,192.168.100.0/24,192.168.0.0/24"
+    Description: "Subnets CIDR for Application and VPN Target"
+    Type: String
+  SubnetNames:
+    Default: "Bastion,Application,VPNTarget"
+    Description: Subnet names
+    Type: String
+
+  VpcCidrBlock:
+    Default: 192.168.0.0/16
+    Description: "The IPv4 network range for the VPC, in CIDR notation."
+    Type: String
+  VpcName:
+    Default: "MyVPC"
+    Description: VPC name
+    Type: String
+
+  # Instances parameters
+  BastionInstanceImageId:
+    Default: ami-08461dc8cd9e834e0
+    Description: "Bastion Instance AMI"
+    Type: AWS::EC2::Image::Id
+  BastionInstanceIngressCidrIp:
+    Description: "Ingress CIDR IP for Bastion Instance"
+    Default: "0.0.0.0/0"
+    Type: String
+  BastionInstanceName:
+    Default: "Bastion"
+    Description: "Bastion Instance name"
+    Type: String
+  BastionInstanceType:
+    Default: t2.micro
+    Description: "Bastion Instance type"
+    Type: String
+  ApplicationInstanceImageId:
+    Default: ami-08461dc8cd9e834e0
+    Description: "Application Instance AMI"
+    Type: AWS::EC2::Image::Id
+  ApplicationInstanceName:
+    Default: "Application"
+    Description: "Application Instances name"
+    Type: String
+  ApplicationInstanceType:
+    Default: t2.micro
+    Description: "Application Instances type"
+    Type: String
+  KeyName:
+    Default: "dso-paris"
+    Description: "Instances Key name"
+    Type: String
+
+Resources:
+  Lambdas:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/110_Lambdas.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        ApplicationLogLevel: INFO
+
+  Roles:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/110_Roles.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+
+  VpcAndSubnets:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/110_VpcAndSubnets.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        AvailabilityZone: !Select [0, !GetAZs ]
+        SubnetCidrBlocks: !Ref SubnetCidrBlocks
+        SubnetNames: !Ref SubnetNames
+        VpcCidrBlock: !Ref VpcCidrBlock
+        VpcName: !Ref VpcName
+
+  Gateways:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - Roles
+      - Lambdas
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/110_Gateways.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        IgwName: !Ref InternetGatewayName
+        VpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
+
+  RouteTables:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/110_RouteTables.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        BucketRegion: !Ref BucketRegion
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        InternetGatewayId: !GetAtt Gateways.Outputs.InternetGatewayId
+        RouteTablePrivateNames: "Application,VPNTarget"
+        RouteTablePublicName: "Bastion"
+        SubnetPrivateIds: !GetAtt VpcAndSubnets.Outputs.SubnetPrivateIds
+        SubnetPublicId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId
+        VpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
+
+  SecurityGroups:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/110_SecurityGroups.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        ApplicationInstanceIngressCidrIp: !GetAtt VpcAndSubnets.Outputs.VpcCidrBlock
+        BastionInstanceIngressCidrIp: !Ref BastionInstanceIngressCidrIp
+        VpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
+
+  Instances:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/110_Instances.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        BastionInstanceImageId: !Ref BastionInstanceImageId
+        BastionInstanceName: !Ref BastionInstanceName
+        BastionInstanceProfile: !GetAtt Roles.Outputs.InstanceCAServerProfileId
+        BastionInstanceSecurityGroup: !GetAtt SecurityGroups.Outputs.BastionInstanceSecurityGroupId
+        BastionInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId
+        BastionInstanceType: !Ref BastionInstanceType
+        ApplicationInstanceImageId: !Ref ApplicationInstanceImageId
+        ApplicationInstanceName: !Ref ApplicationInstanceName
+        ApplicationInstanceProfile: !GetAtt Roles.Outputs.InstanceProfileId
+        ApplicationInstanceSecurityGroup: !GetAtt SecurityGroups.Outputs.ApplicationInstanceSecurityGroupId
+        ApplicationInstanceSubnetId: !Select
+          - 0
+          - !Split [ ",", !GetAtt VpcAndSubnets.Outputs.SubnetPrivateIds ]
+        ApplicationInstanceType: !Ref ApplicationInstanceType
+        KeyName: !Ref KeyName
+
+  SSMDocuments:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/110_SSM_Documents.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        BucketRegion: !Ref BucketRegion
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        BastionInstanceId: !GetAtt Instances.Outputs.BastionInstanceId
+        OutputS3BucketName: !Ref Bucket
+
+  # Endpoints:
+  #   Type: AWS::CloudFormation::Stack
+  #   DeletionPolicy: Delete
+  #   DependsOn:
+  #     - Lambdas
+  #   UpdateReplacePolicy: Delete
+  #   Properties:
+  #     TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/110_Endpoints.yaml"
+  #     TimeoutInMinutes: 5
+  #     Parameters:
+  #       Bucket: !Ref Bucket
+  #       BucketKey: !Ref BucketKey
+  #       BucketObject: !Ref BucketObject
+  #       BucketRegion: !Ref BucketRegion
+  #       EnvironmentName: !Ref EnvironmentName
+  #       ProjectName: !Ref ProjectName
+  #       SaveInS3File: !Ref SaveInS3File
+        

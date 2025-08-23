@@ -1,0 +1,264 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Optimized CloudFormation template for AWS Client VPN Endpoint with multiple authentication types"
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Global Configuration"
+        Parameters:
+          - EnvironmentName
+          - ProjectName
+      - Label:
+          default: "VPN Configuration"
+        Parameters:
+          - ClientVpnEndpointName
+          - Description
+          - ClientCidrBlock
+          - VpcId
+          - SecurityGroupId
+          - TransportProtocol
+          - VpnPort
+          - SplitTunnel
+          - DnsServers
+      - Label:
+          default: "Authentication Configuration"
+        Parameters:
+          - ClientVpnEndpointType
+          - ServerCertificateArn
+          - ClientRootCertificateChainArn
+          - DirectoryId
+          - SAMLProviderArn
+          - SelfServiceSAMLProviderArn
+      - Label:
+          default: "S3 Storage (Optional)"
+        Parameters:
+          - SaveInS3File
+          - Bucket
+          - BucketKey
+          - BucketObject
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "64_VPCEndpointServiceAndAccessThroughVPCEndpoint"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  BucketRegion:
+    AllowedValues: ["eu-west-3", "eu-central-1"]
+    Default: "eu-west-3"
+    Description: "Region where is the Bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: ["dev", "test", "staging", "prod"]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String    
+  ProjectName:
+    ConstraintDescription: "Must be between 1 and 10 characters"
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    MaxLength: 10
+    MinLength: 1
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+
+  # VPN Configuration
+  ClientVpnEndpointName:
+    Default: "MyClientVPNEndpoint"
+    Description: "The name of the Client VPN endpoint"
+    MaxLength: 50
+    MinLength: 1
+    Type: String
+  ClientCidrBlock:
+    Type: String
+    Description: "IPv4 address range in CIDR notation for client IP addresses (must be between /22 and /12)"
+    AllowedPattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\/(?:1[2-9]|2[0-2])$"
+    ConstraintDescription: "Must be a valid CIDR block between /12 and /22"
+  Description:
+    Default: "My Client VPN Endpoint"
+    Description: "A brief description of the Client VPN endpoint"
+    MaxLength: 255
+    Type: String
+  DnsServers:
+    Default: "8.8.8.8,8.8.4.4"
+    Description: "DNS servers for DNS resolution (max 2 servers)"
+    Type: CommaDelimitedList
+  SecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: "Security group ID to apply to the target network"
+  SplitTunnel:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: "Enable split-tunnel on the AWS Client VPN endpoint"
+  TransportProtocol:
+    Default: "udp"
+    Description: "The transport protocol for the VPN connection"
+    AllowedValues: ["udp", "tcp"]
+    Type: String
+  VpcId:
+    Description: "The ID of the VPC"
+    Type: AWS::EC2::VPC::Id
+  VpnPort:
+    Default: 443
+    Description: "The port for the VPN connection"
+    MinValue: 1
+    MaxValue: 65535
+    Type: Number
+
+  # Authentication Configuration
+  ClientVpnEndpointType:
+    AllowedValues: 
+      - "certificate-authentication"
+      - "directory-service-authentication" 
+      - "federated-authentication"
+    Default: "certificate-authentication"
+    Description: "The type of client authentication to be used"
+    Type: String
+  ServerCertificateArn:
+    AllowedPattern: "^arn:aws:acm:[a-z0-9-]+:[0-9]{12}:certificate\/[a-f0-9-]+$"
+    ConstraintDescription: "Must be a valid ACM certificate ARN"
+    Description: "The ARN of the server certificate"
+    Type: String
+
+  # Certificate Authentication
+  ClientRootCertificateChainArn:
+    Default: ""
+    Description: "The ARN of the client root certificate (required for certificate authentication)"
+    Type: String
+
+  # Directory Service Authentication
+  DirectoryId:
+    Default: ""
+    Description: "The ID of the Active Directory (required for directory service authentication)"
+    Type: String
+
+  # Federated Authentication
+  SAMLProviderArn:
+    Default: ""
+    Description: "The ARN of the IAM SAML identity provider (required for federated authentication)"
+    Type: String
+  SelfServiceSAMLProviderArn:
+    Default: ""
+    Description: "The ARN of the IAM SAML identity provider for self-service portal"
+    Type: String
+
+Conditions:
+  IsCertificateAuth: !Equals [!Ref ClientVpnEndpointType, "certificate-authentication"]
+  IsDirectoryServiceAuth: !Equals [!Ref ClientVpnEndpointType, "directory-service-authentication"]
+  IsFederatedAuth: !Equals [!Ref ClientVpnEndpointType, "federated-authentication"]
+  SaveToS3: !Equals [!Ref SaveInS3File, "true"]
+  HasBucketKey: !Not [!Equals [!Ref BucketKey, ""]]
+
+Resources:
+  # Single Client VPN Endpoint resource with conditional authentication
+  ClientVpnEndpoint:
+    Type: AWS::EC2::ClientVpnEndpoint
+    Properties:
+      AuthenticationOptions:
+        - !If
+          - IsCertificateAuth
+          - Type: "certificate-authentication"
+            MutualAuthentication:
+              ClientRootCertificateChainArn: !Ref ClientRootCertificateChainArn
+          - !If
+            - IsDirectoryServiceAuth
+            - Type: "directory-service-authentication"
+              ActiveDirectory:
+                DirectoryId: !Ref DirectoryId
+            - Type: "federated-authentication"
+              FederatedAuthentication:
+                SAMLProviderArn: !Ref SAMLProviderArn
+                SelfServiceSAMLProviderArn: !Ref SelfServiceSAMLProviderArn
+      
+      ClientCidrBlock: !Ref ClientCidrBlock
+      
+      ConnectionLogOptions:
+        Enabled: false
+      
+      Description: !Ref Description
+      DnsServers: !Ref DnsServers
+      
+      SecurityGroupIds:
+        - !Ref SecurityGroupId
+      
+      ServerCertificateArn: !Ref ServerCertificateArn
+      SplitTunnel: !Ref SplitTunnel
+      
+      TagSpecifications:
+        - ResourceType: "client-vpn-endpoint"
+          Tags:
+            - Key: Name
+              Value: !Sub "${ProjectName}-${EnvironmentName}-CVE-${ClientVpnEndpointName}"
+            - Key: Environment
+              Value: !Ref EnvironmentName
+            - Key: Project
+              Value: !Ref ProjectName
+            - Key: ManagedBy
+              Value: "CloudFormation"
+            - Key: AuthenticationType
+              Value: !Ref ClientVpnEndpointType
+            - Key: StackName
+              Value: !Ref AWS::StackName
+      
+      TransportProtocol: !Ref TransportProtocol
+      VpcId: !Ref VpcId
+      VpnPort: !Ref VpnPort
+
+  # S3 storage resource (conditional)
+  ClientVpnEndpointToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: SaveToS3
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:EC2ResourceToS3"
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !If [HasBucketKey, !Ref BucketKey, !Ref "AWS::NoValue"]
+      BucketObject: !Ref BucketObject
+      Region: !Ref AWS::Region
+      ResourceType: "ClientVpnEndpoint"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:ClientVpnEndpoint:${ClientVpnEndpointName}"
+      Value: !Ref ClientVpnEndpoint
+
+Outputs:
+  ClientVpnEndpointId:
+    Description: "Client VPN Endpoint ID"
+    Value: !Ref ClientVpnEndpoint
+    Export:
+      Name: !Sub "${AWS::StackName}-ClientVpnEndpointId"
+
+  ClientVpnEndpointArn:
+    Description: "Client VPN Endpoint ARN"
+    Value: !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:client-vpn-endpoint/${ClientVpnEndpoint}"
+    Export:
+      Name: !Sub "${AWS::StackName}-ClientVpnEndpointArn"
+
+  ClientVpnEndpointDnsName:
+    Description: "Client VPN Endpoint DNS Name"
+    Value: !GetAtt ClientVpnEndpoint.DnsName
+    Export:
+      Name: !Sub "${AWS::StackName}-ClientVpnEndpointDnsName"
+
+  AuthenticationType:
+    Description: "Authentication type used for the VPN endpoint"
+    Value: !Ref ClientVpnEndpointType
+    Export:
+      Name: !Sub "${AWS::StackName}-AuthenticationType"

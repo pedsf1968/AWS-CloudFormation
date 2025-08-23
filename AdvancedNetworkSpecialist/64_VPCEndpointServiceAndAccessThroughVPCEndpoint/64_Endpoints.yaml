@@ -16,6 +16,11 @@ Parameters:
     Default: "Data.json"
     Description: "File to store data in the bucket"
     Type: String
+  BucketRegion:
+    AllowedValues: ["eu-west-3", "eu-central-1"]
+    Default: "eu-west-3"
+    Description: "Region where is the Bucket"
+    Type: String
   EnvironmentName:
     AllowedValues: ["dev", "test", "staging", "prod"]
     ConstraintDescription: "Must specify dev, test or prod"
@@ -42,12 +47,12 @@ Parameters:
     Description: "The Amazon Resource Names (ARNs) of the Network Load Balancers."
     Type: String
     Default: ""
-  VpcEpSecurityGroupIds:
+  VpcEndpointSecurityGroupIds:
     Description: "The Security Group for VPC Endpoint."
     Type: String
-  VpcEpSubnetIds:
+  VpcEndpointSubnetIds:
     Type: String
-  VpcEpVpcId:
+  VpcEndpointVpcId:
     Type: String
 
 Resources:
@@ -56,7 +61,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/VpcEndpointService.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/VPC/VpcEndpointService.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -67,14 +72,14 @@ Resources:
         SaveInS3File: !Ref SaveInS3File
         AcceptanceRequired: !Ref AcceptanceRequired
         NetworkLoadBalancerArn: !Ref NetworkLoadBalancerArn
-        VpcESType: network
+        VpcEndpointServiceType: network
 
   ConsumerVPCEndpoint:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/VpcEndpoint.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/VPC/VpcEndpoint.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -83,10 +88,10 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
-        SecurityGroupIds: !Ref VpcEpSecurityGroupIds
+        SecurityGroupIds: !Ref VpcEndpointSecurityGroupIds
         ServiceName: !GetAtt ServicesVPCEndpointService.Outputs.VPCEndpointServiceName
-        SubnetIds: !Ref VpcEpSubnetIds
-        VpcId: !Ref VpcEpVpcId
+        SubnetIds: !Ref VpcEndpointSubnetIds
+        VpcId: !Ref VpcEndpointVpcId
         VpcEndpointType: "Interface"
 
 Outputs:

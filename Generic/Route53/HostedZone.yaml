@@ -34,28 +34,18 @@ Parameters:
 
   # Stack parameters
   Comment:
+    Default: ""
     Description: >-
       Optional: The comment of the hosted zone.
     MaxLength: 256
     Type: String
   Name:
+    Default: "corp.internal"
     Description: >-
       Optional: The name of the domain. This should be a fully qualified
       domain, such as www.example.com. The trailing dot is not required.
     Type: String
     MaxLength: 1024
-  TagKeys: # Required: Yes
-    Default: ""
-    Description: >-
-      Optional: The list of values of the keys of tags that you want to
-      associate with the hosted zone.
-    Type: CommaDelimitedList
-  TagValues:
-    Default: ""
-    Description: >-
-      Optional: The list of values of the Value element for each tag that you
-      want to associate with the hosted zone.
-    Type: CommaDelimitedList
   VpcIds:
     Default: ""
     Description: >-
@@ -71,27 +61,38 @@ Parameters:
     Type: CommaDelimitedList
 
 Conditions:
-  asNoTagKeys: !Equals [ !Select [0, !Ref TagKeys], ""]
-  isPublicHostedZone: !Equals [ !Select [0, !Ref VpcIds], ""]
+  HasNoComment: !Equals [ !Ref Comment, "" ]
+  HasComment: !Not [Condition: HasNoComment]
+  IsPublicHostedZone: !Equals [ !Select [0, !Ref VpcIds], ""]
   SaveInS3File: !Equals [ !Ref SaveInS3File, "true"]
 
 Resources:
   HostedZone:
     Type: AWS::Route53::HostedZone
     Properties:
-      HostedZoneConfig:
-        Comment: !Ref Comment
-      HostedZoneTags: !If
-        - asNoTagKeys
+      HostedZoneConfig: !If
+        - HasComment
+        - Comment: !Ref Comment
         - !Ref AWS::NoValue
-        - - Key: !Select [0, !Ref TagKeys]
-            Value: !Select [0, !Ref TagValues]
+      HostedZoneTags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: ManagedBy
+          Value: "CloudFormation"
+        - Key: ProjectName
+          Value: !Ref ProjectName
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${Name}"
+        - Key: StackName
+          Value: !Ref AWS::StackName
       Name: !Ref Name
       VPCs: !If
-        - isPublicHostedZone
+        - IsPublicHostedZone
         - !Ref AWS::NoValue
         - - VPCId: !Select [0, !Ref VpcIds]
             VPCRegion: !Select [0, !Ref VpcRegions]
+          - VPCId: !Select [1, !Ref VpcIds]
+            VPCRegion: !Select [1, !Ref VpcRegions]
 
   HostedZoneToS3:
     Type: AWS::CloudFormation::CustomResource
@@ -111,5 +112,13 @@ Resources:
 
 Outputs:
   HostedZoneId:
-    Description: "Id of the HostedZone"
+    Description: "ID of the hosted zone"
     Value: !Ref HostedZone
+    Export:
+      Name: !Sub "${AWS::StackName}-HostedZoneId"
+  
+  HostedZoneName:
+    Description: "Name of the hosted zone"
+    Value: !Ref Name
+    Export:
+      Name: !Sub "${AWS::StackName}-HostedZoneName"

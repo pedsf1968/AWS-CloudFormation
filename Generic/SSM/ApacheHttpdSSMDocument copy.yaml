@@ -34,9 +34,14 @@ Parameters:
     Default: "false"
     Description: "Save resources information in s3 file"
     Type: String
+  
+  # Stack parameters
+  DocumentName:
+    Default: ApacheHttpdSSMDocument
+    Type: String
 
 Resources:
-  ApacheHttpdSSMDocument:
+  SSMDocument:
     Type: "AWS::SSM::Document"
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -112,15 +117,24 @@ Resources:
         schemaVersion: "2.2"
       DocumentFormat: YAML
       DocumentType: Command
-      Name: ApacheHttpdSSMDocument
+      Name: !Sub "${ProjectName}-${EnvironmentName}-${DocumentName}"
       Tags:
-      - Key: EnvironmentName
-        Value: !Ref EnvironmentName
-      - Key: Name
-        Value: !Sub "${ProjectName}-${EnvironmentName}-ApacheHttpd-SSMDocument"
-      - Key: ManagedBy
-        Value: "CloudFormation"
-      - Key: ProjectName
-        Value: !Ref ProjectName
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: ManagedBy
+          Value: "CloudFormation"
+        - Key: ProjectName
+          Value: !Ref ProjectName
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${DocumentName}"
+        - Key: StackName
+          Value: !Ref AWS::StackName
       TargetType: "/AWS::EC2::Instance"
       UpdateMethod: Replace
+
+Outputs:
+  SSMDocumentId:
+    Description: SSM Document Id
+    Value: !Ref SSMDocument
+
+

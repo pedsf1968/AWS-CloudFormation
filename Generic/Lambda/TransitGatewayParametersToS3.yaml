@@ -126,7 +126,7 @@ Resources:
             Resource: 
             - !Join [":", ["arn:aws:s3::", !Sub "${Bucket}/${BucketKey}"]]
             - !Join [":", ["arn:aws:s3::", !Sub "${Bucket}/${BucketKey}/*"]]
-      - PolicyName: TransitGatewayParametersToS3Policy
+      - PolicyName: !Sub "${FunctionName}-Policy"
         PolicyDocument:
           Version: '2012-10-17'
           Statement:
@@ -135,16 +135,18 @@ Resources:
             - ec2:DescribeTransitGateways
             Resource: 
             - "*"
-      RoleName: CustomerTransitParametersToS3Role
+      RoleName: !Sub "${FunctionName}"
       Tags:
         - Key: EnvironmentName
           Value: !Ref EnvironmentName
-        - Key: Name
-          Value: !Sub "${ProjectName}-${EnvironmentName}-CustomerTransitParametersToS3"
         - Key: ManagedBy
           Value: "CloudFormation"
         - Key: ProjectName
           Value: !Ref ProjectName
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${FunctionName}"
+        - Key: StackName
+          Value: !Ref AWS::StackName
 
   LambdaFunctionLogGroup:
     Type: AWS::Logs::LogGroup

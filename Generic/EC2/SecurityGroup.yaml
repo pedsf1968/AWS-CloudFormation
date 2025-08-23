@@ -61,12 +61,14 @@ Resources:
       Tags:
         - Key: EnvironmentName
           Value: !Ref EnvironmentName
-        - Key: Name
-          Value:  !Sub "${ProjectName}-${EnvironmentName}-${Name}"
         - Key: ManagedBy
           Value: "CloudFormation"
+        - Key: Name
+          Value:  !Sub "${ProjectName}-${EnvironmentName}-${Name}"
         - Key: ProjectName
           Value: !Ref ProjectName
+        - Key: StackName
+          Value: !Ref AWS::StackName
       VpcId: !Ref VpcId
 
   SecurityGroupIdToS3:

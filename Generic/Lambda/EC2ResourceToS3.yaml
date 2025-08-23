@@ -82,6 +82,11 @@ Parameters:
       The number of days to retain the log events in the specified log group.
       Possible values are: 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557, 2922, 3288, and 3653.
     Type: String
+  Runtime:
+    Type: String
+    Default: "python3.12"
+    AllowedValues: ["python3.8", "python3.9", "python3.10", "python3.11", "python3.12"]
+    Description: "Python runtime version"
   SystemLogLevel:
     AllowedValues: [DEBUG, INFO, WARN]
     Default: WARN
@@ -143,10 +148,14 @@ Resources:
       Tags:
         - Key: EnvironmentName
           Value: !Ref EnvironmentName
-        - Key: Name
-          Value: !Sub "${ProjectName}-${EnvironmentName}-${FunctionName}Role"
+        - Key: ManagedBy
+          Value: "CloudFormation"
         - Key: ProjectName
           Value: !Ref ProjectName
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${FunctionName}"
+        - Key: StackName
+          Value: !Ref AWS::StackName
 
   LambdaFunctionLogGroup:
     Type: AWS::Logs::LogGroup
@@ -192,6 +201,9 @@ Resources:
             """Fetch EC2 resource data from with retry logic."""
             try:
               match (resource_type):
+                case "ClientVpnEndpoint":
+                  response = ec2_client.describe_client_vpn_endpoints(ClientVpnEndpointIds=[ resource_id ])
+                  return response['ClientVpnEndpoints'][0]
                 case "CustomerGateway":
                   response = ec2_client.describe_customer_gateways(CustomerGatewayIds=[ resource_id ])
                   return response['CustomerGateways'][0]
@@ -339,7 +351,7 @@ Resources:
       - CreateRole
       - !GetAtt LambdaFunctionRole.Arn
       - !Join [ ":", [ "arn:aws:iam:", !Ref "AWS::AccountId", !Sub "role/${FunctionName}Role" ] ]
-      Runtime: python3.12
+      Runtime: !Ref Runtime
       Timeout: 30
     UpdateReplacePolicy: Delete
 

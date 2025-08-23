@@ -68,6 +68,8 @@ Resources:
           Value: "CloudFormation"
         - Key: ProjectName
           Value: !Ref ProjectName
+        - Key: StackName
+          Value: !Ref AWS::StackName
       Type: !Ref Type
 
   CustomerGatewayParametersToS3:

@@ -127,17 +127,18 @@ Resources:
       Scheme: !Ref Scheme
       SecurityGroups: 
         - !Select [ 0, !Ref SecurityGroups ]
-      Subnets: 
-        - !Select [ 0, !Ref Subnets ]
+      Subnets: !Ref Subnets
       Tags:
         - Key: EnvironmentName
           Value: !Ref EnvironmentName
-        - Key: Name
-          Value: !Sub "${ProjectName}-${EnvironmentName}-${Name}-NLB"
         - Key: ManagedBy
           Value: "CloudFormation"
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${Name}-NLB"
         - Key: ProjectName
           Value: !Ref ProjectName
+        - Key: StackName
+          Value: !Ref AWS::StackName
       Type: !Ref Type
 
   NetworkLoadBalancerToS3:

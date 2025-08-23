@@ -16,6 +16,11 @@ Parameters:
     Description: "File to store data in the bucket"
     Type: String
     Default: "Data.json"
+  BucketRegion:
+    AllowedValues: ["eu-west-3", "eu-central-1"]
+    Default: "eu-west-3"
+    Description: "Region where is the Bucket"
+    Type: String
   EnvironmentName:
     AllowedValues:
       - "dev"
@@ -50,7 +55,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/Vpc.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/VPC/Vpc.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -67,7 +72,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/Subnet.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/VPC/Subnet.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -87,7 +92,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/Subnet.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/VPC/Subnet.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -98,7 +103,6 @@ Resources:
         SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Select [0, !GetAZs ]
         CidrBlock: !Select [ 1, !Cidr [!GetAtt VpcAStack.Outputs.VpcCidrBlock, 6, 8]]
-        MapPublicIpOnLaunch: true
         SubnetName: !Join ["-", [!Select [0, !Ref VpcNames], "A-Private"]]
         VpcId: !GetAtt VpcAStack.Outputs.VpcId
 
@@ -107,7 +111,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/Subnet.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/VPC/Subnet.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -118,7 +122,6 @@ Resources:
         SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Select [0, !GetAZs ]
         CidrBlock: !Select [ 3, !Cidr [!GetAtt VpcAStack.Outputs.VpcCidrBlock, 6, 8]]
-        MapPublicIpOnLaunch: true
         SubnetName: !Join ["-", [!Select [0, !Ref VpcNames], "B-Private"]]
         VpcId: !GetAtt VpcAStack.Outputs.VpcId
 
@@ -127,7 +130,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/Subnet.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/VPC/Subnet.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -138,7 +141,6 @@ Resources:
         SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Select [0, !GetAZs ]
         CidrBlock: !Select [ 5, !Cidr [!GetAtt VpcAStack.Outputs.VpcCidrBlock, 6, 8]]
-        MapPublicIpOnLaunch: true
         SubnetName: !Join ["-", [!Select [0, !Ref VpcNames], "C-Private"]]
         VpcId: !GetAtt VpcAStack.Outputs.VpcId
 
@@ -147,7 +149,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/Subnet.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/VPC/Subnet.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -158,7 +160,6 @@ Resources:
         SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Select [1, !GetAZs ]
         CidrBlock: !Select [ 2, !Cidr [!GetAtt VpcAStack.Outputs.VpcCidrBlock, 6, 8]]
-        MapPublicIpOnLaunch: true
         SubnetName: !Join ["-", [!Select [0, !Ref VpcNames], "D-Private"]]
         VpcId: !GetAtt VpcAStack.Outputs.VpcId
 
@@ -168,7 +169,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/Vpc.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/VPC/Vpc.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -185,7 +186,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/Subnet.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/VPC/Subnet.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -196,7 +197,6 @@ Resources:
         SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Select [0, !GetAZs ]
         CidrBlock: !Select [ 1, !Cidr [!GetAtt VpcBStack.Outputs.VpcCidrBlock, 5, 8]]
-        MapPublicIpOnLaunch: true
         SubnetName: !Join ["-", [!Select [1, !Ref VpcNames], "A-Private"]]
         VpcId: !GetAtt VpcBStack.Outputs.VpcId
 
@@ -205,7 +205,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/Subnet.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/VPC/Subnet.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -216,7 +216,6 @@ Resources:
         SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Select [0, !GetAZs ]
         CidrBlock: !Select [ 3, !Cidr [!GetAtt VpcBStack.Outputs.VpcCidrBlock, 5, 8]]
-        MapPublicIpOnLaunch: true
         SubnetName: !Join ["-", [!Select [1, !Ref VpcNames], "B-Private"]]
         VpcId: !GetAtt VpcBStack.Outputs.VpcId
 
@@ -225,7 +224,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/Subnet.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/VPC/Subnet.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -236,7 +235,6 @@ Resources:
         SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Select [1, !GetAZs ]
         CidrBlock: !Select [ 2, !Cidr [!GetAtt VpcBStack.Outputs.VpcCidrBlock, 5, 8]]
-        MapPublicIpOnLaunch: true
         SubnetName: !Join ["-", [!Select [1, !Ref VpcNames], "C-Private"]]
         VpcId: !GetAtt VpcBStack.Outputs.VpcId
 
@@ -245,7 +243,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/VPC/Subnet.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/VPC/Subnet.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -256,7 +254,6 @@ Resources:
         SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Select [1, !GetAZs ]
         CidrBlock: !Select [ 4, !Cidr [!GetAtt VpcBStack.Outputs.VpcCidrBlock, 5, 8]]
-        MapPublicIpOnLaunch: true
         SubnetName: !Join ["-", [!Select [1, !Ref VpcNames], "D-Private"]]
         VpcId: !GetAtt VpcBStack.Outputs.VpcId
 

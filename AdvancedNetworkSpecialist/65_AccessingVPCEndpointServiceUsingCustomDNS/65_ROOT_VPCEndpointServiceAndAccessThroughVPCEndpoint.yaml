@@ -1,0 +1,435 @@
+---
+# aws cloudformation validate-template --template-body file://65_ROOT_VPCEndpointServiceAndAccessThroughVPCEndpoint.yaml
+# aws cloudformation create-stack --stack-name ANS-65 --template-body file:/65_ROOT_VPCEndpointServiceAndAccessThroughVPCEndpoint.yaml --region eu-west-3 --capabilities CAPABILITY_IAM
+# aws cloudformation delete-stack --stack-name ANS-65 --region eu-west-3
+# aws cloudformation list-stacks --stack-status-filter 'CREATE_COMPLETE' 'UPDATE_COMPLETE' 'ROLLBACK_COMPLETE' --query 'StackSummaries[*].StackName' --output text | ForEach-Object { aws cloudformation delete-stack --stack-name $_ }
+#
+# 1 - Deploy with Phase set to "Before VPC Endpoint accepted"
+# 2 - Accept VPC Endpoint Service connection request
+# 3 - Update with Phase set to "After VPC Endpoint accepted"
+# 4 - SSH on bastion with SSH key
+# 5 - Copy SSH key on bastion
+# 6 - SSH on consumer with ssh key
+# 7 - Get DNS name of endpoint
+# 8 - curl DNS endpoint
+
+AWSTemplateFormatVersion: "2010-09-09"
+Description: This template deploys a 2 VPC, Public and Private Subnets, Bastion, consumer and web servers, NLB and Private Link
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Project Configuration"
+        Parameters:
+          - ProjectName
+          - EnvironmentName
+      - Label:
+          default: "Configuration"
+        Parameters:
+          - Bucket
+          - BucketKey
+          - BucketObject
+          - SaveInS3File
+          - Phase
+      - Label:
+          default: "Network configuration"
+        Parameters:
+          - HostedZoneName
+          - ServiceName
+          - VpcNames
+          - VpcCidrBlocks
+          - InternetGatewayName
+      - Label:
+          default: "Instances"
+        Parameters:
+          - InstanceKeyName
+      - Label:
+          default: "Bastion"
+        Parameters:
+          - BastionInstanceImageId
+          - BastionInstanceName
+          - BastionInstanceType
+      - Label:
+          default: "Consumer"
+        Parameters:
+          - ConsumerImageId
+          - ConsumerInstanceName
+          - ConsumerInstanceType
+      - Label:
+          default: "WebServer"
+        Parameters:
+          - WebServerInstanceDnsPrefix
+          - WebServerInstanceImageId
+          - WebServerInstanceName
+          - WebServerInstanceType
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "65_AccessingVPCEndpointServiceUsingCustomDNS"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  BucketRegion:
+    AllowedValues: ["eu-west-3", "eu-central-1"]
+    Default: "eu-west-3"
+    Description: "Region where is the Bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: ["dev", "test", "staging", "prod"]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String    
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "true"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+  Phase:
+    AllowedValues: [ "Before VPC Endpoint accepted", "After VPC Endpoint accepted" ]
+    Default: "Before VPC Endpoint accepted"
+    Description: "Phases before VPC Endpoint accepted and after VPC Endpoint accepted"
+    Type: String
+
+  # Network parameters
+  HostedZoneName:
+    Default: "corp.internal"
+    Description: >-
+      Optional: The name of the hosted zone.
+    MaxLength: 32
+    Type: String
+  InternetGatewayName:
+    Type: String
+    Default: "Out"
+  ServiceName:
+    Description: "Custom service name for DNS record (e.g., api, web, database)"
+    Type: String
+    Default: "app"
+  VpcCidrBlocks:
+    Description: "VPC CIDRs"
+    Type: CommaDelimitedList
+    Default: "10.10.0.0/16,10.20.0.0/16"
+  VpcNames:
+    Description: "VPC names"
+    Type: CommaDelimitedList
+    Default: "Consumer,Provider"
+
+  # Instances parameters
+  BastionInstanceImageId:
+    Default: ami-08461dc8cd9e834e0
+    Description: "Bastion Instance AMI"
+    Type: AWS::EC2::Image::Id
+  BastionInstanceName:
+    Default: "Bastion"
+    Description: "Bastion Instance name"
+    Type: String
+  BastionInstanceType:
+    Default: t2.micro
+    Description: "Bastion Instance type"
+    Type: String
+  ConsumerImageId:
+    Default: ami-08461dc8cd9e834e0
+    Description: "Consumer Instance AMI"
+    Type: AWS::EC2::Image::Id
+  ConsumerInstanceName:
+    Default: "Consumer"
+    Description: "Consumer Instance name"
+    Type: String
+  ConsumerInstanceType:
+    Default: t2.micro
+    Description: "Consumer Instance type"
+    Type: String
+  InstanceKeyName:
+    Description: "Instance Key name"
+    Type: String
+    Default: "dso-paris"
+  WebServerInstanceDnsPrefix:
+    Default: "app"
+    Description: "application Instances DNS prefix"
+    Type: String
+  WebServerInstanceImageId:
+    Default: "ami-0413954edd99eba72"
+    Description: "Web Server AMI"
+    Type: String
+  WebServerInstanceName:
+    Default: "WebServer"
+    Description: "WebServer Instance name"
+    Type: String
+  WebServerInstanceType:
+    Default: t2.micro
+    Description: "WebServer Instance type"
+    Type: String
+
+Conditions:
+  HasNoWebServerInstanceImageId: !Equals [ !Ref WebServerInstanceImageId, "" ]
+
+Resources:
+  LambdasStacks:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/65_Lambdas.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        ApplicationLogLevel: DEBUG
+
+  SSMDocumentsStacks:
+    Type: AWS::CloudFormation::Stack
+    Condition: HasNoWebServerInstanceImageId
+    DeletionPolicy: Delete
+    DependsOn:
+      - LambdasStacks
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/65_SSM_Documents.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+
+  RolesStacks:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - LambdasStacks
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/65_Roles.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+
+  VpcAndSubnetsStacks:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - LambdasStacks
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/65_VpcAndSubnets.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        VpcCidrBlocks: !Join [ ",", !Ref VpcCidrBlocks ]
+        VpcNames: !Join [ ",", !Ref VpcNames ]
+
+  SecurityGroupsStacks:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - LambdasStacks
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/65_SecurityGroups.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        BastionInstanceIngressCidrIp: "0.0.0.0/0"
+        BastionInstanceVpcId: !Select
+          - 0
+          - !Split [",", !GetAtt VpcAndSubnetsStacks.Outputs.VpcIds]
+        ConsumerIngressCidrIp: !Select [0, !Ref VpcCidrBlocks]
+        ConsumerVPCId: !Select
+          - 0
+          - !Split [",", !GetAtt VpcAndSubnetsStacks.Outputs.VpcIds]
+        PrefixListEntries: !Join
+          - ","
+          - - !Select [0, !Ref VpcCidrBlocks]
+            - "VPC-A"
+            - !Select [1, !Ref VpcCidrBlocks]
+            - "VPC-B"
+        WebServerVPCId: !Select
+          - 1
+          - !Split [",", !GetAtt VpcAndSubnetsStacks.Outputs.VpcIds]
+
+  GatewaysStacks:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - LambdasStacks
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/65_Gateways.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        IgwName: !Ref InternetGatewayName
+        VpcIds: !GetAtt VpcAndSubnetsStacks.Outputs.VpcIds
+
+
+  RouteTablesStacks:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - LambdasStacks
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/65_RouteTables.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        VpcIds: !GetAtt VpcAndSubnetsStacks.Outputs.VpcIds
+        VpcASubnetPrivateIds: !GetAtt VpcAndSubnetsStacks.Outputs.VpcASubnetPrivateIds
+        VpcBSubnetPrivateIds: !GetAtt VpcAndSubnetsStacks.Outputs.VpcBSubnetPrivateIds
+        SubnetPublicId: !GetAtt VpcAndSubnetsStacks.Outputs.VpcASubnetPublicId
+        RouteTableNames: "Consumer,Provider"
+        InternetGatewayId: !GetAtt GatewaysStacks.Outputs.InternetGatewayId
+
+  Route53Stacks:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/65_Route53.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        HostedZoneName: !Ref HostedZoneName
+        VpcIds: !GetAtt VpcAndSubnetsStacks.Outputs.VpcIds
+
+  InstancesStacks:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - LambdasStacks
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/65_Instances.yaml"
+      TimeoutInMinutes: 10
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        KeyName: !Ref InstanceKeyName
+        BaseInstanceProfile: !GetAtt RolesStacks.Outputs.InstanceProfileId
+        BaseInstanceSecurityGroup: !GetAtt SecurityGroupsStacks.Outputs.BastionInstanceSecurityGroupId
+        BaseInstanceSubnetId: !GetAtt VpcAndSubnetsStacks.Outputs.VpcASubnetPublicId
+        BastionInstanceImageId: !Ref BastionInstanceImageId
+        BastionInstanceName: !Ref BastionInstanceName
+        BastionInstanceType: !Ref BastionInstanceType
+        BastionInstanceSecurityGroup: !GetAtt SecurityGroupsStacks.Outputs.BastionInstanceSecurityGroupId
+        BastionInstanceSubnetId: !GetAtt VpcAndSubnetsStacks.Outputs.VpcASubnetPublicId
+        ConsumerImageId: !Ref ConsumerImageId
+        ConsumerInstanceName: !Ref ConsumerInstanceName
+        ConsumerInstanceType: !Ref ConsumerInstanceType
+        ConsumerSecurityGroup: !GetAtt SecurityGroupsStacks.Outputs.ConsumerSecurityGroupId
+        ConsumerSubnetIds: !GetAtt VpcAndSubnetsStacks.Outputs.VpcASubnetPrivateIds
+        OutputS3BucketName: !Ref Bucket
+        WebServerInstanceImageId: !Ref WebServerInstanceImageId
+        WebServerInstanceName: !Ref WebServerInstanceName
+        WebServerInstanceType: !Ref WebServerInstanceType
+        WebServerInstanceSecurityGroup: !GetAtt SecurityGroupsStacks.Outputs.WebServerInstanceSecurityGroupId
+        WebServerInstanceSubnetIds: !GetAtt VpcAndSubnetsStacks.Outputs.VpcBSubnetPrivateIds
+
+  LoadBalancersStacks:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - LambdasStacks
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/65_LoadBalancers.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        NLBName: "Provider"
+        NLBSourceCidr: !Select [ 0, !Ref VpcCidrBlocks ] # A CIDR
+        NLBSubnetIds: !GetAtt VpcAndSubnetsStacks.Outputs.VpcBSubnetPrivateIds
+        NLBTargetIds: !GetAtt InstancesStacks.Outputs.ApplicationInstanceIds
+        VpcId: !Select [1, !Split [ ",", !GetAtt VpcAndSubnetsStacks.Outputs.VpcIds ] ]
+
+  VPCEndpointsStacks:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - LambdasStacks
+      - Route53Stacks
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/65_Endpoints.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        ServiceName: !Ref ServiceName
+        HostedZoneName: !Ref HostedZoneName
+        NetworkLoadBalancerArn: !GetAtt LoadBalancersStacks.Outputs.NetworkLoadBalancerArn
+        Phase: !Ref Phase
+        VpcEndpointSubnetIds: !Join 
+          - ","
+          - - !Select
+              - 1
+              - !Split [ ",", !GetAtt VpcAndSubnetsStacks.Outputs.VpcASubnetPrivateIds ]
+            - !Select
+              - 3
+              - !Split [ ",", !GetAtt VpcAndSubnetsStacks.Outputs.VpcASubnetPrivateIds ]          
+        VpcEndpointVpcId: !Select
+          - 0
+          - !Split [ ",", !GetAtt VpcAndSubnetsStacks.Outputs.VpcIds ]
+        VpcEndpointSecurityGroupIds: !GetAtt SecurityGroupsStacks.Outputs.VpcEndpointServiceSecurityGroupId

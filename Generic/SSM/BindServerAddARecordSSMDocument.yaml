@@ -34,9 +34,14 @@ Parameters:
     Default: "false"
     Description: "Save resources information in s3 file"
     Type: String
+  
+  # Stack parameters
+  DocumentName:
+    Default: BindServerAddARecordSSMDocument
+    Type: String
 
 Resources:
-  BindServerAddARecordSSMDocument:
+  SSMDocument:
     Type: AWS::SSM::Document
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -92,15 +97,30 @@ Resources:
         schemaVersion: "2.2"
       DocumentFormat: YAML
       DocumentType: Command
-      Name: BindServerAddARecordSSMDocument
+      Name: !Sub "${ProjectName}-${EnvironmentName}-${DocumentName}"
       Tags:
         - Key: EnvironmentName
           Value: !Ref EnvironmentName
-        - Key: Name
-          Value: !Sub "${ProjectName}-${EnvironmentName}-BindServerAddARecord-SSMDocument"
         - Key: ManagedBy
           Value: "CloudFormation"
         - Key: ProjectName
           Value: !Ref ProjectName
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${DocumentName}"
+        - Key: StackName
+          Value: !Ref AWS::StackName
       TargetType: "/AWS::EC2::Instance"
       UpdateMethod: Replace
+
+Outputs:
+  SSMDocumentName:
+    Description: "Name of the created SSM Document"
+    Value: !Ref SSMDocument
+    Export:
+      Name: !Sub "${ProjectName}-${EnvironmentName}-${DocumentName}-Name"
+  
+  SSMDocumentArn:
+    Description: "ARN of the created SSM Document"
+    Value: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:document/${DocumentName}"
+    Export:
+      Name: !Sub "${ProjectName}-${EnvironmentName}-ApacheHttpd-${DocumentName}-Arn"

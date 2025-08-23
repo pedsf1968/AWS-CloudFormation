@@ -1,0 +1,120 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create SSM Document to deploy Apache Httpd
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "110_AWSClientVpn"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  BucketRegion:
+    AllowedValues: ["eu-west-3", "eu-central-1"]
+    Default: "eu-west-3"
+    Description: "Region where is the Bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: ["dev", "staging", "test", "prod"]
+    ConstraintDescription: "Must specify dev, staging, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: ["false", "true"]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+    
+  # Stack parameters
+  BastionInstanceId:
+    Description: "Bastion Instance ID"
+    Type: String
+  OutputS3BucketName:
+    Description: "The Bucket name for logs"
+    Type: String
+  OutputS3KeyPrefix:
+    Default: "logs/"
+    Description: "Logs prefix"
+    Type: String
+
+Resources:
+  OpenVPNEasyRSASSMDocument:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/SSM/OpenVPNEasyRSASSMDocument.yaml"
+      TimeoutInMinutes: 10
+      Parameters:
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+
+# Wait condition handle for Apache installation
+  SSMAssociationWaitHandle:
+    Type: AWS::CloudFormation::WaitConditionHandle
+
+  # Wait condition for Apache installation completion
+  SSMAssociationWaitCondition:
+    Type: AWS::CloudFormation::WaitCondition
+    DependsOn: 
+      - OpenVPNEasyRSASSMAssociation
+    Properties:
+      Count: 1
+      Handle: !Ref SSMAssociationWaitHandle
+      Timeout: 600
+
+  OpenVPNEasyRSASSMAssociation:
+    Type: AWS::SSM::Association
+    Properties:
+      AssociationName: OpenVPNEasyRSASSMAssociation
+      Name: !GetAtt OpenVPNEasyRSASSMDocument.Outputs.SSMDocumentName
+      OutputLocation:
+        S3Location: 
+          OutputS3BucketName: !Ref OutputS3BucketName
+          OutputS3KeyPrefix: !Ref OutputS3KeyPrefix
+      Parameters:
+        Bucket: 
+          - !Ref Bucket
+        BucketKey: 
+          - !Ref BucketKey
+        ProjectName: 
+          - !Ref ProjectName
+        EnvironmentName: 
+          - !Ref EnvironmentName
+        CaName: 
+          - "Demo CA"
+        ClientBaseName: 
+          - "client1.domain.kr"
+        WaitHandleUrl: 
+          - !Ref SSMAssociationWaitHandle
+        StackName: 
+          - !Ref AWS::StackName
+        Region: 
+          - !Ref AWS::Region
+        ResourceName: 
+          - "SSMAssociationWaitCondition"
+      Targets:
+      - Key: InstanceIds
+        Values:
+        - !Ref BastionInstanceId
+
+Outputs:
+  SSMDocumentName:
+    Description: "Name of the created SSM Document"
+    Value: !GetAtt OpenVPNEasyRSASSMDocument.Outputs.SSMDocumentName
+  
+  SSMDocumentArn:
+    Description: "ARN of the created SSM Document"
+    Value: !GetAtt OpenVPNEasyRSASSMDocument.Outputs.SSMDocumentArn

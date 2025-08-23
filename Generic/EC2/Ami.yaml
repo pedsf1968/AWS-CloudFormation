@@ -25,13 +25,31 @@ Parameters:
     Default: "ANS"
     Description: "Project name that prefix all resources"
     Type: String
-  SaveInS3File:
-    AllowedValues: [ "false", "true" ]
-    Default: "false"
-    Description: "Save resources information in s3 file"
-    Type: String
 
   # Stack parameters
+  AmiName:
+    Default: ""
+    Description: Name of the AMI to create
+    Type: String
+  ApplicationLogLevel:
+    AllowedValues: [ TRACE, DEBUG, INFO, WARN, ERROR, FATAL ]
+    Default: DEBUG
+    Description: |
+      Set this property to filter the application logs for your function that Lambda sends to CloudWatch. 
+      Lambda only sends application logs at the selected level of detail and lower, 
+      where TRACE is the highest level and FATAL is the lowest.
+    Type: String
+  AssociatePublicIpAddress:
+    AllowedValues:
+      - "false"
+      - "true"
+    Default: "false"
+    Description: >-
+      Indicates whether to assign a public IPv4 address to an instance. Applies
+      only if creating a network interface when launching an instance. The
+      network interface must be the primary network interface. If launching
+      into a default subnet, the default value is true.
+    Type: String
   AvailabilityZone: # Required: No
     Description: >-
       The Availability Zone of the instance. If not specified, an Availability
@@ -108,6 +126,9 @@ Parameters:
       network interface, you must specify any subnets as part of the network
       interface instead of using this parameter.
     Type: String
+  SSMDocumentName:
+    Description: SSM Document to be executed on instance before creating AMI
+    Type: String
   UserData: # Required: No
     Default: ""
     Description: >-
@@ -119,144 +140,158 @@ Parameters:
       store volume and you update user data, the instance is replaced.
     Type: String
 
+Conditions:
+  hasElasticIP: !Equals [!Ref ElasticIP, "true"]
+  hasNoUserData: !Equals [!Ref UserData, ""]
+  hasNoAmiName: !Equals [!Ref AmiName, ""]
+
 Resources:
-  # Completes when the instance is fully provisioned and ready for AMI creation.
-  InstanceForAmi:
+  # Create all needed Lambda
+  CreateAmiFromInstanceIdStack: # Lambda to create AMI from Instance
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/EC2/Instance.yaml"
-      TimeoutInMinutes: 10
       Parameters:
         Bucket: !Ref Bucket
         BucketKey: !Ref BucketKey
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
-        SaveInS3File: "false"
-        AvailabilityZone: !Select [0, !GetAZs ]
-        IamInstanceProfile: !Ref IamInstanceProfile
-        ImageId: !Ref ImageId
-        InstanceName: !Ref InstanceName
-        InstanceType: !Ref InstanceType
-        KeyName: !Ref KeyName
-        SecurityGroupIds: !Ref SecurityGroupIds
-        SubnetId: !Ref SubnetId
-        UserData: !Ref UserData
+        ApplicationLogLevel: !Ref ApplicationLogLevel
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/Lambda/CreateAmiFromInstanceId.yaml"
+      TimeoutInMinutes: 5
 
-  AMI:
-    Type: Custom::AMI
-    DependsOn: AMICreate
+  CheckSSMExecutionCompleteStack: # Lambda to check the execution of SSM Association
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
     Properties:
-      ServiceToken: !GetAtt AMIFunction.Arn
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        ApplicationLogLevel: !Ref ApplicationLogLevel
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/Lambda/CheckSSMExecutionComplete.yaml"
+      TimeoutInMinutes: 5
+
+  # Create base instance
+  Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone: !Ref AvailabilityZone
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref IamInstanceProfile
+      KeyName: !Ref KeyName
+      # Network interfaces with security groups specified within
+      NetworkInterfaces:
+        - DeviceIndex: 0
+          SubnetId: !Ref SubnetId
+          AssociatePublicIpAddress: true
+          DeleteOnTermination: true
+          GroupSet: !Ref SecurityGroupIds
+      # Remove the separate SecurityGroupIds property
+      SourceDestCheck: !Ref SourceDestCheck
+      Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: ManagedBy
+          Value: "CloudFormation"
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${InstanceName}"
+        - Key: ProjectName
+          Value: !Ref ProjectName
+        - Key: StackName
+          Value: !Ref AWS::StackName
+      UserData: !If
+        - hasNoUserData
+        - !Base64 |
+          #!/bin/bash
+          if grep -q "amzn" /etc/os-release; then
+            yum update -y
+            amazon-linux-extras install -y aws-ssm-agent
+          elif grep -q "Ubuntu" /etc/os-release; then
+            apt update -y
+            apt install -y aws-ssm-agent
+          elif grep -q "CentOS" /etc/os-release || grep -q "Red Hat" /etc/os-release; then
+            yum update -y
+            yum install -y amazon-ssm-agent
+          fi
+          systemctl enable amazon-ssm-agent
+          systemctl start amazon-ssm-agent
+        - !Ref UserData
+
+
+  # Wait condition handle for Apache installation
+  SSMAssociationWaitHandle:
+    Type: AWS::CloudFormation::WaitConditionHandle
+
+  # Wait condition for Apache installation completion
+  SSMAssociationWaitCondition:
+    Type: AWS::CloudFormation::WaitCondition
+    DependsOn: 
+      - SSMAssociation
+    Properties:
+      Count: 1
+      Handle: !Ref SSMAssociationWaitHandle
+      Timeout: 1800  # 30 minutes - should match or exceed SSM association timeout
+
+  # Apply SSM Document to the instance
+  SSMAssociation:
+    Type: AWS::SSM::Association
+    Properties:
+      Name: !Ref SSMDocumentName
+      Parameters:
+        Message: 
+          - "Instance behind a Load Balancer"
+        WaitHandleUrl:
+          - !Ref SSMAssociationWaitHandle
+        StackName:
+          - !Ref AWS::StackName
+        Region:
+          - !Ref AWS::Region
+        ResourceName:
+          - "SSMAssociationWaitCondition"
+      Targets:
+        - Key: InstanceIds
+          Values:
+          - !Ref Instance
+      # FIXED: Use a simpler, compliant association name format
+      AssociationName: !Sub "${ProjectName}-${EnvironmentName}-${SSMDocumentName}"
+      WaitForSuccessTimeoutSeconds: 1200  # 20 minutes
+      MaxConcurrency: "1"
+      MaxErrors: "0"
+
+  # Check the completion of the SSM application
+  CheckSSMExecutionComplete:
+    Type: AWS::CloudFormation::CustomResource
+    DependsOn:
+      - CheckSSMExecutionCompleteStack
+      - SSMAssociationWaitCondition  # ✅ Add this dependency
+    Properties:
+      ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:CheckSSMExecutionComplete"
+      AssociationId: !Ref SSMAssociation
       InstanceId: !Ref Instance
+      MaxWaitTimeMinutes: 10
 
-  AMIFunction:
-    Type: AWS::Lambda::Function
+  # Create AMI
+  CreateAmi:
+    Type: AWS::CloudFormation::CustomResource
+    DeletionPolicy: Retain
+    DependsOn:
+      - CheckSSMExecutionComplete
+    UpdateReplacePolicy: Retain
     Properties:
-      Handler: index.handler
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Code:
-        ZipFile: !Sub |
-          var response = require('cfn-response');
-          var AWS = require('aws-sdk');
-          exports.handler = function(event, context) {
-            console.log("Request received:\n", JSON.stringify(event));
-            var physicalId = event.PhysicalResourceId;
-            function success(data) {
-              return response.send(event, context, response.SUCCESS, data, physicalId);
-            }
-            function failed(e) {
-              return response.send(event, context, response.FAILED, e, physicalId);
-            }
-            // Call ec2.waitFor, continuing if not finished before Lambda function timeout.
-            function wait(waiter) {
-              console.log("Waiting: ", JSON.stringify(waiter));
-              event.waiter = waiter;
-              event.PhysicalResourceId = physicalId;
-              var request = ec2.waitFor(waiter.state, waiter.params);
-              setTimeout(()=>{
-                request.abort();
-                console.log("Timeout reached, continuing function. Params:\n", JSON.stringify(event));
-                var lambda = new AWS.Lambda();
-                lambda.invoke({
-                  FunctionName: context.invokedFunctionArn,
-                  InvocationType: 'Event',
-                  Payload: JSON.stringify(event)
-                }).promise().then((data)=>context.done()).catch((err)=>context.fail(err));
-              }, context.getRemainingTimeInMillis() - 5000);
-              return request.promise().catch((err)=>
-                (err.code == 'RequestAbortedError') ?
-                  new Promise(()=>context.done()) :
-                  Promise.reject(err)
-              );
-            }
-            var ec2 = new AWS.EC2(),
-                instanceId = event.ResourceProperties.InstanceId;
-            if (event.waiter) {
-              wait(event.waiter).then((data)=>success({})).catch((err)=>failed(err));
-            } else if (event.RequestType == 'Create' || event.RequestType == 'Update') {
-              if (!instanceId) { failed('InstanceID required'); }
-              ec2.waitFor('instanceStopped', {InstanceIds: [instanceId]}).promise()
-              .then((data)=>
-                ec2.createImage({
-                  InstanceId: instanceId,
-                  Name: event.RequestId
-                }).promise()
-              ).then((data)=>
-                wait({
-                  state: 'imageAvailable',
-                  params: {ImageIds: [physicalId = data.ImageId]}
-                })
-              ).then((data)=>success({})).catch((err)=>failed(err));
-            } else if (event.RequestType == 'Delete') {
-              if (physicalId.indexOf('ami-') !== 0) { return success({});}
-              ec2.describeImages({ImageIds: [physicalId]}).promise()
-              .then((data)=>
-                (data.Images.length == 0) ? success({}) :
-                ec2.deregisterImage({ImageId: physicalId}).promise()
-              ).then((data)=>
-                ec2.describeSnapshots({Filters: [{
-                  Name: 'description',
-                  Values: ["*" + physicalId + "*"]
-                }]}).promise()
-              ).then((data)=>
-                (data.Snapshots.length === 0) ? success({}) :
-                ec2.deleteSnapshot({SnapshotId: data.Snapshots[0].SnapshotId}).promise()
-              ).then((data)=>success({})).catch((err)=>failed(err));
-            }
-          };
-      Runtime: nodejs20.x
-      Timeout: 300
-  
-  LambdaExecutionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-        - Effect: Allow
-          Principal: {Service: [lambda.amazonaws.com]}
-          Action: ['sts:AssumeRole']
-      Path: /
-      ManagedPolicyArns:
-      - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-      - arn:aws:iam::aws:policy/service-role/AWSLambdaRole
-      Policies:
-      - PolicyName: EC2Policy
-        PolicyDocument:
-          Version: '2012-10-17'
-          Statement:
-            - Effect: Allow
-              Action:
-              - 'ec2:DescribeInstances'
-              - 'ec2:DescribeImages'
-              - 'ec2:CreateImage'
-              - 'ec2:DeregisterImage'
-              - 'ec2:DescribeSnapshots'
-              - 'ec2:DeleteSnapshot'
-              Resource: ['*']
+      ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:CreateAmiFromInstanceId"
+      InstanceId: !Ref Instance
+      Name: !If
+        - hasNoAmiName
+        - !Sub "${SSMDocumentName}-AMI"
+        - !Ref AmiName
+
 Outputs:
-  AmiId:
-    Value: !Ref AMI
+  ImageId:
+    Value: !GetAtt CreateAmi.ImageId

@@ -1,0 +1,417 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template for creating Delay
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "Datas"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: ["dev", "test", "staging", "prod"]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String    
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  Runtime:
+    Type: String
+    Default: "python3.12"
+    AllowedValues: ["python3.8", "python3.9", "python3.10", "python3.11", "python3.12"]
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+  # Stack parameters
+  ApplicationLogLevel:
+    AllowedValues: [ TRACE, DEBUG, INFO, WARN, ERROR, FATAL ]
+    Default: ERROR
+    Description: |
+      Set this property to filter the application logs for your function that Lambda sends to CloudWatch. 
+      Lambda only sends application logs at the selected level of detail and lower, 
+      where TRACE is the highest level and FATAL is the lowest.
+    Type: String
+  CreateRole:
+    AllowedValues: [ "false", "true" ]
+    Default: "true"
+    Description: "Save resources information in s3 file"
+    Type: String
+  FunctionName:
+    Default: CheckSSMExecutionComplete
+    Type: String
+  LogFormat:
+    AllowedValues: [ Text, JSON ]
+    Default: JSON
+    Description: |
+      The format in which Lambda sends your function's application and system logs to CloudWatch.
+      Select between plain text and structured JSON.
+    Type: String
+  LogGroupClass:
+    AllowedValues: [ STANDARD, INFREQUENT_ACCESS ]
+    Default: STANDARD
+    Description: Specifies the log group class for this log group. 
+    Type: String
+  RetentionInDays:
+    AllowedValues: [ 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557, 2922, 3288, 3653 ]
+    Default: 1
+    Description: |
+      The number of days to retain the log events in the specified log group.
+      Possible values are: 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557, 2922, 3288, and 3653.
+    Type: String
+  SystemLogLevel:
+    AllowedValues: [ DEBUG, INFO, WARN ]
+    Default: WARN
+    Description: |
+      Set this property to filter the system logs for your function that Lambda sends to CloudWatch.
+      Lambda only sends system logs at the selected level of detail and lower,
+      where DEBUG is the highest level and WARN is the lowest.
+    Type: String
+
+Conditions:
+  CreateRole: !Equals [!Ref CreateRole, "true" ]
+  SaveInS3File: !And 
+    - !Equals [!Ref CreateRole, "true" ]
+    - !Equals [ !Ref SaveInS3File, "true"]
+
+Resources:
+  LambdaFunctionRole:
+    Type: AWS::IAM::Role
+    Condition: CreateRole
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaRole
+      Path: "/"
+      Policies:
+        - PolicyName: UpdateObjectFromS3Policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - s3:DeleteObject
+                  - s3:GetObject
+                  - s3:List*
+                  - s3:ListBucket
+                  - s3:PutObject
+                Effect: Allow
+                Resource:
+                  - !Join [":", ["arn:aws:s3::", !Sub "${Bucket}/${BucketKey}"]]
+                  - !Join [":", ["arn:aws:s3::", !Sub "${Bucket}/${BucketKey}/*"]]
+        - PolicyName: !Sub "${FunctionName}Policy"
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                  - "ssm:DescribeAssociationExecutionTargets"
+                  - "ssm:GetAssociationExecutions"
+                  - "ssm:DescribeAssociationExecutions"
+                  - "ssm:ListAssociations"
+                  - "ssm:ListInstanceAssociations"
+                  - "ssm:DescribeEffectiveInstanceAssociations"
+                  - "ssm:DescribeInstanceAssociationsStatus"
+                Effect: Allow
+                Resource: "*"
+              - Action:
+                  - ec2:DescribeInstances
+                Effect: Allow
+                Resource: "*"
+      RoleName: !Sub "${FunctionName}Role"
+      Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: ManagedBy
+          Value: "CloudFormation"
+        - Key: ProjectName
+          Value: !Ref ProjectName
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${FunctionName}"
+        - Key: StackName
+          Value: !Ref AWS::StackName
+
+  LambdaFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupClass: !Ref LogGroupClass
+      LogGroupName: !Sub "/aws/lambda/${FunctionName}"
+      RetentionInDays: !Ref RetentionInDays
+    UpdateReplacePolicy: Delete
+
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    DeletionPolicy: Delete
+    Properties:
+      Code:
+        ZipFile: |
+          import boto3
+          import json
+          import time
+          import logging
+          from urllib.request import urlopen, Request
+          from urllib.error import HTTPError, URLError
+
+          # Set up logging
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          def send_response(event, context, response_status, response_data, physical_resource_id=None, reason=None):
+              """Send response to CloudFormation"""
+              response_url = event['ResponseURL']
+              
+              response_body = {
+                  'Status': response_status,
+                  'Reason': reason or f'See CloudWatch Log Stream: {context.log_stream_name}',
+                  'PhysicalResourceId': physical_resource_id or context.log_stream_name,
+                  'StackId': event['StackId'],
+                  'RequestId': event['RequestId'],
+                  'LogicalResourceId': event['LogicalResourceId'],
+                  'Data': response_data
+              }
+              
+              json_response_body = json.dumps(response_body)
+              
+              logger.info(f"Response body: {json_response_body}")
+              
+              headers = {
+                  'content-type': '',
+                  'content-length': str(len(json_response_body))
+              }
+              
+              try:
+                  request = Request(response_url, data=json_response_body.encode('utf-8'), headers=headers)
+                  request.get_method = lambda: 'PUT'
+                  response = urlopen(request)
+                  logger.info(f"Status code: {response.getcode()}")
+                  logger.info(f"Status message: {response.msg}")
+                  return True
+              except HTTPError as e:
+                  logger.error(f"Failed to send response: {e}")
+                  return False
+              except URLError as e:
+                  logger.error(f"Failed to send response: {e}")
+                  return False
+
+          def check_ssm_execution_complete(association_id, instance_id, max_wait_minutes=10):
+              """Check if SSM Association execution is complete"""
+              ssm = boto3.client('ssm')
+              max_wait_seconds = max_wait_minutes * 60
+              check_interval = 30  # Check every 30 seconds
+              elapsed_time = 0
+              
+              logger.info(f"Checking SSM execution for Association ID: {association_id}, Instance ID: {instance_id}")
+              
+              while elapsed_time < max_wait_seconds:
+                  try:
+                      # Use the correct method name: describe_association_executions
+                      response = ssm.describe_association_executions(
+                          AssociationId=association_id,
+                          MaxResults=1
+                      )
+                      
+                      if not response['AssociationExecutions']:
+                          logger.info(f"No executions found yet. Waiting... ({elapsed_time}/{max_wait_seconds}s)")
+                          time.sleep(check_interval)
+                          elapsed_time += check_interval
+                          continue
+                      
+                      execution = response['AssociationExecutions'][0]
+                      execution_id = execution['ExecutionId']
+                      status = execution['Status']
+                      
+                      logger.info(f"Execution {execution_id} status: {status}")
+                      
+                      if status == 'Success':
+                          logger.info("SSM execution completed successfully!")
+                          return True, "SSM execution completed successfully"
+                      elif status in ['Failed', 'Cancelled', 'TimedOut']:
+                          # Get more details about the failure
+                          try:
+                              exec_details = ssm.describe_association_execution_targets(
+                                  AssociationId=association_id,
+                                  ExecutionId=execution_id
+                              )
+                              
+                              failure_details = []
+                              for target in exec_details.get('AssociationExecutionTargets', []):
+                                  if target.get('Status') in ['Failed', 'TimedOut', 'Cancelled']:
+                                      failure_details.append({
+                                          'ResourceId': target.get('ResourceId'),
+                                          'Status': target.get('Status'),
+                                          'DetailedStatus': target.get('DetailedStatus'),
+                                          'OutputSource': target.get('OutputSource', {}).get('OutputSourceId', 'N/A')
+                                      })
+                              
+                              error_msg = f"SSM execution failed with status: {status}. Details: {json.dumps(failure_details)}"
+                              logger.error(error_msg)
+                              return False, error_msg
+                          except Exception as e:
+                              error_msg = f"SSM execution failed with status: {status}. Could not get failure details: {str(e)}"
+                              logger.error(error_msg)
+                              return False, error_msg
+                      elif status in ['Pending', 'InProgress']:
+                          logger.info(f"SSM execution in progress. Waiting... ({elapsed_time}/{max_wait_seconds}s)")
+                          time.sleep(check_interval)
+                          elapsed_time += check_interval
+                          continue
+                      else:
+                          logger.warning(f"Unknown status: {status}. Continuing to wait...")
+                          time.sleep(check_interval)
+                          elapsed_time += check_interval
+                          continue
+                          
+                  except Exception as e:
+                      logger.error(f"Error checking SSM execution: {str(e)}")
+                      # If it's a specific boto3 error, we might want to handle it differently
+                      if 'InvalidAssociationId' in str(e):
+                          return False, f"Invalid Association ID: {association_id}"
+                      time.sleep(check_interval)
+                      elapsed_time += check_interval
+                      continue
+              
+              # Timeout reached
+              timeout_msg = f"Timeout waiting for SSM execution to complete after {max_wait_minutes} minutes"
+              logger.error(timeout_msg)
+              return False, timeout_msg
+
+          def lambda_handler(event, context):
+              """Main Lambda handler for CloudFormation Custom Resource"""
+              logger.info(f"Received event: {json.dumps(event)}")
+              
+              try:
+                  request_type = event['RequestType']
+                  properties = event.get('ResourceProperties', {})
+                  
+                  # Extract parameters
+                  association_id = properties.get('AssociationId')
+                  instance_id = properties.get('InstanceId')
+                  max_wait_minutes = int(properties.get('MaxWaitTimeMinutes', 10))
+                  
+                  if request_type in ['Create', 'Update']:
+                      if not association_id:
+                          error_msg = "AssociationId is required"
+                          logger.error(error_msg)
+                          send_response(event, context, 'FAILED', {}, reason=error_msg)
+                          return
+                      
+                      if not instance_id:
+                          error_msg = "InstanceId is required"
+                          logger.error(error_msg)
+                          send_response(event, context, 'FAILED', {}, reason=error_msg)
+                          return
+                      
+                      # Check SSM execution status
+                      success, message = check_ssm_execution_complete(
+                          association_id, 
+                          instance_id, 
+                          max_wait_minutes
+                      )
+                      
+                      if success:
+                          response_data = {
+                              'AssociationId': association_id,
+                              'InstanceId': instance_id,
+                              'Status': 'Complete',
+                              'Message': message
+                          }
+                          send_response(event, context, 'SUCCESS', response_data, 
+                                      physical_resource_id=f"SSMCheck-{association_id}")
+                      else:
+                          send_response(event, context, 'FAILED', {}, reason=message)
+                          
+                  elif request_type == 'Delete':
+                      # Nothing to do on delete
+                      logger.info("Delete request - nothing to clean up")
+                      send_response(event, context, 'SUCCESS', {}, 
+                                  physical_resource_id=event.get('PhysicalResourceId', 'SSMCheck'))
+                  
+              except Exception as e:
+                  error_msg = f"Unexpected error: {str(e)}"
+                  logger.error(error_msg, exc_info=True)
+                  send_response(event, context, 'FAILED', {}, reason=error_msg)
+
+          # For testing purposes
+          if __name__ == "__main__":
+              # Test the function locally
+              test_event = {
+                  'RequestType': 'Create',
+                  'ResourceProperties': {
+                      'AssociationId': 'test-association-id',
+                      'InstanceId': 'i-1234567890abcdef0',
+                      'MaxWaitTimeMinutes': '5'
+                  },
+                  'ResponseURL': 'https://httpbin.org/put',
+                  'StackId': 'test-stack',
+                  'RequestId': 'test-request',
+                  'LogicalResourceId': 'TestResource'
+              }
+              
+              class MockContext:
+                  log_stream_name = 'test-log-stream'
+              
+              lambda_handler(test_event, MockContext())
+      Description: Function to wait
+      FunctionName: !Ref FunctionName
+      Handler: index.lambda_handler
+      LoggingConfig:
+        ApplicationLogLevel: !Ref ApplicationLogLevel
+        LogFormat: !Ref LogFormat
+        LogGroup: !Sub "/aws/lambda/${FunctionName}"
+        SystemLogLevel: !Ref SystemLogLevel
+      MemorySize: 128
+      Role: !If 
+      - CreateRole
+      - !GetAtt LambdaFunctionRole.Arn
+      - !Join [ ":", [ "arn:aws:iam:", !Ref "AWS::AccountId", !Sub "role/${FunctionName}Role" ] ]
+      Runtime: !Ref Runtime
+      Timeout: 900  # Increased to 15 minutes to allow AMI creation time
+    UpdateReplacePolicy: Delete
+
+  LambdaFunctionRoleToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: SaveInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:IAMResourceToS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Region: !Ref AWS::Region
+      ResourceType: "Role"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:IAM:Role:${FunctionName}Role"
+      Value: !Ref LambdaFunctionRole
+
+Outputs:
+  LambdaFunctionArn:
+    Description: ARN of the Lambda Function
+    Value: !GetAtt LambdaFunction.Arn
+  LogGroupId:
+    Description: Lambda Function Log Group Id
+    Value: !Ref LambdaFunctionLogGroup
+  RoleArn:
+    Description: Lambda Function Role Arn
+    Value: !If [ CreateRole, !GetAtt LambdaFunctionRole.Arn, "" ]

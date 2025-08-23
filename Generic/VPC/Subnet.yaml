@@ -92,6 +92,8 @@ Resources:
           Value: "CloudFormation"
         - Key: ProjectName
           Value: !Ref ProjectName
+        - Key: StackName
+          Value: !Ref AWS::StackName
 
   SubnetWithIpv6:
     Type: AWS::EC2::Subnet
@@ -112,6 +114,8 @@ Resources:
           Value: "CloudFormation"
         - Key: ProjectName
           Value: !Ref ProjectName
+        - Key: StackName
+          Value: !Ref AWS::StackName
 
   SubnetToS3:
     Type: AWS::CloudFormation::CustomResource

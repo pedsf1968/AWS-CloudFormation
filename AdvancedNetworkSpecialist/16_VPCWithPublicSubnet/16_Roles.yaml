@@ -5,32 +5,34 @@ Description:  This template create a role for instance
 Parameters:
   # Global parameters
   Bucket:
-    Description: "CloudFormation bucket URL"
-    Type: String
     Default: "hawkfund-cloudformation"
-  BucketKey:
-    Description: "Key to find object in the bucket"
+    Description: CloudFormation buket URL
     Type: String
-    Default: "16_VPCWithPublicSubnet"
+  BucketKey:
+    Default: "110_AWSClientVpn"
+    Description: Key to find object in the bucket
+    Type: String
   BucketObject:
+    Default: "Data.json"
     Description: "File to store data in the bucket"
     Type: String
-    Default: "Data.json"
+  BucketRegion:
+    AllowedValues: ["eu-west-3", "eu-central-1"]
+    Default: "eu-west-3"
+    Description: "Region where is the Bucket"
+    Type: String
   EnvironmentName:
+    AllowedValues: ["dev", "staging", "test", "prod"]
+    ConstraintDescription: "Must specify dev, staging, test or prod"
+    Default: "dev"
     Description: "Environment name that prefix all resources"
     Type: String
-    Default: "dev"
-    AllowedValues:
-      - "dev"
-      - "test"
-      - "prod"
-    ConstraintDescription: Must specify dev, test or prod
   ProjectName:
+    Default: "ANS"
     Description: "Project name that prefix all resources"
     Type: String
-    Default: "ANS"
   SaveInS3File:
-    AllowedValues: [ "false", "true" ]
+    AllowedValues: ["false", "true"]
     Default: "false"
     Description: "Save resources information in s3 file"
     Type: String
@@ -41,7 +43,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/IAM/InstanceRole.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/IAM/InstanceRole.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
