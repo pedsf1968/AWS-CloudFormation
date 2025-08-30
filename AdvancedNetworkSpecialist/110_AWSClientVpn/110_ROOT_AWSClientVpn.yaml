@@ -99,7 +99,7 @@ Parameters:
 
   # Instances parameters
   BastionInstanceImageId:
-    Default: ami-08461dc8cd9e834e0
+    Default: ami-096dd88190a75cd20
     Description: "Bastion Instance AMI"
     Type: AWS::EC2::Image::Id
   BastionInstanceIngressCidrIp:
@@ -115,7 +115,7 @@ Parameters:
     Description: "Bastion Instance type"
     Type: String
   ApplicationInstanceImageId:
-    Default: ami-08461dc8cd9e834e0
+    Default: ami-096dd88190a75cd20
     Description: "Application Instance AMI"
     Type: AWS::EC2::Image::Id
   ApplicationInstanceName:
@@ -251,6 +251,23 @@ Resources:
         BastionInstanceIngressCidrIp: !Ref BastionInstanceIngressCidrIp
         VpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
 
+  SsmDocuments:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/110_SsmDocuments.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        BucketRegion: !Ref BucketRegion
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+
   Instances:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
@@ -282,24 +299,6 @@ Resources:
           - !Split [ ",", !GetAtt VpcAndSubnets.Outputs.SubnetPrivateIds ]
         ApplicationInstanceType: !Ref ApplicationInstanceType
         KeyName: !Ref KeyName
-
-  SSMDocuments:
-    Type: AWS::CloudFormation::Stack
-    DeletionPolicy: Delete
-    DependsOn:
-      - Lambdas
-    UpdateReplacePolicy: Retain
-    Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/110_SSM_Documents.yaml"
-      TimeoutInMinutes: 5
-      Parameters:
-        Bucket: !Ref Bucket
-        BucketKey: !Ref BucketKey
-        BucketObject: !Ref BucketObject
-        BucketRegion: !Ref BucketRegion
-        EnvironmentName: !Ref EnvironmentName
-        ProjectName: !Ref ProjectName
-        BastionInstanceId: !GetAtt Instances.Outputs.BastionInstanceId
         OutputS3BucketName: !Ref Bucket
 
   # Endpoints:

@@ -1,6 +1,6 @@
 ---
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "Deploy VPCEndpointDNSResolver Lambda function"
+Description: "Deploy VpcEndpointDnsResolver Lambda function"
 
 Parameters:
   # Global parameters
@@ -47,7 +47,7 @@ Parameters:
     Description: "Save resources information in s3 file"
     Type: String
   FunctionName:
-    Default: "VPCEndpointDNSResolver"
+    Default: "VpcEndpointDnsResolver"
     Description: "Name for the Lambda function"
     Type: String
   LogFormat:

@@ -71,7 +71,7 @@ Parameters:
       use the AWS::IAM::InstanceProfile resource.
     Type: String
   ImageId: # Required: Conditional
-    Default: ami-08461dc8cd9e834e0
+    Default: ami-096dd88190a75cd20
     Description: >-
       The ID of the AMI. An AMI ID is required to launch an instance and must
       be specified here or in a launch template.
@@ -162,7 +162,7 @@ Resources:
       TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/Lambda/CreateAmiFromInstanceId.yaml"
       TimeoutInMinutes: 5
 
-  CheckSSMExecutionCompleteStack: # Lambda to check the execution of SSM Association
+  CheckSsmExecutionCompleteStack: # Lambda to check the execution of SSM Association
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -174,7 +174,7 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         ApplicationLogLevel: !Ref ApplicationLogLevel
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/Lambda/CheckSSMExecutionComplete.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/Lambda/CheckSsmExecutionComplete.yaml"
       TimeoutInMinutes: 5
 
   # Create base instance
@@ -224,7 +224,6 @@ Resources:
           systemctl start amazon-ssm-agent
         - !Ref UserData
 
-
   # Wait condition handle for Apache installation
   SSMAssociationWaitHandle:
     Type: AWS::CloudFormation::WaitConditionHandle
@@ -266,13 +265,13 @@ Resources:
       MaxErrors: "0"
 
   # Check the completion of the SSM application
-  CheckSSMExecutionComplete:
+  CheckSsmExecutionComplete:
     Type: AWS::CloudFormation::CustomResource
     DependsOn:
-      - CheckSSMExecutionCompleteStack
+      - CheckSsmExecutionCompleteStack
       - SSMAssociationWaitCondition  # ✅ Add this dependency
     Properties:
-      ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:CheckSSMExecutionComplete"
+      ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:CheckSsmExecutionComplete"
       AssociationId: !Ref SSMAssociation
       InstanceId: !Ref Instance
       MaxWaitTimeMinutes: 10
@@ -282,7 +281,7 @@ Resources:
     Type: AWS::CloudFormation::CustomResource
     DeletionPolicy: Retain
     DependsOn:
-      - CheckSSMExecutionComplete
+      - CheckSsmExecutionComplete
     UpdateReplacePolicy: Retain
     Properties:
       ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:CreateAmiFromInstanceId"

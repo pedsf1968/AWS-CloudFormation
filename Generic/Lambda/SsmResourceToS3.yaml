@@ -1,17 +1,17 @@
 ---
 AWSTemplateFormatVersion: "2010-09-09"
 Description:
-  This template for creating lambda to get EC2 resources type and backup un S3
+  This template for creating lambda to get SSM resources type and backup un S3
   # Event JSON to test Lambda
   # {
   #   "ResourceProperties": {
   #     "Bucket": "hawkfund-cloudformation",
-  #     "BucketKey": "54_VPCGatewayEndpointForS3",
+  #     "BucketKey": "110_VPCInterfaceEndPointForSSM",
   #     "BucketObject": "Data.json",
   #     "Region": "eu-west-3",
-  #     "ResourceType": "Instance",
-  #     "Key": "eu-west-3:ANS:dev:EC2:Instance:MyInstance",
-  #     "Value": "i-02e4e2dd113397d4e"
+  #     "ResourceType": "Queue",
+  #     "Key": "eu-west-3:ANS:dev:SSM:Queue:MyQueue",
+  #     "Value": "https://sqs.eu-west-3.amazonaws.com/612187453729/My-Queue"
   #   }
   # }
 
@@ -60,7 +60,7 @@ Parameters:
     Description: "Save resources information in s3 file"
     Type: String
   FunctionName:
-    Default: Ec2ResourceToS3
+    Default: SsmResourceToS3
     Type: String
   LogFormat:
     AllowedValues: [Text, JSON]
@@ -82,11 +82,6 @@ Parameters:
       The number of days to retain the log events in the specified log group.
       Possible values are: 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557, 2922, 3288, and 3653.
     Type: String
-  Runtime:
-    Type: String
-    Default: "python3.12"
-    AllowedValues: ["python3.8", "python3.9", "python3.10", "python3.11", "python3.12"]
-    Description: "Python runtime version"
   SystemLogLevel:
     AllowedValues: [DEBUG, INFO, WARN]
     Default: WARN
@@ -135,16 +130,17 @@ Resources:
                 Resource:
                   - !Join [":", ["arn:aws:s3::", !Sub "${Bucket}/${BucketKey}"]]
                   - !Join [":", ["arn:aws:s3::", !Sub "${Bucket}/${BucketKey}/*"]]
-        - PolicyName: !Sub "${FunctionName}Policy"
+        - PolicyName: !Sub "${FunctionName}-Policy"
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
-                  - "ec2:Describe*"
+                  - "ssm:GetDocument"
+                  - "ssm:Describe*"
                 Resource:
                   - "*"
-      RoleName: !Sub "${FunctionName}Role"
+      RoleName: !Sub "${FunctionName}"
       Tags:
         - Key: EnvironmentName
           Value: !Ref EnvironmentName
@@ -195,72 +191,15 @@ Resources:
             return my_dict
 
           def fetch_resource_data(region: str, resource_type: str, resource_id: str) -> Dict[str, Any]:
-            logger.info(f"Fetch EC2 resource {resource_type} with ID: {resource_id}.")
-            ec2_client = boto3.client('ec2', region)
+            logger.info(f"Fetch SSM resource {resource_type} with ID: {resource_id}.")
+            ssm_client = boto3.client('ssm', region)
 
-            """Fetch EC2 resource data from with retry logic."""
+            """Fetch SSM resource data from with retry logic."""
             try:
               match (resource_type):
-                case "ClientVpnEndpoint":
-                  response = ec2_client.describe_client_vpn_endpoints(ClientVpnEndpointIds=[ resource_id ])
-                  return response['ClientVpnEndpoints'][0]
-                case "CustomerGateway":
-                  response = ec2_client.describe_customer_gateways(CustomerGatewayIds=[ resource_id ])
-                  return response['CustomerGateways'][0]
-                case "DhcpOptions":
-                  response = ec2_client.describe_dhcp_options(DhcpOptionsIds=[ resource_id ])
-                  return response['DhcpOptions'][0]
-                case "EgressOnlyInternetGateway":
-                  response = ec2_client.describe_egress_only_internet_gateways(EgressOnlyInternetGatewayIds=[ resource_id ])
-                  return response['EgressOnlyInternetGateways'][0]
-                case "FlowLog":
-                  response = ec2_client.describe_flow_logs(FlowLogIds=[ resource_id ])
-                  return response['FlowLogs'][0]
-                case "Image":
-                  response = ec2_client.describe_images(ImageIds=[ resource_id ])
-                  return response['Images'][0]
-                case "Instance":
-                  response = ec2_client.describe_instances(InstanceIds=[resource_id])
-                  return response['Reservations'][0]['Instances'][0]
-                case "InternetGateway":
-                  response = ec2_client.describe_internet_gateways(InternetGatewayIds=[resource_id])
-                  return response['InternetGateways'][0]
-                case "NatGateway":
-                  response = ec2_client.describe_nat_gateways(NatGatewayIds=[ resource_id ])
-                  return response['NatGateways'][0]
-                case "RouteTable":
-                  response = ec2_client.describe_route_tables(RouteTableIds=[resource_id])
-                  return response['RouteTables'][0]
-                case "SecurityGroup":
-                  response = ec2_client.describe_security_groups(GroupIds=[resource_id])
-                  return response['SecurityGroups'][0]
-                case "Subnet":
-                  response = ec2_client.describe_subnets(SubnetIds=[resource_id])
-                  return response['Subnets'][0]
-                case "TransitGateway":
-                  response = ec2_client.describe_transit_gateways(TransitGatewayIds=[ resource_id ])
-                  return response['TransitGateways'][0]
-                case "TransitGatewayAttachment":
-                  response = ec2_client.describe_transit_gateway_attachments(TransitGatewayAttachmentIds=[ resource_id ])
-                  return response['TransitGatewayAttachments'][0]
-                case "TransitGatewayRouteTable":
-                  response = ec2_client.describe_transit_gateway_route_tables(TransitGatewayRouteTableIds=[ resource_id ])
-                  return response['TransitGatewayRouteTables'][0]
-                case "Vpc":
-                  response = ec2_client.describe_vpcs(VpcIds=[ resource_id ])
-                  return response['Vpcs'][0]
-                case "VpcEndpoint":
-                  response = ec2_client.describe_vpc_endpoints(VpcEndpointIds=[ resource_id ])
-                  return response['VpcEndpoints'][0]
-                case "VpnConnection":
-                  response = ec2_client.describe_vpn_connections(VpnConnectionIds=[ resource_id ])
-                  return response['VpnConnections'][0]
-                case "VpnGateway":
-                  response = ec2_client.describe_vpn_gateways(VpnGatewayIds=[ resource_id ])
-                  return response['VpnGateways'][0]
-                case "VpcPeeringConnection":
-                  response = ec2_client.describe_vpc_peering_connections(VpcPeeringConnectionIds=[ resource_id ])
-                  return response['VpcPeeringConnections'][0]
+                case "Document":
+                  response = ssm_client.get_document(Name=resource_id)
+                  return response['Document']
                 case _:
                   logger.warning(f"Unsupported resource type: {resource_type}")
                   return {}
@@ -310,7 +249,7 @@ Resources:
 
             logger.info(f"Event: {event}\nContext: {context}")
             logger.info(f"Read in Bucket {bucket} file with Key {key}.")
-            logger.info(f"Fetch EC2 resource {resource_type} in Region {region} with ID: {resource_id}.")
+            logger.info(f"Fetch SSM resource {resource_type} in Region {region} with ID: {resource_id}.")
             logger.info(f"Save {resource_type} content with Key: {parameter_key}.")
 
             try:
@@ -351,7 +290,7 @@ Resources:
       - CreateRole
       - !GetAtt LambdaFunctionRole.Arn
       - !Join [ ":", [ "arn:aws:iam:", !Ref "AWS::AccountId", !Sub "role/${FunctionName}Role" ] ]
-      Runtime: !Ref Runtime
+      Runtime: python3.12
       Timeout: 30
     UpdateReplacePolicy: Delete
 
@@ -368,7 +307,7 @@ Resources:
       BucketObject: !Ref BucketObject
       Region: !Ref AWS::Region
       ResourceType: "Role"
-      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:IAM:Role:${FunctionName}"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:IAM:Role:${FunctionName}Role"
       Value: !Ref LambdaFunctionRole
 
 Outputs:

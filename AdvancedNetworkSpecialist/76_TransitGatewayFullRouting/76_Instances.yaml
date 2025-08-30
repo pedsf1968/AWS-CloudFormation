@@ -42,7 +42,7 @@ Parameters:
 
   # Application parameters
   ApplicationInstanceImageId:
-    Default: ami-08461dc8cd9e834e0
+    Default: ami-096dd88190a75cd20
     Description: "Application Instance AMI"
     Type: String
   ApplicationInstanceName:
@@ -60,7 +60,7 @@ Parameters:
     Type: String
   # Bastion parameters
   BastionInstanceImageId:
-    Default: ami-08461dc8cd9e834e0
+    Default: ami-096dd88190a75cd20
     Description: "Bastion Instance AMI"
     Type: String
   BastionInstanceName:

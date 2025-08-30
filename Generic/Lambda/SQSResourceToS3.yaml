@@ -60,7 +60,7 @@ Parameters:
     Description: "Save resources information in s3 file"
     Type: String
   FunctionName:
-    Default: SQSResourceToS3
+    Default: SqsResourceToS3
     Type: String
   LogFormat:
     AllowedValues: [Text, JSON]
@@ -191,7 +191,7 @@ Resources:
 
           def fetch_resource_data(region: str, resource_type: str, resource_id: str) -> Dict[str, Any]:
             logger.info(f"Fetch SQS resource {resource_type} with ID: {resource_id}.")
-            sqs_client = boto3.client('ec2', region)
+            sqs_client = boto3.client('sqs', region)
 
             """Fetch SQS resource data from with retry logic."""
             try:

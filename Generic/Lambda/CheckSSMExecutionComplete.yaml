@@ -51,7 +51,7 @@ Parameters:
     Description: "Save resources information in s3 file"
     Type: String
   FunctionName:
-    Default: CheckSSMExecutionComplete
+    Default: CheckSsmExecutionComplete
     Type: String
   LogFormat:
     AllowedValues: [ Text, JSON ]

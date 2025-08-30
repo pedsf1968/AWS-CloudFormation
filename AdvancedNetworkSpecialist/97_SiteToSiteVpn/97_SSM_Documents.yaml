@@ -74,12 +74,12 @@ Conditions:
   IsEuWest3: !Equals [!Ref "AWS::Region", "eu-west-3" ]
 
 Resources:
-  LibreswanSSMDocument:
+  LibreswanSsmDocument:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/SSM/LibreswanSSMDocument.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/SSM/LibreswanSsmDocument.yaml"
       TimeoutInMinutes: 10
 
   GetIpsecLeftId:
@@ -119,10 +119,10 @@ Resources:
     Type: AWS::SSM::Association
     Condition: IsEuWest3
     DependsOn:
-      - LibreswanSSMDocument
+      - LibreswanSsmDocument
     Properties:
       AssociationName: LibreswanDeploySSMAssociation
-      Name: LibreswanSSMDocument
+      Name: LibreswanSsmDocument
       Targets:
       - Key: InstanceIds
         Values:

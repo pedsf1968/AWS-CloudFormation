@@ -117,12 +117,12 @@ Parameters:
 
 Resources:
   # Create SSM Document for the WEB server
-  ApacheHttpdSSMDocument:
+  ApacheHttpdSsmDocument:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/SSM/ApacheHttpdSSMDocument.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/SSM/ApacheHttpdSsmDocument.yaml"
       TimeoutInMinutes: 10
       Parameters:
         Bucket: !Ref Bucket
@@ -138,7 +138,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/SSM/BindServerSSMDocument.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/SSM/BindServerSsmDocument.yaml"
       TimeoutInMinutes: 10
       Parameters:
         Bucket: !Ref Bucket
@@ -153,7 +153,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/SSM/BindServerAddARecordSSMDocument.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/SSM/ApacheHttpdSsmBindServerAddARecordSsmD.yaml"
       TimeoutInMinutes: 10
       Parameters:
         Bucket: !Ref Bucket
@@ -168,7 +168,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/SSM/BindServerAddCnameRecordSSMDocument.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/SSM/BindServerAddCnameRecordSsmDocument.yaml"
       TimeoutInMinutes: 10
       Parameters:
         Bucket: !Ref Bucket
@@ -182,10 +182,10 @@ Resources:
   ApacheHttpdInstallSSMAssociation:
     Type: AWS::SSM::Association
     DependsOn:
-      - ApacheHttpdSSMDocument
+      - ApacheHttpdSsmDocument
     Properties:
       AssociationName: ApacheHttpdInstallSSMAssociation
-      Name: ApacheHttpdSSMDocument
+      Name: ApacheHttpdSsmDocument
       Targets:
         - Key: InstanceIds
           Values:
@@ -207,7 +207,7 @@ Resources:
     UpdateReplacePolicy: Delete
     Properties:
       AssociationName: DnsServerSSMAssociation
-      Name: BindServerSSMDocument
+      Name: BindServerSsmDocument
       Targets:
         - Key: InstanceIds
           Values:
@@ -247,7 +247,7 @@ Resources:
     UpdateReplacePolicy: Delete
     Properties:
       AssociationName: DnsServerAddApplicationARecordSSMAssociation
-      Name: BindServerAddARecordSSMDocument
+      Name: ApacheHttpdSsmBindServerAddARecordSsmD
       Targets:
         - Key: InstanceIds
           Values:
@@ -285,7 +285,7 @@ Resources:
     UpdateReplacePolicy: Delete
     Properties:
       AssociationName: DnsServerAddApplicationCnameRecordSSMAssociation
-      Name: BindServerAddCnameRecordSSMDocument
+      Name: BindServerAddCnameRecordSsmDocument
       Targets:
         - Key: InstanceIds
           Values:
@@ -313,7 +313,7 @@ Resources:
     UpdateReplacePolicy: Delete
     Properties:
       AssociationName: DnsServerAddBastionARecordSSMAssociation
-      Name: BindServerAddARecordSSMDocument
+      Name: ApacheHttpdSsmBindServerAddARecordSsmD
       Targets:
         - Key: InstanceIds
           Values:
@@ -351,7 +351,7 @@ Resources:
     UpdateReplacePolicy: Delete
     Properties:
       AssociationName: DnsServerAddBastionCnameRecordSSMAssociation
-      Name: BindServerAddCnameRecordSSMDocument
+      Name: BindServerAddCnameRecordSsmDocument
       Targets:
         - Key: InstanceIds
           Values:
@@ -379,7 +379,7 @@ Resources:
     UpdateReplacePolicy: Delete
     Properties:
       AssociationName: DnsServerAddDatabaseARecordSSMAssociation
-      Name: BindServerAddARecordSSMDocument
+      Name: ApacheHttpdSsmBindServerAddARecordSsmD
       Targets:
         - Key: InstanceIds
           Values:
@@ -417,7 +417,7 @@ Resources:
     UpdateReplacePolicy: Delete
     Properties:
       AssociationName: DnsServerAddDatabaseCnameRecordSSMAssociation
-      Name: BindServerAddCnameRecordSSMDocument
+      Name: BindServerAddCnameRecordSsmDocument
       Targets:
         - Key: InstanceIds
           Values:

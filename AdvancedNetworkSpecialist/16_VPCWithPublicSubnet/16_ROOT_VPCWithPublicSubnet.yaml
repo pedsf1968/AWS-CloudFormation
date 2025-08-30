@@ -102,7 +102,7 @@ Parameters:
 
   # Instances parameters
   BastionInstanceImageId:
-    Default: ami-08461dc8cd9e834e0
+    Default: ami-096dd88190a75cd20
     Description: "Bastion Instance AMI"
     Type: AWS::EC2::Image::Id
   BastionInstanceName:

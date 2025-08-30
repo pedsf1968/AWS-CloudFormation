@@ -89,7 +89,7 @@ Resources:
       TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/Lambda/CreateAmiFromInstanceId.yaml"
       TimeoutInMinutes: 5
 
-  EC2ResourceToS3Stack:
+  Ec2ResourceToS3Stack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     DependsOn:
@@ -108,7 +108,7 @@ Resources:
           - "false"
         SaveInS3File: !Ref SaveInS3File
         ApplicationLogLevel: !Ref ApplicationLogLevel
-      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/Lambda/EC2ResourceToS3.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/Lambda/Ec2ResourceToS3.yaml"
       TimeoutInMinutes: 5
 
   GetParametersFromS3Stack:
@@ -177,7 +177,7 @@ Resources:
       TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/Lambda/Route53ResourceToS3.yaml"
       TimeoutInMinutes: 5
 
-  VPCEndpointDNSResolverStack:
+  VpcEndpointDnsResolverStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     DependsOn:
@@ -196,7 +196,7 @@ Resources:
           - "false"
         SaveInS3File: !Ref SaveInS3File
         ApplicationLogLevel: !Ref ApplicationLogLevel
-      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/Lambda/VPCEndpointDNSResolver.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/Lambda/VpcEndpointDnsResolver.yaml"
       TimeoutInMinutes: 5
 
 Outputs:
@@ -223,18 +223,18 @@ Outputs:
     Description: GetParametersFromS3 Lambda Log Group Id
     Value: !GetAtt GetParametersFromS3Stack.Outputs.LogGroupId
 
-  EC2ResourceToS3LambdaFunctionArn:
-    Description: "EC2ResourceToS3 Lambda Arn"
-    Value: !GetAtt EC2ResourceToS3Stack.Outputs.LambdaFunctionArn
-  EC2ResourceToS3RoleArn:
-    Description: "EC2ResourceToS3 Lambda Role Arn"
+  Ec2ResourceToS3LambdaFunctionArn:
+    Description: "Ec2ResourceToS3 Lambda Arn"
+    Value: !GetAtt Ec2ResourceToS3Stack.Outputs.LambdaFunctionArn
+  Ec2ResourceToS3RoleArn:
+    Description: "Ec2ResourceToS3 Lambda Role Arn"
     Value: !If
           - CreateRole
-          - !GetAtt EC2ResourceToS3Stack.Outputs.RoleArn
+          - !GetAtt Ec2ResourceToS3Stack.Outputs.RoleArn
           - ""
-  EC2ResourceToS3LogGroupId:
-    Description: EC2ResourceToS3 Lambda Log Group Id
-    Value: !GetAtt EC2ResourceToS3Stack.Outputs.LogGroupId
+  Ec2ResourceToS3LogGroupId:
+    Description: Ec2ResourceToS3 Lambda Log Group Id
+    Value: !GetAtt Ec2ResourceToS3Stack.Outputs.LogGroupId
 
   IAMResourceToS3LambdaFunctionArn:
     Description: "IAMResourceToS3 Lambda Arn"
@@ -275,15 +275,15 @@ Outputs:
     Description: UpdateParametersFromS3 Lambda Log Group Id
     Value: !GetAtt UpdateParametersFromS3Stack.Outputs.LogGroupId
 
-  VPCEndpointDNSResolverLambdaFunctionArn:
-    Description: "ARN of VPCEndpointDNSResolver Lambda"
-    Value: !GetAtt VPCEndpointDNSResolverStack.Outputs.LambdaFunctionArn
-  VPCEndpointDNSResolverRoleArn:
-    Description: "VPCEndpointDNSResolver Lambda Role Arn"
+  VpcEndpointDnsResolverLambdaFunctionArn:
+    Description: "ARN of VpcEndpointDnsResolver Lambda"
+    Value: !GetAtt VpcEndpointDnsResolverStack.Outputs.LambdaFunctionArn
+  VpcEndpointDnsResolverRoleArn:
+    Description: "VpcEndpointDnsResolver Lambda Role Arn"
     Value: !If
           - CreateRole
-          - !GetAtt VPCEndpointDNSResolverStack.Outputs.RoleArn
+          - !GetAtt VpcEndpointDnsResolverStack.Outputs.RoleArn
           - ""
-  VPCEndpointDNSResolverLogGroupId:
+  VpcEndpointDnsResolverLogGroupId:
     Description: UpdateParametersFromS3 Lambda Log Group Id
-    Value: !GetAtt VPCEndpointDNSResolverStack.Outputs.LogGroupId
+    Value: !GetAtt VpcEndpointDnsResolverStack.Outputs.LogGroupId

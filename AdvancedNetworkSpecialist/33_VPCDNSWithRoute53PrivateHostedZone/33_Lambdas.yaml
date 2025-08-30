@@ -93,7 +93,7 @@ Resources:
       TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/Lambda/GetParametersFromS3.yaml"
       TimeoutInMinutes: 5
 
-  EC2ResourceToS3Stack:
+  Ec2ResourceToS3Stack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     DependsOn:
@@ -112,7 +112,7 @@ Resources:
           - "false"
         SaveInS3File: !Ref SaveInS3File
         ApplicationLogLevel: !Ref ApplicationLogLevel
-      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/Lambda/EC2ResourceToS3.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/Lambda/Ec2ResourceToS3.yaml"
       TimeoutInMinutes: 5
 
   Route53ResourceToS3Stack:
@@ -173,18 +173,18 @@ Outputs:
     Description: GetParametersFromS3 Lambda Log Group Id
     Value: !GetAtt GetParametersFromS3Stack.Outputs.LogGroupId
 
-  EC2ResourceToS3LambdaFunctionArn:
-    Description: "EC2ResourceToS3 Lambda Arn"
-    Value: !GetAtt EC2ResourceToS3Stack.Outputs.LambdaFunctionArn
-  EC2ResourceToS3RoleArn:
-    Description: "EC2ResourceToS3 Lambda Role Arn"
+  Ec2ResourceToS3LambdaFunctionArn:
+    Description: "Ec2ResourceToS3 Lambda Arn"
+    Value: !GetAtt Ec2ResourceToS3Stack.Outputs.LambdaFunctionArn
+  Ec2ResourceToS3RoleArn:
+    Description: "Ec2ResourceToS3 Lambda Role Arn"
     Value: !If
           - CreateRole
-          - !GetAtt EC2ResourceToS3Stack.Outputs.RoleArn
+          - !GetAtt Ec2ResourceToS3Stack.Outputs.RoleArn
           - ""
-  EC2ResourceToS3LogGroupId:
-    Description: EC2ResourceToS3 Lambda Log Group Id
-    Value: !GetAtt EC2ResourceToS3Stack.Outputs.LogGroupId
+  Ec2ResourceToS3LogGroupId:
+    Description: Ec2ResourceToS3 Lambda Log Group Id
+    Value: !GetAtt Ec2ResourceToS3Stack.Outputs.LogGroupId
 
   Route53ResourceToS3LambdaFunctionArn:
     Description: "Route53ResourceToS3 Lambda Arn"

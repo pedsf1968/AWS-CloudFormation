@@ -52,7 +52,7 @@ Parameters:
 
   # Base Instance parameters
   BaseInstanceImageId:
-    Default: ami-08461dc8cd9e834e0
+    Default: ami-096dd88190a75cd20
     Description: "Base Instance AMI"
     Type: AWS::EC2::Image::Id
   BaseInstanceName:
@@ -75,7 +75,7 @@ Parameters:
 
   # Bastion parameters
   BastionInstanceImageId:
-    Default: ami-08461dc8cd9e834e0
+    Default: ami-096dd88190a75cd20
     Description: "Bastion Instance AMI"
     Type: AWS::EC2::Image::Id
   BastionInstanceName:
@@ -95,7 +95,7 @@ Parameters:
 
   # Consumer parameters
   ConsumerImageId:
-    Default: ami-08461dc8cd9e834e0
+    Default: ami-096dd88190a75cd20
     Description: "Consumer Instance AMI"
     Type: AWS::EC2::Image::Id
   ConsumerInstanceName:
@@ -159,7 +159,7 @@ Resources:
         InstanceType: !Ref BaseInstanceType
         SecurityGroupIds: !Ref BaseInstanceSecurityGroup
         KeyName: !Ref KeyName
-        SSMDocumentName: !Sub "${ProjectName}-${EnvironmentName}-ApacheHttpdSSMDocument"
+        SSMDocumentName: !Sub "${ProjectName}-${EnvironmentName}-ApacheHttpdSsmDocument"
         SubnetId: !Ref BaseInstanceSubnetId
 
   BastionInstance:

@@ -64,7 +64,7 @@ Parameters:
       use the AWS::IAM::InstanceProfile resource.
     Type: String
   ImageId: # Required: Conditional
-    Default: ami-08461dc8cd9e834e0
+    Default: ami-096dd88190a75cd20
     Description: >-
       The ID of the AMI. An AMI ID is required to launch an instance and must
       be specified here or in a launch template.
@@ -216,7 +216,7 @@ Resources:
             "arn:aws:lambda",
             !Sub "${AWS::Region}",
             !Sub "${AWS::AccountId}",
-            "function:EC2ResourceToS3",
+            "function:Ec2ResourceToS3",
           ],
         ]
       ServiceTimeout: 60

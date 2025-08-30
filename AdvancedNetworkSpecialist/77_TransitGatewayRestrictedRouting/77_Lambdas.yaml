@@ -48,7 +48,7 @@ Parameters:
     Type: String
 
 Resources:
-  EC2ResourceToS3Stack:
+  Ec2ResourceToS3Stack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -61,7 +61,7 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         ApplicationLogLevel: !Ref ApplicationLogLevel
-      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/Lambda/EC2ResourceToS3.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/Lambda/Ec2ResourceToS3.yaml"
       TimeoutInMinutes: 5
 
   UpdateParametersFromS3Stack:
@@ -81,15 +81,15 @@ Resources:
       TimeoutInMinutes: 5
 
 Outputs:
-  EC2ResourceToS3LambdaFunctionArn:
-    Description: "EC2ResourceToS3 Lambda Arn"
-    Value: !GetAtt EC2ResourceToS3Stack.Outputs.LambdaFunctionArn
-  EC2ResourceToS3RoleArn:
-    Description: "EC2ResourceToS3 Lambda Role Arn"
-    Value: !GetAtt EC2ResourceToS3Stack.Outputs.RoleArn
-  EC2ResourceToS3LogGroupId:
-    Description: EC2ResourceToS3 Lambda Log Group Id
-    Value: !GetAtt EC2ResourceToS3Stack.Outputs.LogGroupId
+  Ec2ResourceToS3LambdaFunctionArn:
+    Description: "Ec2ResourceToS3 Lambda Arn"
+    Value: !GetAtt Ec2ResourceToS3Stack.Outputs.LambdaFunctionArn
+  Ec2ResourceToS3RoleArn:
+    Description: "Ec2ResourceToS3 Lambda Role Arn"
+    Value: !GetAtt Ec2ResourceToS3Stack.Outputs.RoleArn
+  Ec2ResourceToS3LogGroupId:
+    Description: Ec2ResourceToS3 Lambda Log Group Id
+    Value: !GetAtt Ec2ResourceToS3Stack.Outputs.LogGroupId
 
   UpdateParametersFromS3LambdaFunctionArn:
     Description: "ARN of UpdateParametersFromS3 Lambda"

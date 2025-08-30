@@ -228,7 +228,7 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:EC2ResourceToS3"
+      ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:Ec2ResourceToS3"
       ServiceTimeout: 60
       Bucket: !Ref Bucket
       BucketKey: !If [HasBucketKey, !Ref BucketKey, !Ref "AWS::NoValue"]
