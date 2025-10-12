@@ -74,10 +74,12 @@ Parameters:
     Type: String
   InstanceType: # Required: No
     AllowedValues:
-      - t2.micro
-      - t2.small
-      - t2.large
-    Default: t2.micro
+      - t3a.nano
+      - t3a.micro
+      - t3a.small
+      - t3a.medium
+      - t3a.large
+    Default: t3a.micro
     Description: >-
       The instance type. For more information, see Instance types in the Amazon
       EC2 User Guide. When you change your EBS-backed instance type, instance
@@ -166,20 +168,48 @@ Resources:
           Value: !Ref AWS::StackName
       UserData: !If
         - hasNoUserData
-        - !Base64 |
-          #!/bin/bash
-          if grep -q "amzn" /etc/os-release; then
-            yum update -y
-            amazon-linux-extras install -y aws-ssm-agent
-          elif grep -q "Ubuntu" /etc/os-release; then
-            apt update -y
-            apt install -y aws-ssm-agent
-          elif grep -q "CentOS" /etc/os-release || grep -q "Red Hat" /etc/os-release; then
-            yum update -y
-            yum install -y amazon-ssm-agent
-          fi
-          systemctl enable amazon-ssm-agent
-          systemctl start amazon-ssm-agent
+        - !Base64
+          Fn::Sub: |
+            #!/bin/bash
+
+            # Log all output to a file for debugging
+            exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
+            echo "Starting user data script execution..."
+
+            if grep -q "amzn" /etc/os-release; then
+              yum update -y
+              amazon-linux-extras install -y aws-ssm-agent
+            elif grep -q "Ubuntu" /etc/os-release; then
+              apt update -y
+              apt install -y aws-ssm-agent
+            elif grep -q "CentOS" /etc/os-release || grep -q "Red Hat" /etc/os-release; then
+              yum update -y
+              yum install -y amazon-ssm-agent
+            fi
+
+            # Set hostname
+            echo "Setting hostname to ${InstanceName}"
+            hostnamectl set-hostname "${InstanceName}"
+            
+            # Restart SSH service
+            systemctl restart sshd
+            
+            # Enable and start SSM agent
+            echo "Configuring SSM agent..."
+            systemctl enable amazon-ssm-agent
+            systemctl restart amazon-ssm-agent
+            
+            # Wait a bit and check SSM agent status
+            sleep 10
+            systemctl status amazon-ssm-agent
+            
+            # Test connectivity to SSM endpoints
+            echo "Testing connectivity to SSM endpoints..."
+            curl -I https://ssm.${AWS::Region}.amazonaws.com/ || echo "SSM endpoint unreachable"
+            curl -I https://ec2messages.${AWS::Region}.amazonaws.com/ || echo "EC2 Messages endpoint unreachable"
+            curl -I https://ssmmessages.${AWS::Region}.amazonaws.com/ || echo "SSM Messages endpoint unreachable"
+            
+            echo "User data script completed successfully!"
         - !Ref UserData
 
   EIP:
@@ -209,16 +239,7 @@ Resources:
     DependsOn: EIPWaitConditionHandle
     UpdateReplacePolicy: Retain
     Properties:
-      ServiceToken:
-        !Join [
-          ":",
-          [
-            "arn:aws:lambda",
-            !Sub "${AWS::Region}",
-            !Sub "${AWS::AccountId}",
-            "function:Ec2ResourceToS3",
-          ],
-        ]
+      ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:Ec2ResourceToS3"
       ServiceTimeout: 60
       Bucket: !Ref Bucket
       BucketKey: !Ref BucketKey

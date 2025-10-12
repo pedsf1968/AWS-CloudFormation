@@ -81,10 +81,10 @@ Parameters:
     Type: String
   InstanceType: # Required: No
     AllowedValues:
-      - t2.micro
+      - t3a.micro
       - t2.small
       - t2.large
-    Default: t2.micro
+    Default: t3a.micro
     Description: >-
       The instance type. For more information, see Instance types in the Amazon
       EC2 User Guide. When you change your EBS-backed instance type, instance

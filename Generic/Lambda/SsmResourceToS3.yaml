@@ -197,6 +197,9 @@ Resources:
             """Fetch SSM resource data from with retry logic."""
             try:
               match (resource_type):
+                case "Association":
+                  response = ssm_client.describe_association(AssociationId=resource_id)
+                  return response['AssociationDescription']
                 case "Document":
                   response = ssm_client.get_document(Name=resource_id)
                   return response['Document']

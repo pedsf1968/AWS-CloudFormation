@@ -7,5 +7,5 @@ Resources:
   MyEC2Instance:
     Type: AWS::EC2::Instance
     Properties:
-      InstanceType: t2.micro
+      InstanceType: t3a.micro
       ImageId: !Ref ImageId

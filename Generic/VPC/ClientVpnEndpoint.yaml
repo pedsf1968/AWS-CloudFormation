@@ -88,7 +88,7 @@ Parameters:
   ClientCidrBlock:
     Type: String
     Description: "IPv4 address range in CIDR notation for client IP addresses (must be between /22 and /12)"
-    AllowedPattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\/(?:1[2-9]|2[0-2])$"
+    AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
     ConstraintDescription: "Must be a valid CIDR block between /12 and /22"
   Description:
     Default: "My Client VPN Endpoint"
@@ -132,7 +132,7 @@ Parameters:
     Description: "The type of client authentication to be used"
     Type: String
   ServerCertificateArn:
-    AllowedPattern: "^arn:aws:acm:[a-z0-9-]+:[0-9]{12}:certificate\/[a-f0-9-]+$"
+    # AllowedPattern: "^arn:aws:acm:[a-z0-9-]+:[0-9]{12}:certificate\/[a-f0-9-]+$"
     ConstraintDescription: "Must be a valid ACM certificate ARN"
     Description: "The ARN of the server certificate"
     Type: String
@@ -158,6 +158,14 @@ Parameters:
     Default: ""
     Description: "The ARN of the IAM SAML identity provider for self-service portal"
     Type: String
+    
+  TargetNetworkCidr:
+    Default: "192.168.1.0/24"
+    Description: "The IPv4 address range, in CIDR notation, of the network to which the authorization rule applies"
+    Type: String
+  TargetSubnetId:
+    Description: "The ID of the subnet to associate with the Client VPN endpoint"
+    Type: AWS::EC2::Subnet::Id
 
 Conditions:
   IsCertificateAuth: !Equals [!Ref ClientVpnEndpointType, "certificate-authentication"]
@@ -186,21 +194,15 @@ Resources:
               FederatedAuthentication:
                 SAMLProviderArn: !Ref SAMLProviderArn
                 SelfServiceSAMLProviderArn: !Ref SelfServiceSAMLProviderArn
-      
       ClientCidrBlock: !Ref ClientCidrBlock
-      
       ConnectionLogOptions:
         Enabled: false
-      
       Description: !Ref Description
       DnsServers: !Ref DnsServers
-      
       SecurityGroupIds:
         - !Ref SecurityGroupId
-      
       ServerCertificateArn: !Ref ServerCertificateArn
       SplitTunnel: !Ref SplitTunnel
-      
       TagSpecifications:
         - ResourceType: "client-vpn-endpoint"
           Tags:
@@ -238,6 +240,20 @@ Resources:
       Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:ClientVpnEndpoint:${ClientVpnEndpointName}"
       Value: !Ref ClientVpnEndpoint
 
+  ClientVpnTargetNetworkAssociation:
+    Type: AWS::EC2::ClientVpnTargetNetworkAssociation
+    Properties:
+      ClientVpnEndpointId: !Ref ClientVpnEndpoint
+      SubnetId: !Ref TargetSubnetId # Your VPC subnet
+
+  ClientVPNAuthorizationRule:
+    Type: AWS::EC2::ClientVpnAuthorizationRule
+    Properties:
+      ClientVpnEndpointId: !Ref ClientVpnEndpoint
+      TargetNetworkCidr: !Ref TargetNetworkCidr
+      AuthorizeAllGroups: true
+      Description: Allow access to VPC subnet
+
 Outputs:
   ClientVpnEndpointId:
     Description: "Client VPN Endpoint ID"
@@ -250,12 +266,6 @@ Outputs:
     Value: !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:client-vpn-endpoint/${ClientVpnEndpoint}"
     Export:
       Name: !Sub "${AWS::StackName}-ClientVpnEndpointArn"
-
-  ClientVpnEndpointDnsName:
-    Description: "Client VPN Endpoint DNS Name"
-    Value: !GetAtt ClientVpnEndpoint.DnsName
-    Export:
-      Name: !Sub "${AWS::StackName}-ClientVpnEndpointDnsName"
 
   AuthenticationType:
     Description: "Authentication type used for the VPN endpoint"

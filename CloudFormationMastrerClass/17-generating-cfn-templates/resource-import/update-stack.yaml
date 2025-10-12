@@ -20,4 +20,4 @@ Resources:
     DeletionPolicy: Retain
     Properties:
       ImageId: ami-0302f42a44bf53a45
-      InstanceType: t2.micro
+      InstanceType: t3a.micro

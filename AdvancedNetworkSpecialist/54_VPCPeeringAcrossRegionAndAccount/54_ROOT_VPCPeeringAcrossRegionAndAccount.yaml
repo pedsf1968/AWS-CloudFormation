@@ -126,7 +126,7 @@ Mappings:
       InstanceElasticIP: "true"
       InstanceName: "A-Instance"
       InstanceImageId: ami-015875403620174eb
-      InstanceType: t2.micro
+      InstanceType: t3a.micro
       KeyName: "dso-paris"
       InstanceIngressCidrIp: 0.0.0.0/0
     eu-central-1:
@@ -142,7 +142,7 @@ Mappings:
       InstanceElasticIP: "false"
       InstanceName: "B-Instance"
       InstanceImageId: ami-00060fac2f8c42d30
-      InstanceType: t2.micro
+      InstanceType: t3a.micro
       KeyName: "dso-francfort"
       InstanceIngressCidrIp: 10.10.0.0/16
 

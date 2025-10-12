@@ -38,12 +38,57 @@ Parameters:
     Type: String
 
 Resources:
-  OpenVpnEasyRsaSsmDocument:
+  EasyRsaInstallerSsmDocument:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/SSM/OpenVpnEasyRsaSsmDocument.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/SSM/EasyRsaInstallerSsmDocument.yaml"
+      TimeoutInMinutes: 10
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        BucketRegion: !Ref BucketRegion
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+
+  EasyRsaCACertificateSsmDocument:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/SSM/EasyRsaCACertificateSsmDocument.yaml"
+      TimeoutInMinutes: 10
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        BucketRegion: !Ref BucketRegion
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+
+  EasyRsaServerCertificateSsmDocument:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/SSM/EasyRsaServerCertificateSsmDocument.yaml"
+      TimeoutInMinutes: 10
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        BucketRegion: !Ref BucketRegion
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+
+  EasyRsaClientCertificateSsmDocument:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/SSM/EasyRsaClientCertificateSsmDocument.yaml"
       TimeoutInMinutes: 10
       Parameters:
         Bucket: !Ref Bucket
@@ -54,10 +99,30 @@ Resources:
         ProjectName: !Ref ProjectName
 
 Outputs:
-  SsmDocumentName:
+  EasyRsaInstallerSsmDocumentName:
     Description: "Name of the created SSM Document"
-    Value: !GetAtt OpenVpnEasyRsaSsmDocument.Outputs.SsmDocumentName
-  
-  SsmDocumentArn:
+    Value: !GetAtt EasyRsaInstallerSsmDocument.Outputs.SsmDocumentName
+  EasyRsaInstallerSsmDocumentArn:
     Description: "ARN of the created SSM Document"
-    Value: !GetAtt OpenVpnEasyRsaSsmDocument.Outputs.SsmDocumentArn
+    Value: !GetAtt EasyRsaInstallerSsmDocument.Outputs.SsmDocumentArn
+
+  EasyRsaCACertificateSsmDocumentName:
+    Description: "Name of the created SSM Document"
+    Value: !GetAtt EasyRsaCACertificateSsmDocument.Outputs.SsmDocumentName
+  EasyRsaCACertificateSsmDocumentArn:
+    Description: "ARN of the created SSM Document"
+    Value: !GetAtt EasyRsaCACertificateSsmDocument.Outputs.SsmDocumentArn 
+
+  EasyRsaServerCertificateSsmDocumentName:
+    Description: "Name of the created SSM Document"
+    Value: !GetAtt EasyRsaServerCertificateSsmDocument.Outputs.SsmDocumentName
+  EasyRsaServerCertificateSsmDocumentArn:
+    Description: "ARN of the created SSM Document"
+    Value: !GetAtt EasyRsaServerCertificateSsmDocument.Outputs.SsmDocumentArn
+
+  EasyRsaClientCertificateSsmDocumentName:
+    Description: "Name of the created SSM Document"
+    Value: !GetAtt EasyRsaClientCertificateSsmDocument.Outputs.SsmDocumentName
+  EasyRsaClientCertificateSsmDocumentArn:
+    Description: "ARN of the created SSM Document"
+    Value: !GetAtt EasyRsaClientCertificateSsmDocument.Outputs.SsmDocumentArn

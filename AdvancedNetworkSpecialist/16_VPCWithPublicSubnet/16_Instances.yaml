@@ -53,7 +53,7 @@ Parameters:
     Description: "Bastion Instances name"
     Type: String
   BastionInstanceType:
-    Default: t2.micro
+    Default: t3a.micro
     Description: "Bastion Instances type"
     Type: String
   BastionInstanceSecurityGroup:

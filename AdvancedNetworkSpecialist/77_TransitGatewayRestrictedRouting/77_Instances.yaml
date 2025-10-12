@@ -64,7 +64,7 @@ Parameters:
     Description: "Instance AMI"
     Type: String
   InstanceType:
-    Default: t2.micro
+    Default: t3a.micro
     Description: "Instances type"
     Type: String
   KeyName:

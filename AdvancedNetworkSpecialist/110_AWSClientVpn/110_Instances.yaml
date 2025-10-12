@@ -38,17 +38,21 @@ Parameters:
     Type: String
 
   # Stack parameters
+  CaName:
+    Default: "OpenVPN-CA"
+    Description: "The name of the CA certificate"
+    Type: String
+  ClientName:
+    Default: "client1.domain.kr"
+    Description: "The base name of the client certificate"
+    Type: String
   KeyName:
     Default: "dso-paris"
     Description: "Instances Key name"
     Type: String
-  OutputS3BucketName:
-    Default: "hawkfund-cloudformation"
-    Description: "The Bucket name for logs"
-    Type: String
-  OutputS3KeyPrefix:
-    Default: "logs/"
-    Description: "Logs prefix"
+  ServerName:
+    Default: "application.domain.kr"
+    Description: "The base name of the server certificate"
     Type: String
 
   # Bastion parameters
@@ -57,14 +61,14 @@ Parameters:
     Description: "Bastion Instance AMI"
     Type: AWS::EC2::Image::Id
   BastionInstanceName:
-    Default: "Bastion"
+    Default: "bastion"
     Description: "Bastion Instances name"
     Type: String
   BastionInstanceProfile:
     Description: "Profile of the Application"
     Type: String
   BastionInstanceType:
-    Default: t2.micro
+    Default: t3a.micro
     Description: "Bastion Instances type"
     Type: String
   BastionInstanceSecurityGroup:
@@ -78,16 +82,16 @@ Parameters:
   ApplicationInstanceImageId:
     Default: "096dd88190a75cd20"
     Description: "Web Server AMI"
-    Type: String
+    Type: AWS::EC2::Image::Id
   ApplicationInstanceName:
-    Default: "Application"
+    Default: "application"
     Description: "Application Instances name"
     Type: String
   ApplicationInstanceProfile:
     Description: "Profile of the Application"
     Type: String
   ApplicationInstanceType:
-    Default: t2.micro
+    Default: t3a.micro
     Description: "Application Instances type"
     Type: String
   ApplicationInstanceSecurityGroup:
@@ -95,6 +99,28 @@ Parameters:
     Type: String
   ApplicationInstanceSubnetId:
     Description: "Application Subnet ID"
+    Type: String
+
+  CaServerInstanceImageId:
+    Default: ami-096dd88190a75cd20
+    Description: "CA Instance AMI"
+    Type: AWS::EC2::Image::Id
+  CaServerInstanceName:
+    Default: "ca-server"
+    Description: "CA Instance name"
+    Type: String
+  CaServerInstanceProfile:
+    Description: "Profile of the CA"
+    Type: String
+  CaServerInstanceType:
+    Default: t3a.nano
+    Description: "CA Instance type"
+    Type: String
+  CaServerInstanceSecurityGroup:
+    Description: "CA Security Group"
+    Type: String
+  CaServerInstanceSubnetId:
+    Description: "CA Subnet ID"
     Type: String
 
 Resources:
@@ -122,27 +148,6 @@ Resources:
         SecurityGroupIds: !Ref BastionInstanceSecurityGroup
         SubnetId: !Ref BastionInstanceSubnetId
 
-  BastionInstanceAssociation:
-    Type: AWS::CloudFormation::Stack
-    DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
-    Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/SSM/OpenVpnEasyRsaSsmAssociation.yaml"
-      TimeoutInMinutes: 5
-      Parameters:
-        Bucket: !Ref Bucket
-        BucketKey: !Ref BucketKey
-        BucketObject: !Ref BucketObject
-        BucketRegion: !Ref BucketRegion
-        EnvironmentName: !Ref EnvironmentName
-        ProjectName: !Ref ProjectName
-        SaveInS3File: !Ref SaveInS3File
-        AssociationName: OpenVpnEasyRsaSsmAssociation
-        OutputS3BucketName: !Ref Bucket
-        CaName: "Demo CA"
-        ClientBaseName: "client1.domain.kr"
-        InstanceId: !GetAtt BastionInstance.Outputs.InstanceId
-
   # Application Instance
   ApplicationInstance:
     Type: AWS::CloudFormation::Stack
@@ -167,6 +172,116 @@ Resources:
         SecurityGroupIds: !Ref ApplicationInstanceSecurityGroup
         SubnetId: !Ref ApplicationInstanceSubnetId
 
+  # Application Instance
+  CaInstance:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/EC2/Instance.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        AvailabilityZone: !Select [0, !GetAZs ]
+        IamInstanceProfile: !Ref CaServerInstanceProfile
+        ImageId: !Ref CaServerInstanceImageId
+        InstanceName: !Ref CaServerInstanceName
+        InstanceType: !Ref CaServerInstanceType
+        KeyName: !Ref KeyName
+        SecurityGroupIds: !Ref CaServerInstanceSecurityGroup
+        SubnetId: !Ref CaServerInstanceSubnetId
+
+  EasyRsaInstallerSsmAssociation:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/SSM/EasyRsaInstallerSsmAssociation.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        BucketRegion: !Ref BucketRegion
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        InstallDirectory: "/opt/openvpn-setup"
+        InstanceId: !GetAtt CaInstance.Outputs.InstanceId
+        OutputS3BucketName: !Ref Bucket
+
+  EasyRsaCACertificateSsmAssociation:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - EasyRsaInstallerSsmAssociation
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/SSM/EasyRsaCACertificateSsmAssociation.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        BucketRegion: !Ref BucketRegion
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        CaName: !Ref CaName
+        InstallDirectory: "/opt/openvpn-setup"
+        InstanceId: !GetAtt CaInstance.Outputs.InstanceId
+        OutputS3BucketName: !Ref Bucket
+
+  EasyRsaServerCertificateSsmAssociation:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - EasyRsaInstallerSsmAssociation
+      - EasyRsaCACertificateSsmAssociation
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/SSM/EasyRsaServerCertificateSsmAssociation.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        BucketRegion: !Ref BucketRegion
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        InstanceId: !GetAtt CaInstance.Outputs.InstanceId
+        ServerName: !Ref ServerName
+        OutputS3BucketName: !Ref Bucket
+
+  EasyRsaClientCertificateSsmAssociation:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - EasyRsaInstallerSsmAssociation
+      - EasyRsaCACertificateSsmAssociation
+      - EasyRsaServerCertificateSsmAssociation
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/SSM/EasyRsaClientCertificateSsmAssociation.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        BucketRegion: !Ref BucketRegion
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        ClientName: !Ref ClientName
+        InstanceId: !GetAtt CaInstance.Outputs.InstanceId
+        OutputS3BucketName: !Ref Bucket
+
 Outputs:
   BastionInstanceId:
     Description: "Id of the Bastion Instance"
@@ -184,3 +299,10 @@ Outputs:
   ApplicationInstancePrivateIP:
     Description: "Application Instance IP"
     Value: !GetAtt ApplicationInstance.Outputs.InstancePrivateIP
+  
+  CaInstanceId:
+    Description: "CA Instance ID"
+    Value: !GetAtt CaInstance.Outputs.InstanceId
+  CaInstancePrivateIP:
+    Description: "CA Instance IP"
+    Value: !GetAtt CaInstance.Outputs.InstancePrivateIP

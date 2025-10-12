@@ -40,8 +40,22 @@ Parameters:
     Description: "Save resources information in s3 file"
     Type: String
 
+  # Stack parameters
+  BastionInstanceName:
+    Default: "bastion"
+    Description: "Bastion Instances name"
+    Type: String
+  ApplicationInstanceName:
+    Default: "application"
+    Description: "Application Instances name"
+    Type: String
+  CaServerInstanceName:
+    Default: "ca-server"
+    Description: "CA Server Instances name"
+    Type: String
+
 Resources:
-  InstanceRoleStack:
+  BastionRoleStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -52,18 +66,35 @@ Resources:
         Bucket: !Ref Bucket
         BucketKey: !Ref BucketKey
         BucketObject: !Ref BucketObject
-        InstanceProfileName: Private-Instance-Profile
-        RoleName: Private-Instance-Role
+        InstanceProfileName: !Sub "${BastionInstanceName}-Instance-Profile"
+        RoleName: !Sub "${BastionInstanceName}-Instance-Role"
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
 
-  InstanceCAServerRoleStack:
+  ApplicationRoleStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/IAM/InstanceCAServerRole.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/IAM/InstanceRole.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        InstanceProfileName: !Sub "${ApplicationInstanceName}-Instance-Profile"
+        RoleName: !Sub "${ApplicationInstanceName}-Instance-Role"
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+
+  CaServerRoleStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/Generic/IAM/InstanceCaServerRole.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -71,33 +102,46 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
-        InstanceProfileName: CA-Instance-Profile
-        RoleName: CA-Instance-Role
+        InstanceProfileName: !Sub "${CaServerInstanceName}-Instance-Profile"
+        RoleName: !Sub "${CaServerInstanceName}-Instance-Role"
         SaveInS3File: !Ref SaveInS3File
 
 Outputs:
-  InstanceRoleArn:
-    Description: "Instance Role ARN"
-    Value: !GetAtt InstanceRoleStack.Outputs.RoleArn
-  InstanceRoleId:
-    Description: "Instance Role ID"
-    Value: !GetAtt InstanceRoleStack.Outputs.RoleId
-  InstanceProfileArn:
-    Description: "Instance Profile ARN"
-    Value: !GetAtt InstanceRoleStack.Outputs.InstanceProfileArn
-  InstanceProfileId:
-    Description: "Instance Profile ID"
-    Value: !GetAtt InstanceRoleStack.Outputs.InstanceProfileId
+  BastionRoleArn:
+    Description: "Bastion Role ARN"
+    Value: !GetAtt BastionRoleStack.Outputs.RoleArn
+  BastionRoleId:
+    Description: "Bastion Role ID"
+    Value: !GetAtt BastionRoleStack.Outputs.RoleId
+  BastionInstanceProfileArn:
+    Description: "Bastion Instance Profile ARN"
+    Value: !GetAtt BastionRoleStack.Outputs.InstanceProfileArn
+  BastionInstanceProfileId:
+    Description: "Bastion Instance Profile ID"
+    Value: !GetAtt BastionRoleStack.Outputs.InstanceProfileId
 
-  InstanceCAServerRoleArn:
+  ApplicationRoleArn:
+    Description: "Application Role ARN"
+    Value: !GetAtt ApplicationRoleStack.Outputs.RoleArn
+  ApplicationRoleId:
+    Description: "Application Role ID"
+    Value: !GetAtt ApplicationRoleStack.Outputs.RoleId
+  ApplicationInstanceProfileArn:
+    Description: "Application Instance Profile ARN"
+    Value: !GetAtt ApplicationRoleStack.Outputs.InstanceProfileArn
+  ApplicationInstanceProfileId:
+    Description: "Application Instance Profile ID"
+    Value: !GetAtt ApplicationRoleStack.Outputs.InstanceProfileId
+
+  CaServerRoleArn:
     Description: "Instance CA Server Role ARN"
-    Value: !GetAtt InstanceCAServerRoleStack.Outputs.RoleArn
-  InstanceCAServerRoleId:
+    Value: !GetAtt CaServerRoleStack.Outputs.RoleArn
+  CaServerRoleId:
     Description: "Instance CA Server Role ID"
-    Value: !GetAtt InstanceCAServerRoleStack.Outputs.RoleId
-  InstanceCAServerProfileArn:
+    Value: !GetAtt CaServerRoleStack.Outputs.RoleId
+  CaServerInstanceProfileArn:
     Description: "Instance CA Server Profile ARN"
-    Value: !GetAtt InstanceCAServerRoleStack.Outputs.InstanceProfileArn
-  InstanceCAServerProfileId:
+    Value: !GetAtt CaServerRoleStack.Outputs.InstanceProfileArn
+  CaServerInstanceProfileId:
     Description: "Instance CA Server Profile ID"
-    Value: !GetAtt InstanceCAServerRoleStack.Outputs.InstanceProfileId
+    Value: !GetAtt CaServerRoleStack.Outputs.InstanceProfileId

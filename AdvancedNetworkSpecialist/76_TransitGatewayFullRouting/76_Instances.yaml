@@ -49,7 +49,7 @@ Parameters:
     Description: "Application Instance name"
     Type: String
   ApplicationInstanceType:
-    Default: t2.micro
+    Default: t3a.micro
     Description: "Bastion Instances type"
     Type: String
   ApplicationInstanceSubnetIds:
@@ -67,7 +67,7 @@ Parameters:
     Description: "Bastion Instance name"
     Type: String
   BastionInstanceType:
-    Default: t2.micro
+    Default: t3a.micro
     Description: "Bastion Instances type"
     Type: String
   BastionInstanceSecurityGroup:

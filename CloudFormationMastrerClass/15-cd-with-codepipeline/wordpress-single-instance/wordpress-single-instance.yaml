@@ -14,11 +14,11 @@ Parameters:
   InstanceType:
     Description: WebServer EC2 instance type
     Type: String
-    Default: t2.micro
+    Default: t3a.micro
     AllowedValues:
       - t1.micro
       - t2.nano
-      - t2.micro
+      - t3a.micro
       - t2.small
       - t2.medium
       - t2.large
@@ -115,7 +115,7 @@ Mappings:
       Arch: HVM64
     t2.nano:
       Arch: HVM64
-    t2.micro:
+    t3a.micro:
       Arch: HVM64
     t2.small:
       Arch: HVM64

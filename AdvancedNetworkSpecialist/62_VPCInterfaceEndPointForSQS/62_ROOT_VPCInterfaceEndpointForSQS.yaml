@@ -141,7 +141,7 @@ Parameters:
     Description: "Application Instances name"
     Type: String
   ApplicationInstanceType:
-    Default: t2.micro
+    Default: t3a.micro
     Description: "Application Instances type"
     Type: String
   BastionInstanceImageId:
@@ -153,7 +153,7 @@ Parameters:
     Description: "Bastion Instances name"
     Type: String
   BastionInstanceType:
-    Default: t2.micro
+    Default: t3a.micro
     Description: "Bastion Instances type"
     Type: String
   KeyName:

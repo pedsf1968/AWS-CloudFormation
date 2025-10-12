@@ -56,7 +56,7 @@ Parameters:
     Description: "Profile of the Base Instance"
     Type: String
   BaseInstanceType:
-    Default: t2.micro
+    Default: t3a.micro
     Description: "Base Instances type"
     Type: String
   BaseInstanceSecurityGroup:
@@ -76,7 +76,7 @@ Parameters:
     Description: "Bastion Instances name"
     Type: String
   BastionInstanceType:
-    Default: t2.micro
+    Default: t3a.micro
     Description: "Bastion Instances type"
     Type: String
   BastionInstanceSecurityGroup:
@@ -96,7 +96,7 @@ Parameters:
     Description: "Consumer Instances name"
     Type: String
   ConsumerInstanceType:
-    Default: t2.micro
+    Default: t3a.micro
     Description: "Consumer Instances type"
     Type: String
   ConsumerSecurityGroup:
@@ -116,7 +116,7 @@ Parameters:
     Description: "WebServer Instances name"
     Type: String
   WebServerInstanceType:
-    Default: t2.micro
+    Default: t3a.micro
     Description: "WebServer Instances type"
     Type: String
   WebServerInstanceSecurityGroup:

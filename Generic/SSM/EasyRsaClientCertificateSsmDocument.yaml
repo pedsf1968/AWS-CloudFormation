@@ -1,9 +1,6 @@
 ---
 AWSTemplateFormatVersion: "2010-09-09"
-Description: >- 
-  CloudFormation template for OpenVPN EasyRSA SSM Document
-  Create CA, server and client certificates using EasyRSA, import server certificate to AWS ACM,
-  and export to s3.
+Description: CloudFormation SSM Document template to Create Client certificate with EasyRSA
 
 Parameters:
   # Global parameters
@@ -60,7 +57,7 @@ Parameters:
     Default: "/opt/certificates"
     Description: "Directory for certificates"
     Type: "String"
-  ClientBaseName:
+  ClientName:
     AllowedPattern: "^[a-zA-Z0-9._-]+$"
     ConstraintDescription: "Must contain only alphanumeric characters, periods, hyphens, and underscores"
     Default: "client1.domain.kr"
@@ -72,11 +69,15 @@ Parameters:
     Default: "/opt/openvpn-setup"
     Description: "Working directory for installation"
     Type: String
+  LogFile:
+    Default: "/var/log/openvpn-easyrsa-install.log"
+    Description: "Log file path"
+    Type: String
   Name:
     AllowedPattern: "^[a-zA-Z0-9_.-]+$"
     ConstraintDescription: "Must contain only alphanumeric characters, hyphens, periods, and underscores"
     Description: "Name of the SSM Document"
-    Default: "OpenVpnEasyRsaInstaller"
+    Default: "EasyRsaClientCertificate"
     MaxLength: 64
     MinLength: 3
     Type: String
@@ -86,14 +87,6 @@ Parameters:
     MaxLength: 256
     MinLength: 1
     Type: String
-  ServerBaseName:
-    AllowedPattern: "^[a-zA-Z0-9._-]+$"
-    ConstraintDescription: "Must contain only alphanumeric characters, periods, hyphens, and underscores"
-    Default: "application"
-    Description: "Default server certificate base name"
-    MaxLength: 64
-    MinLength: 1
-    Type: String
 
 Conditions:
   SaveInS3File: !Equals [ !Ref SaveInS3File, "true"]
@@ -101,6 +94,8 @@ Conditions:
 Resources:
   SsmDocument:
     Type: "AWS::SSM::Document"
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
     Properties:
       Name: !Sub "${ProjectName}-${EnvironmentName}-${Name}"
       DocumentType: "Command"
@@ -139,10 +134,10 @@ Resources:
             default: !Ref CertificatesDirectory
             description: "Directory for certificates"
             type: "String"
-          ClientBaseName:
-            description: "Base name for client certificates"
-            default: !Ref ClientBaseName
+          ClientName:
             allowedPattern: "^[a-zA-Z0-9._-]+$"
+            default: !Ref ClientName
+            description: "Base name for client certificates"
             type: "String"
           EnvironmentName:
             default: !Ref EnvironmentName
@@ -152,14 +147,13 @@ Resources:
             default: !Ref InstallDirectory
             description: "Working directory for installation"
             type: "String"
+          LogFile:
+            default: !Ref LogFile
+            description: "Log file path"
+            type: "String"
           ProjectName:
             default: !Ref ProjectName
             description: "Project name for parameter storage"
-            type: "String"
-          ServerBaseName:
-            description: "Base name for server certificates"
-            default: !Ref ServerBaseName
-            allowedPattern: "^[a-zA-Z0-9._-]+$"
             type: "String"
           StackName:
             default: ""
@@ -190,18 +184,17 @@ Resources:
                     # Variables - Using proper path expansion
                     readonly BUCKET="{{Bucket}}"
                     readonly BUCKET_KEY="{{BucketKey}}"
-                    readonly PROJECT_NAME="{{ProjectName}}"
+                    readonly CA_NAME="{{CaName}}"
+                    readonly CERT_DIR="{{CertificatesDirectory}}"
+                    readonly CLIENT_NAME="{{ClientName}}"
                     readonly ENVIRONMENT_NAME="{{EnvironmentName}}"
-                    readonly WAIT_HANDLE_URL="{{WaitHandleUrl}}"
-                    readonly STACK_NAME="{{StackName}}"
+                    readonly LOG_FILE="{{LogFile}}"
+                    readonly PROJECT_NAME="{{ProjectName}}"
                     readonly REGION="{{Region}}"
                     readonly RESOURCE_NAME="{{ResourceName}}"
-                    readonly CA_NAME="{{CaName}}"
-                    readonly CLIENT_BASE_NAME="{{ClientBaseName}}"
-                    readonly SERVER_BASE_NAME="{{ServerBaseName}}"
+                    readonly STACK_NAME="{{StackName}}"
+                    readonly WAIT_HANDLE_URL="{{WaitHandleUrl}}"
                     readonly WORKING_DIR="{{InstallDirectory}}"
-                    readonly LOG_FILE="/var/log/openvpn-easyrsa-install.log"
-                    readonly CERT_DIR="{{CertificatesDirectory}}"
 
                     # Logging function
                     log() {
@@ -227,7 +220,7 @@ Resources:
                                     \"Status\": \"$status\",
                                     \"Reason\": \"$message\",
                                     \"UniqueId\": \"$(hostname)-$(date +%s)\",
-                                    \"Data\": \"OpenVPN EasyRSA setup completed with exit code $exit_code\"
+                                    \"Data\": \"EasyRSA client certificate setup completed with exit code $exit_code\"
                                 }" \
                                 "$WAIT_HANDLE_URL" 2>/dev/null || echo "000")
                             
@@ -256,86 +249,65 @@ Resources:
                         local exit_code=$?
                         local line_number="${1:-unknown}"
                         log "ERROR" "Script failed at line $line_number with exit code $exit_code"
-                        signal_cloudformation "$exit_code" "OpenVPN EasyRSA setup failed at line $line_number"
+                        signal_cloudformation "$exit_code" "EasyRSA client certificate setup failed at line $line_number"
                         exit "$exit_code"
                     }
 
                     # Set up error handling
                     trap 'cleanup_and_exit $LINENO' ERR
 
-                    # Main installation function
-                    install_dependencies() {
-                        log "INFO" "Installing dependencies..."
-                        
-                        if command -v yum >/dev/null 2>&1; then
-                            log "INFO" "Detected RHEL/Amazon Linux - using yum"
-                            yum update -y
-                            yum install -y git awscli
-                        elif command -v apt-get >/dev/null 2>&1; then
-                            log "INFO" "Detected Ubuntu/Debian - using apt"
-                            export DEBIAN_FRONTEND=noninteractive
-                            apt-get update -y
-                            apt-get install -y git awscli
-                        else
-                            log "ERROR" "Unsupported package manager"
-                            return 1
-                        fi
-                        
-                        # Verify AWS CLI is available
-                        if ! command -v aws >/dev/null 2>&1; then
-                            log "ERROR" "AWS CLI not available after installation"
-                            return 1
-                        fi
-                    }
+                    easy_rsa_client_cert() {
+                        log "INFO" "Creating client certificate with EasyRSA."
 
-                    setup_easy_rsa() {
-                        log "INFO" "Setting up EasyRSA..."
-                        
                         # Create working directory with proper permissions
                         log "INFO" "Creating directories: $WORKING_DIR and $CERT_DIR"
                         mkdir -p "$WORKING_DIR" "$CERT_DIR"
-                        
+
                         # Ensure directories are writable
                         chmod 755 "$WORKING_DIR" "$CERT_DIR"
                         
-                        cd "$WORKING_DIR"
-                        
-                        # Clone EasyRSA
-                        if [[ -d "easy-rsa" ]]; then
-                            log "INFO" "EasyRSA directory exists, removing..."
-                            rm -rf easy-rsa
+                        cd "$WORKING_DIR/easy-rsa/easyrsa3"
+
+                        # Check if CA already exists, if not create one
+                        if [[ ! -f "pki/ca.crt" ]]; then
+                            log "INFO" "No existing CA found. Initializing PKI and creating CA..."
+                            
+                            # Initialize PKI (this will create a fresh pki directory)
+                            ./easyrsa init-pki
+                            
+                            # Build CA certificate
+                            log "INFO" "Building CA certificate with name: $CA_NAME"
+                            ./easyrsa --batch build-ca nopass --req-cn="$CA_NAME"
+                            
+                            # Copy CA certificate to certificates directory
+                            cp "pki/ca.crt" "$CERT_DIR/"
+                            chmod 644 "$CERT_DIR/ca.crt"
+                            
+                            log "INFO" "CA certificate created successfully"
+                        else
+                            log "INFO" "Existing CA found, using it for server certificate generation"
+                            
+                            # Copy existing CA certificate to certificates directory
+                            cp "pki/ca.crt" "$CERT_DIR/"
+                            chmod 644 "$CERT_DIR/ca.crt"
                         fi
-                        
-                        log "INFO" "Cloning EasyRSA repository..."
-                        git clone --depth 1 https://github.com/OpenVPN/easy-rsa.git
-                        cd easy-rsa/easyrsa3
-                        
-                        # Make easyrsa executable
-                        chmod +x ./easyrsa
-                        
-                        # Initialize PKI
-                        log "INFO" "Initializing PKI..."
-                        ./easyrsa init-pki
-                        
-                        # Build CA
-                        log "INFO" "Building CA certificate..."
-                        ./easyrsa --batch build-ca nopass <<< "$CA_NAME"
-                        
-                        # Build server certificate
-                        log "INFO" "Building server certificate..."
-                        ./easyrsa --batch --san=DNS:$SERVER_BASE_NAME build-server-full "$SERVER_BASE_NAME" nopass
-                        
+
+                        # Check if client certificate already exists
+                        if [[ -f "pki/issued/$CLIENT_NAME.crt" ]]; then
+                            log "WARN" "Client certificate $CLIENT_NAME already exists. Removing it to create a new one..."
+                            rm -f "pki/issued/$CLIENT_NAME.crt"
+                            rm -f "pki/private/$CLIENT_NAME.key"
+                            rm -f "pki/reqs/$CLIENT_NAME.req"
+                        fi
+
                         # Build client certificate
                         log "INFO" "Building client certificate..."
-                        ./easyrsa --batch build-client-full "$CLIENT_BASE_NAME" nopass
+                        ./easyrsa --batch build-client-full "$CLIENT_NAME" nopass
                         
                         # Copy certificates to organized directory
                         log "INFO" "Organizing certificates in $CERT_DIR..."
-                        cp pki/ca.crt "$CERT_DIR/"
-                        cp pki/issued/server.crt "$CERT_DIR/"
-                        cp pki/private/server.key "$CERT_DIR/"
-                        cp pki/issued/"$CLIENT_BASE_NAME.crt" "$CERT_DIR/"
-                        cp pki/private/"$CLIENT_BASE_NAME.key" "$CERT_DIR/"
+                        cp pki/issued/"$CLIENT_NAME.crt" "$CERT_DIR/"
+                        cp pki/private/"$CLIENT_NAME.key" "$CERT_DIR/"
                         
                         # Set proper permissions
                         chmod 600 "$CERT_DIR"/*.key
@@ -346,42 +318,48 @@ Resources:
                     }
 
                     import_to_acm() {
-                        log "INFO" "Importing server certificate to AWS Certificate Manager..."
+                        log "INFO" "Importing client certificate to AWS Certificate Manager..."
                         
                         cd "$CERT_DIR"
                         
                         # Verify certificate files exist
-                        for file in server.crt server.key ca.crt; do
+                        for file in "$CLIENT_NAME.crt" "$CLIENT_NAME.key" "ca.crt"; do
                             if [[ ! -f "$file" ]]; then
                                 log "ERROR" "Certificate file $file not found in $CERT_DIR"
                                 return 1
                             fi
                         done
-                        
-                        local server_arn
-                        if ! server_arn=$(aws acm import-certificate \
-                            --certificate fileb://server.crt \
-                            --private-key fileb://server.key \
-                            --certificate-chain fileb://ca.crt \
+
+
+                        if ! client_arn=$(aws acm import-certificate \
+                            --certificate "fileb://$CLIENT_NAME.crt" \
+                            --private-key "fileb://$CLIENT_NAME.key" \
+                            --certificate-chain "fileb://ca.crt" \
                             --region "$REGION" \
                             --query 'CertificateArn' \
                             --output text 2>&1); then
-                            log "ERROR" "Failed to import server certificate: $server_arn"
+                            log "ERROR" "Failed to import client certificate: $client_arn"
                             return 1
                         fi
-                        
-                        log "INFO" "Server certificate imported: $server_arn"
-                        
+
+                        log "INFO" "Client certificate imported: $client_arn"
+                    }
+
+                    store_arn_parameter_store() {
+                        log "INFO" "Store ARN to SSM parameter store"
+
+                        cd "$CERT_DIR"
+
                         # Store ARN for reference
                         if ! aws ssm put-parameter \
-                            --name "/$PROJECT_NAME/$ENVIRONMENT_NAME/certificates/server-arn" \
-                            --value "$server_arn" \
+                            --name "/$PROJECT_NAME/$ENVIRONMENT_NAME/certificates/$CLIENT_NAME/arn" \
+                            --value "$client_arn" \
                             --type String \
                             --overwrite \
                             --region "$REGION" 2>&1; then
-                            log "WARN" "Failed to store server certificate ARN in SSM Parameter Store"
+                            log "WARN" "Failed to store client certificate ARN in SSM Parameter Store"
                         else
-                            log "INFO" "Server certificate ARN stored in SSM: /$PROJECT_NAME/$ENVIRONMENT_NAME/certificates/server-arn"
+                            log "INFO" "Client certificate ARN stored in SSM: /$PROJECT_NAME/$ENVIRONMENT_NAME/certificates/$CLIENT_NAME/arn"
                         fi
                     }
 
@@ -398,36 +376,24 @@ Resources:
                         # Copy certificates to S3 with error handling
                         local s3_prefix="s3://$BUCKET/$BUCKET_KEY"
                         
-                        if ! aws s3 cp server.crt "$s3_prefix/server.crt" --region "$REGION"; then
-                            log "WARN" "Failed to copy server certificate to S3"
-                        else
-                            log "INFO" "Server certificate copied to: $s3_prefix/server.crt"
-                        fi
-                        
-                        if ! aws s3 cp "$CLIENT_BASE_NAME.crt" "$s3_prefix/$CLIENT_BASE_NAME.crt" --region "$REGION"; then
+                        if ! aws s3 cp "$CLIENT_NAME.crt" "$s3_prefix/$CLIENT_NAME.crt" --region "$REGION"; then
                             log "WARN" "Failed to copy client certificate to S3"
                         else
-                            log "INFO" "Client certificate copied to: $s3_prefix/$CLIENT_BASE_NAME.crt"
+                            log "INFO" "Client certificate copied to: $s3_prefix/$CLIENT_NAME.crt"
                         fi
 
-                        if ! aws s3 cp "$CLIENT_BASE_NAME.key" "$s3_prefix/$CLIENT_BASE_NAME.key" --region "$REGION"; then
+                        if ! aws s3 cp "$CLIENT_NAME.key" "$s3_prefix/$CLIENT_NAME.key" --region "$REGION"; then
                             log "WARN" "Failed to copy client key to S3"
                         else
-                            log "INFO" "Client key copied to: $s3_prefix/$CLIENT_BASE_NAME.key"
-                        fi
-
-                        if ! aws s3 cp ca.crt "$s3_prefix/ca.crt" --region "$REGION"; then
-                            log "WARN" "Failed to copy CA certificate to S3"
-                        else
-                            log "INFO" "CA certificate copied to: $s3_prefix/ca.crt"
+                            log "INFO" "Client key copied to: $s3_prefix/$CLIENT_NAME.key"
                         fi
                     }
 
                     # Main execution
                     main() {
-                        log "INFO" "Starting OpenVPN EasyRSA installation..."
+                        log "INFO" "Starting client certificate creation with EasyRSA..."
                         log "INFO" "Parameters: Project=$PROJECT_NAME, Environment=$ENVIRONMENT_NAME"
-                        log "INFO" "Certificate details: CA=$CA_NAME, Client=$CLIENT_BASE_NAME, Region=$REGION"
+                        log "INFO" "Certificate details: Client=$CLIENT_NAME, Region=$REGION"
                         log "INFO" "Working directory: $WORKING_DIR"
                         log "INFO" "Certificates directory: $CERT_DIR"
                         
@@ -436,16 +402,17 @@ Resources:
                             log "WARN" "Not running as root, some operations might fail"
                         fi
                         
-                        install_dependencies
-                        setup_easy_rsa
-                        import_to_acm
-                        copy_to_s3
-                        
-                        log "INFO" "OpenVPN EasyRSA installation completed successfully"
+                        easy_rsa_client_cert
+                        log "INFO" "Client certificate completed successfully"
                         log "INFO" "Certificates stored in: $CERT_DIR"
-                        log "INFO" "Server certificate ARN stored in SSM Parameter Store"
+                        import_to_acm
+                        log "INFO" "Certificate imported in ACM"
+                        store_arn_parameter_store
+                        log "INFO" "Certificate ARN stored in SSM Parameter Store"
+                        copy_to_s3
+                        log "INFO" "Client certificate ARN stored S3"
                         
-                        signal_cloudformation 0 "OpenVPN EasyRSA installation and certificate import completed successfully"
+                        signal_cloudformation 0 "Client certificate created and imported completed successfully"
                     }
 
                     # Execute main function
@@ -479,13 +446,3 @@ Outputs:
     Value: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:document/${SsmDocument}"
     Export:
       Name: !Sub "${ProjectName}-${EnvironmentName}-${Name}-Arn"
-
-  SsmDocumentExecutionCommand:
-    Description: "AWS CLI command to execute the document"
-    Value: !Sub |
-      aws ssm send-command \
-        --document-name "${SsmDocument}" \
-        --instance-ids "i-1234567890abcdef0" \
-        --parameters "CaName=MyCA,ClientBaseName=client1,Region=${AWS::Region},ProjectName=${ProjectName},EnvironmentName=${EnvironmentName},Bucket=${Bucket},BucketKey=${BucketKey}"
-    Export:
-      Name: !Sub "${ProjectName}-${EnvironmentName}-${Name}-ExecutionCommand"

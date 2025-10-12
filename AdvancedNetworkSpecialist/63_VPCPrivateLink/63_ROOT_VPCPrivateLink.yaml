@@ -110,7 +110,7 @@ Parameters:
     Description: "Bastion Instance name"
     Type: String
   BastionInstanceType:
-    Default: t2.micro
+    Default: t3a.micro
     Description: "Bastion Instance type"
     Type: String
   ConsumerImageId:
@@ -122,7 +122,7 @@ Parameters:
     Description: "Consumer Instance name"
     Type: String
   ConsumerInstanceType:
-    Default: t2.micro
+    Default: t3a.micro
     Description: "Consumer Instance type"
     Type: String
   InstanceKeyName:
@@ -134,7 +134,7 @@ Parameters:
     Description: "WebServer Instance name"
     Type: String
   WebServerInstanceType:
-    Default: t2.micro
+    Default: t3a.micro
     Description: "WebServer Instance type"
     Type: String
 

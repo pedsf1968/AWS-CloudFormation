@@ -1,6 +1,24 @@
 # aws cloudformation validate-template --template-body file:/110_ROOT_SiteToSiteVpn.yaml
 # aws cloudformation create-stack --stack-name ANS-110 --template-body file:/110_ROOT_SiteToSiteVpn.yaml --region ${BucketRegion} --capabilities CAPABILITY_IAM
 # aws cloudformation delete-stack --stack-name ANS-110 --region ${BucketRegion}
+# aws cloudformation list-stacks --stack-status-filter @('CREATE_COMPLETE','DELETE_FAILED') --query 'StackSummaries[*].StackName' --output json | ConvertFrom-Json | ForEach-Object { Write-Host $_ ; aws cloudformation delete-stack --stack-name $_}
+# 1 - Launch ROOT Stack
+# 2 - Go to console VPC/Client endpoint/
+# 3 - Select Client VPN endpoint
+# 5 - Download client configuration
+# 6 - Download client certificate and key from S3
+# 7 - Modify opvn configuration like below
+#
+# Add xxxxx. prefix to the endpoint URL
+# remote xxxxx.cvpn-endpoint-0f9e9a8da14044a36.prod.clientvpn.eu-west-3.amazonaws.com 443
+# 
+# Add Cert and Key
+# reneg-sec 0
+# cert client1.domain.kr.crt
+# key client1.domain.kr.key
+# 7 - Load the configuration in your OpenVPN client
+# 8 - Connect to the VPN
+# 9 - Check you can access the Application instance private IP of your Application instance
 
 AWSTemplateFormatVersion: "2010-09-09"
 Description: This template create a VPN between two accounts
@@ -26,8 +44,10 @@ Metadata:
         Parameters:
           - VpcCidrBlock
           - VpcName
-          - SubnetCidrBlocks
-          - SubnetNames
+          - SubnetPrivateCidrBlocks
+          - SubnetPrivateNames
+          - SubnetPublicCidrBlock
+          - SubnetPublicName
       - Label:
           default: "Instances"
         Parameters:
@@ -35,9 +55,18 @@ Metadata:
           - BastionInstanceImageId
           - BastionInstanceName
           - BastionInstanceType
+          - CaServerInstanceImageId
+          - CaServerInstanceName
+          - CaServerInstanceType
           - ApplicationInstanceImageId
           - ApplicationInstanceName
           - ApplicationInstanceType
+      - Label:
+          default: "Certificates"
+        Parameters:
+          - ServerName
+          - ClientName
+          
 
 Parameters:
   # Global parameters
@@ -76,15 +105,26 @@ Parameters:
 
   # Network parameters
   InternetGatewayName:
-    Default: "VPC-IGW"
+    Default: "My"
+    Type: String
+  NatGatewayName:
+    Default: "My"
     Type: String
 
-  SubnetCidrBlocks:
-    Default: "192.168.200.0/24,192.168.100.0/24,192.168.0.0/24"
+  SubnetPrivateCidrBlocks:
+    Default: "192.168.0.0/24,192.168.100.0/24"
     Description: "Subnets CIDR for Application and VPN Target"
     Type: String
-  SubnetNames:
-    Default: "Bastion,Application,VPNTarget"
+  SubnetPrivateNames:
+    Default: "Application,VPNTarget"
+    Description: Subnet names
+    Type: String
+  SubnetPublicCidrBlock:
+    Default: "192.168.200.0/24"
+    Description: "Subnets CIDR for Application and VPN Target"
+    Type: String
+  SubnetPublicName:
+    Default: "Bastion"
     Description: Subnet names
     Type: String
 
@@ -104,15 +144,27 @@ Parameters:
     Type: AWS::EC2::Image::Id
   BastionInstanceIngressCidrIp:
     Description: "Ingress CIDR IP for Bastion Instance"
-    Default: "0.0.0.0/0"
+    Default: " 88.188.126.220/32"
     Type: String
   BastionInstanceName:
     Default: "Bastion"
     Description: "Bastion Instance name"
     Type: String
   BastionInstanceType:
-    Default: t2.micro
+    Default: t3a.micro
     Description: "Bastion Instance type"
+    Type: String
+  CaServerInstanceImageId:
+    Default: ami-096dd88190a75cd20
+    Description: "CA Server Instance AMI"
+    Type: AWS::EC2::Image::Id
+  CaServerInstanceName:
+    Default: "ca-server"
+    Description: "CA Server Instance name"
+    Type: String
+  CaServerInstanceType:
+    Default: t3a.micro
+    Description: "CA Instance type"
     Type: String
   ApplicationInstanceImageId:
     Default: ami-096dd88190a75cd20
@@ -123,12 +175,25 @@ Parameters:
     Description: "Application Instances name"
     Type: String
   ApplicationInstanceType:
-    Default: t2.micro
+    Default: t3a.micro
     Description: "Application Instances type"
     Type: String
   KeyName:
     Default: "dso-paris"
     Description: "Instances Key name"
+    Type: String
+
+  CaName:
+    Default: "root-ca.domain.kr"
+    Description: "The name of the CA certificate"
+    Type: String
+  ClientName:
+    Default: "client1.domain.kr"
+    Description: "The full name of the client certificate"
+    Type: String
+  ServerName:
+    Default: "application.domain.kr"  
+    Description: "The full name of the server certificate"
     Type: String
 
 Resources:
@@ -182,8 +247,10 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Select [0, !GetAZs ]
-        SubnetCidrBlocks: !Ref SubnetCidrBlocks
-        SubnetNames: !Ref SubnetNames
+        SubnetPrivateCidrBlocks: !Ref SubnetPrivateCidrBlocks
+        SubnetPrivateNames: !Ref SubnetPrivateNames
+        SubnetPublicCidrBlock: !Ref SubnetPublicCidrBlock
+        SubnetPublicName: !Ref SubnetPublicName
         VpcCidrBlock: !Ref VpcCidrBlock
         VpcName: !Ref VpcName
 
@@ -205,6 +272,8 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         IgwName: !Ref InternetGatewayName
+        NgwName: !Ref NatGatewayName
+        SubnetPublicId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId
         VpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
 
   RouteTables:
@@ -225,6 +294,7 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         InternetGatewayId: !GetAtt Gateways.Outputs.InternetGatewayId
+        NatGatewayId: !GetAtt Gateways.Outputs.NatGatewayId
         RouteTablePrivateNames: "Application,VPNTarget"
         RouteTablePublicName: "Bastion"
         SubnetPrivateIds: !GetAtt VpcAndSubnets.Outputs.SubnetPrivateIds
@@ -273,6 +343,7 @@ Resources:
     DeletionPolicy: Delete
     DependsOn:
       - Lambdas
+      - SsmDocuments
     UpdateReplacePolicy: Retain
     Properties:
       TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/110_Instances.yaml"
@@ -286,36 +357,60 @@ Resources:
         SaveInS3File: !Ref SaveInS3File
         BastionInstanceImageId: !Ref BastionInstanceImageId
         BastionInstanceName: !Ref BastionInstanceName
-        BastionInstanceProfile: !GetAtt Roles.Outputs.InstanceCAServerProfileId
+        BastionInstanceProfile: !GetAtt Roles.Outputs.BastionInstanceProfileId
         BastionInstanceSecurityGroup: !GetAtt SecurityGroups.Outputs.BastionInstanceSecurityGroupId
         BastionInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId
         BastionInstanceType: !Ref BastionInstanceType
+        CaName: !Ref CaName
+        CaServerInstanceImageId: !Ref CaServerInstanceImageId
+        CaServerInstanceName: !Ref CaServerInstanceName
+        CaServerInstanceProfile: !GetAtt Roles.Outputs.CaServerInstanceProfileId
+        CaServerInstanceSecurityGroup: !GetAtt SecurityGroups.Outputs.CaServerInstanceSecurityGroupId
+        CaServerInstanceSubnetId: !Select [0, !Split [ ",", !GetAtt VpcAndSubnets.Outputs.SubnetPrivateIds ]]
+        CaServerInstanceType: !Ref CaServerInstanceType
+        ClientName: !Ref ClientName
         ApplicationInstanceImageId: !Ref ApplicationInstanceImageId
         ApplicationInstanceName: !Ref ApplicationInstanceName
-        ApplicationInstanceProfile: !GetAtt Roles.Outputs.InstanceProfileId
+        ApplicationInstanceProfile: !GetAtt Roles.Outputs.ApplicationInstanceProfileId
         ApplicationInstanceSecurityGroup: !GetAtt SecurityGroups.Outputs.ApplicationInstanceSecurityGroupId
         ApplicationInstanceSubnetId: !Select
           - 0
           - !Split [ ",", !GetAtt VpcAndSubnets.Outputs.SubnetPrivateIds ]
         ApplicationInstanceType: !Ref ApplicationInstanceType
         KeyName: !Ref KeyName
-        OutputS3BucketName: !Ref Bucket
+        ServerName: !Ref ServerName
 
-  # Endpoints:
-  #   Type: AWS::CloudFormation::Stack
-  #   DeletionPolicy: Delete
-  #   DependsOn:
-  #     - Lambdas
-  #   UpdateReplacePolicy: Delete
-  #   Properties:
-  #     TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/110_Endpoints.yaml"
-  #     TimeoutInMinutes: 5
-  #     Parameters:
-  #       Bucket: !Ref Bucket
-  #       BucketKey: !Ref BucketKey
-  #       BucketObject: !Ref BucketObject
-  #       BucketRegion: !Ref BucketRegion
-  #       EnvironmentName: !Ref EnvironmentName
-  #       ProjectName: !Ref ProjectName
-  #       SaveInS3File: !Ref SaveInS3File
-        
+  Endpoints:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
+      - Instances
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/110_Endpoints.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        BucketRegion: !Ref BucketRegion
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        ClientVpnEndpointName: "MyClientVPNEndpoint"
+        ClientCidrBlock: "10.10.0.0/16"
+        ClientRootCertificateChainArn: !Sub "/${ProjectName}/${EnvironmentName}/certificates/${ClientName}/arn"
+        Description: "My Client VPN Endpoint"
+        SecurityGroupId: !GetAtt SecurityGroups.Outputs.ENISecurityGroupId
+        ServerCertificateArn: !Sub "/${ProjectName}/${EnvironmentName}/certificates/${ServerName}/arn"
+        TargetNetworkCidr: !GetAtt VpcAndSubnets.Outputs.VpcCidrBlock
+        TargetSubnetId: !Select [1, !Split [ ",", !GetAtt VpcAndSubnets.Outputs.SubnetPrivateIds ]]
+        TransportProtocol: "udp"
+        VpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
+        VpnPort: 443
+
+
+
+
+

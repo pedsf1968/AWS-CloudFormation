@@ -3,9 +3,10 @@ Parameters:
     Type: String
     Default: t2.small
     AllowedValues:
-      - t2.nano
-      - t2.micro
-      - t2.small
+    - t3a.nano
+    - t3a.micro
+    - t3a.small
+    - t3a.medium
 
   Environment:
     Type: String
@@ -38,14 +39,14 @@ Rules:
       # - Assert:
       #     'Fn::Or':
       #       - !Equals [!Ref InstanceType, t2.nano]
-      #       - !Equals [!Ref InstanceType, t2.micro]
+      #       - !Equals [!Ref InstanceType, t3a.micro]
       # Assert with Contains
       - Assert:
           'Fn::Contains':
             - - t2.nano
-              - t2.micro
+              - t3a.micro
             - !Ref InstanceType
-        AssertDescription: 'For a development environment, the instance type must be t2.nano or t2.micro'
+        AssertDescription: 'For a development environment, the instance type must be t2.nano or t3a.micro'
   
 
 Resources:

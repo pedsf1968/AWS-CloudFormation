@@ -38,17 +38,22 @@ Parameters:
     Type: String
 
   # Stack parameters
+  ClientCidrBlock:
+    AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
+    ConstraintDescription: "Must be a valid CIDR block between /12 and /22"
+    Default: "10.10.0.0/16"
+    Description: "IPv4 address range in CIDR notation for client IP addresses (must be between /22 and /12)"
+    Type: String
   ClientVpnEndpointName:
     Default: "MyClientVPNEndpoint"
     Description: "The name of the Client VPN endpoint"
     MaxLength: 50
     MinLength: 1
     Type: String
-  ClientCidrBlock:
+  ClientRootCertificateChainArn:
+    ConstraintDescription: "Must be a valid ACM certificate ARN"
+    Description: "The ARN of the client certificate"
     Type: String
-    Description: "IPv4 address range in CIDR notation for client IP addresses (must be between /22 and /12)"
-    AllowedPattern: "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\/(?:1[2-9]|2[0-2])$"
-    ConstraintDescription: "Must be a valid CIDR block between /12 and /22"
   Description:
     Default: "My Client VPN Endpoint"
     Description: "A brief description of the Client VPN endpoint"
@@ -58,10 +63,16 @@ Parameters:
     Type: AWS::EC2::SecurityGroup::Id
     Description: "Security group ID to apply to the target network"
   ServerCertificateArn:
-    AllowedPattern: "^arn:aws:acm:[a-z0-9-]+:[0-9]{12}:certificate\/[a-f0-9-]+$"
     ConstraintDescription: "Must be a valid ACM certificate ARN"
     Description: "The ARN of the server certificate"
     Type: String
+  TargetNetworkCidr:
+    Default: "192.168.1.0/24"
+    Description: "The IPv4 address range, in CIDR notation, of the network to which the authorization rule applies"
+    Type: String
+  TargetSubnetId:
+    Description: "The ID of the subnet to associate with the Client VPN endpoint"
+    Type: AWS::EC2::Subnet::Id
   TransportProtocol:
     Default: "udp"
     Description: "The transport protocol for the VPN connection"
@@ -92,19 +103,14 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
-        ClientCidrBlock: "10.0.0.0/22"
-        ClientRootCertificateChainArn: !Ref ClientRootCertificateChainArn
+        ClientCidrBlock: !Ref ClientCidrBlock
+        ClientRootCertificateChainArn: !Sub "{{resolve:ssm:${ClientRootCertificateChainArn}}}"
         ClientVpnEndpointType: "certificate-authentication"
-        Description: "My Client VPN Endpoint"
+        Description: !Ref Description
         SecurityGroupId: !Ref SecurityGroupId
-        ServerCertificateArn: !Ref ServerCertificateArn
+        ServerCertificateArn: !Sub "{{resolve:ssm:${ServerCertificateArn}}}"
+        TargetNetworkCidr: !Ref TargetNetworkCidr
+        TargetSubnetId: !Ref TargetSubnetId
+        TransportProtocol: !Ref TransportProtocol
         VpcId: !Ref VpcId
         VpnPort: !Ref VpnPort
-
-  # ClientVPNAuthorizationRule:
-  #   Type: AWS::EC2::ClientVpnAuthorizationRule
-  #   Properties:
-  #     ClientVpnEndpointId: !Ref ClientVpnEndpoint
-  #     TargetNetworkCidr: 192.168.1.0/24 # Your VPC subnet
-  #     AuthorizeAllGroups: true
-  #     Description: Allow access to VPC subnet

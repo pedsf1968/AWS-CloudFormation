@@ -112,7 +112,7 @@ Parameters:
   InstanceType:
     Description: "Instance type"
     Type: String
-    Default: t2.micro
+    Default: t3a.micro
 
 Resources:
   Lambdas:

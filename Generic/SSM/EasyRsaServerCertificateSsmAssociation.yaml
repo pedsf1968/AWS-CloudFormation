@@ -1,6 +1,6 @@
 ---
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "Association for OpenVPN EasyRSA SSM Document"
+Description: CloudFormation SSM Association to create client certificate with EasyRSA
 
 Parameters:
   # Global parameters
@@ -47,32 +47,28 @@ Parameters:
     Type: String
 
   # Stack parameters
-  AssociationName:
-    Default: "OpenVpnEasyRsaSsmAssociation"
-    Description: "Specify a descriptive name for the association."
-    Type: String
   CaName:
     Default: "OpenVPN-CA"
     Description: "Default CA certificate name"
     MaxLength: 64
     MinLength: 1
     Type: String
-  ClientBaseName: 
-    AllowedPattern: "^[a-zA-Z0-9._-]+$"
-    ConstraintDescription: "Must contain only alphanumeric characters, periods, hyphens, and underscores"
-    Default: "client1.domain.kr"
-    Description: "Default client certificate base name"
-    MaxLength: 64
-    MinLength: 1
-    Type: String
+  CertificatesDirectory:
+    Default: "/opt/certificates"
+    Description: "Directory for certificates"
+    Type: "String"
   InstanceId:
     Description: "ID of the EC2 instance"
+    Type: String
+  InstallDirectory:
+    Default: "/opt/openvpn-setup"
+    Description: "Working directory for installation"
     Type: String
   Name:
     AllowedPattern: "^[a-zA-Z0-9_.-]+$"
     ConstraintDescription: "Must contain only alphanumeric characters, hyphens, periods, and underscores"
     Description: "Name of the SSM Document"
-    Default: "OpenVpnEasyRsaInstaller"
+    Default: "EasyRsaServerCertificate"
     MaxLength: 64
     MinLength: 3
     Type: String
@@ -83,10 +79,10 @@ Parameters:
     Default: "logs/"
     Description: "Logs prefix"
     Type: String
-  ServerBaseName:
+  ServerName:
     AllowedPattern: "^[a-zA-Z0-9._-]+$"
     ConstraintDescription: "Must contain only alphanumeric characters, periods, hyphens, and underscores"
-    Default: "application"
+    Default: "application.domain.kr"
     Description: "Default server certificate base name"
     MaxLength: 64
     MinLength: 1
@@ -102,49 +98,68 @@ Resources:
   AssociationWaitCondition:
     Type: AWS::CloudFormation::WaitCondition
     DependsOn: 
-      - Association
+      - SsmAssociation
     Properties:
       Count: 1
       Handle: !Ref AssociationWaitConditionHandle
-      Timeout: 600
+      Timeout: 700
 
-  Association:
+  SsmAssociation:
     Type: AWS::SSM::Association
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
     Properties:
-      AssociationName: !Ref AssociationName
+      AssociationName: !Sub "${ProjectName}-${EnvironmentName}-${Name}"
       Name: !Sub "${ProjectName}-${EnvironmentName}-${Name}"
       OutputLocation:
         S3Location:
           OutputS3BucketName: !Ref OutputS3BucketName
           OutputS3KeyPrefix: !Ref OutputS3KeyPrefix
       Parameters:
-        Bucket:
-          - !Ref Bucket
-        BucketKey:
-          - !Ref BucketKey
+        EnvironmentName:
+          - !Ref EnvironmentName
         ProjectName:
           - !Ref ProjectName
-        EnvironmentName: 
-          - !Ref EnvironmentName
-        CaName:
-          - !Ref CaName
-        ClientBaseName: 
-          - !Ref ClientBaseName
-        StackName: 
-          - !Ref AWS::StackName
         Region: 
           - !Ref AWS::Region
         ResourceName:
           - "AssociationWaitCondition"
-        ServerBaseName:
-          - !Ref ServerBaseName
+        StackName: 
+          - !Ref AWS::StackName
         WaitHandleUrl:
           - !Ref AssociationWaitConditionHandle
-        InstallDirectory:
-          - "/opt/openvpn-setup"
+        CaName:
+          - !Ref CaName
         CertificatesDirectory:
-          - "/opt/certificates"
+          - !Ref CertificatesDirectory
+        InstallDirectory:
+          - !Ref InstallDirectory
+        ServerName:
+          - !Ref ServerName
       Targets:
       - Key: InstanceIds
         Values:
         - !Ref InstanceId
+
+  SsmAssociationToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: SaveInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:SsmResourceToS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Region: !Ref AWS::Region
+      ResourceType: "Association"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:SSM:Association:${Name}"
+      Value: !Ref SsmAssociation
+
+Outputs:
+  CertificateParameterStore:
+    Description: "SSM Parameter Store Key for server certificate ARN"
+    Value: !Sub "/${ProjectName}/${EnvironmentName}/certificates/${ServerName}/arn"
+    Export:
+      Name: !Sub "${AWS::StackName}-CertificateParameterStore"
