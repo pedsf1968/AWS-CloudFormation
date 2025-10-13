@@ -241,7 +241,7 @@ Resources:
     Properties:
       AvailabilityZone:  !Select [ 0, !GetAZs ]
       ImageId: !Ref InstanceImageId
-      InstanceType: t2.micro
+      InstanceType: t3a.micro
       KeyName: !Ref KeyName
       SecurityGroupIds:
         - !Ref SSHSecurityGroup
@@ -256,7 +256,7 @@ Resources:
     Properties:
       AvailabilityZone:  !Select [ 0, !GetAZs ]
       ImageId: !Ref InstanceImageId
-      InstanceType: t2.micro
+      InstanceType: t3a.micro
       KeyName: !Ref KeyName
       SecurityGroupIds:
         - !Ref SSHSecurityGroup

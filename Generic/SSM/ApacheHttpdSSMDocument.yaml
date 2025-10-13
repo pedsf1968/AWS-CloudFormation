@@ -37,7 +37,7 @@ Parameters:
   
   # Stack parameters
   DocumentName:
-    Default: ApacheHttpdSSMDocument
+    Default: ApacheHttpdSsmDocument
     Type: String
 
 Resources:
@@ -372,7 +372,7 @@ Outputs:
     Export:
       Name: !Sub "${ProjectName}-${EnvironmentName}-${DocumentName}-Name"
   
-  SSMDocumentArn:
+  SsmDocumentArn:
     Description: "ARN of the created SSM Document"
     Value: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:document/${SSMDocument}"
     Export:

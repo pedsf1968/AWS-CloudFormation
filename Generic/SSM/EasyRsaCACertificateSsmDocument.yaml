@@ -1,0 +1,345 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: CloudFormation SSM Document template to Create CA certificate with EasyRSA
+
+Parameters:
+  # Global parameters
+  Bucket:
+    AllowedPattern: "^[a-zA-Z0-9_.-]+$"
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation bucket URL
+    Type: String
+  BucketKey:
+    AllowedPattern: "^[a-zA-Z0-9_.-]+$"
+    Default: "110_AWSClientVpn"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    AllowedPattern: "^[a-zA-Z0-9_.-]+$"
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  BucketRegion:
+    AllowedPattern: "^[a-zA-Z0-9_.-]+$"
+    AllowedValues: ["eu-west-3", "eu-central-1"]
+    Default: "eu-west-3"
+    Description: "Region where is the Bucket"
+    Type: String
+  EnvironmentName:
+    AllowedPattern: "^[a-zA-Z0-9_.-]+$"
+    AllowedValues: ["dev", "test", "prod"]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefixes all resources"
+    Type: String
+  ProjectName:
+    AllowedPattern: "^[a-zA-Z0-9_.-]+$"
+    ConstraintDescription: "Must be 1-20 characters"
+    Default: "OpenVPN"
+    Description: "Project name that prefixes all resources"
+    MinLength: 1
+    MaxLength: 20
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+  # Stack parameters
+  CaName:
+    Default: "OpenVPN-CA"
+    Description: "Default CA certificate name"
+    MaxLength: 64
+    MinLength: 1
+    Type: String
+  CertificatesDirectory:
+    Default: "/opt/certificates"
+    Description: "Directory for certificates"
+    Type: "String"
+  InstallDirectory:
+    Default: "/opt/openvpn-setup"
+    Description: "Working directory for installation"
+    Type: String
+  LogFile:
+    Default: "/var/log/openvpn-easyrsa-install.log"
+    Description: "Log file path"
+    Type: String
+  Name:
+    AllowedPattern: "^[a-zA-Z0-9_.-]+$"
+    ConstraintDescription: "Must contain only alphanumeric characters, hyphens, periods, and underscores"
+    Description: "Name of the SSM Document"
+    Default: "EasyRsaCACertificate"
+    MaxLength: 64
+    MinLength: 3
+    Type: String
+  Purpose:
+    Default: "Create CA certificate with EasyRSA"
+    Description: Purpose of the Document
+    MaxLength: 256
+    MinLength: 1
+    Type: String
+
+Conditions:
+  SaveInS3File: !Equals [ !Ref SaveInS3File, "true"]
+
+Resources:
+  SsmDocument:
+    Type: "AWS::SSM::Document"
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Name: !Sub "${ProjectName}-${EnvironmentName}-${Name}"
+      DocumentType: "Command"
+      DocumentFormat: "YAML"
+      TargetType: "/AWS::EC2::Instance"
+      UpdateMethod: "Replace"
+      Tags:
+        - Key: "Environment"
+          Value: !Ref EnvironmentName
+        - Key: "ManagedBy"
+          Value: "CloudFormation"
+        - Key: "Project"
+          Value: !Ref ProjectName
+        - Key: "Purpose"
+          Value: !Ref Purpose
+        - Key: "StackName"
+          Value: !Ref "AWS::StackName"
+      Content:
+        schemaVersion: "1.2"
+        description: "Install and configure OpenVPN EasyRSA with certificate generation and AWS ACM import"
+        parameters:
+          Bucket:
+            default: !Ref Bucket
+            description: "S3 bucket for certificate storage"
+            type: "String"
+          BucketKey:
+            default: !Ref BucketKey
+            description: "S3 bucket key prefix"
+            type: "String"
+          CaName:
+            allowedPattern: "^[a-zA-Z0-9\\s._-]+$"
+            default: !Ref CaName
+            description: "Certificate Authority name"
+            type: "String"
+          CertificatesDirectory:
+            default: !Ref CertificatesDirectory
+            description: "Directory for certificates"
+            type: "String"
+          EnvironmentName:
+            default: !Ref EnvironmentName
+            description: "Environment name for parameter storage"
+            type: "String"
+          InstallDirectory:
+            default: !Ref InstallDirectory
+            description: "Working directory for installation"
+            type: "String"
+          LogFile:
+            default: !Ref LogFile
+            description: "Log file path"
+            type: "String"
+          ProjectName:
+            default: !Ref ProjectName
+            description: "Project name for parameter storage"
+            type: "String"
+          StackName:
+            default: ""
+            description: "CloudFormation Stack Name (optional)"
+            type: "String"
+          Region:
+            default: "{{ global:REGION }}"
+            description: "AWS Region for ACM certificate import"
+            type: "String"
+          ResourceName:
+            default: ""
+            description: "CloudFormation Resource Name for signaling (optional)"
+            type: "String"
+          WaitHandleUrl:
+            default: ""
+            description: "CloudFormation WaitCondition URL (optional)"
+            type: "String"
+        runtimeConfig:
+          "aws:runShellScript":
+            properties:
+              - id: "0.aws:runShellScript"
+                timeoutSeconds: 300
+                runCommand:
+                  - |
+                    #!/bin/bash
+                    set -euo pipefail  # Strict error handling
+
+                    # Variables - Using proper path expansion
+                    readonly BUCKET="{{Bucket}}"
+                    readonly BUCKET_KEY="{{BucketKey}}"
+                    readonly PROJECT_NAME="{{ProjectName}}"
+                    readonly ENVIRONMENT_NAME="{{EnvironmentName}}"
+                    readonly WAIT_HANDLE_URL="{{WaitHandleUrl}}"
+                    readonly STACK_NAME="{{StackName}}"
+                    readonly REGION="{{Region}}"
+                    readonly RESOURCE_NAME="{{ResourceName}}"
+                    readonly CA_NAME="{{CaName}}"
+                    readonly WORKING_DIR="{{InstallDirectory}}"
+                    readonly LOG_FILE="{{LogFile}}"
+                    readonly CERT_DIR="{{CertificatesDirectory}}"
+
+                    # Logging function
+                    log() {
+                        local level="$1"
+                        shift
+                        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*" | tee -a "$LOG_FILE"
+                    }
+
+                    # CloudFormation signaling function
+                    signal_cloudformation() {
+                        local exit_code="$1"
+                        local message="$2"
+                        local status=$([ "$exit_code" -eq 0 ] && echo "SUCCESS" || echo "FAILURE")
+                        
+                        log "INFO" "Signaling CloudFormation: Status=$status, Message=$message"
+                        
+                        if [[ -n "$WAIT_HANDLE_URL" ]]; then
+                            log "INFO" "Using WaitCondition URL for signaling"
+                            local response_code
+                            response_code=$(curl -w "%{http_code}" -s -X PUT \
+                                -H 'Content-Type: application/json' \
+                                --data-binary "{
+                                    \"Status\": \"$status\",
+                                    \"Reason\": \"$message\",
+                                    \"UniqueId\": \"$(hostname)-$(date +%s)\",
+                                    \"Data\": \"EasyRSA CA certificate setup completed with exit code $exit_code\"
+                                }" \
+                                "$WAIT_HANDLE_URL" 2>/dev/null || echo "000")
+                            
+                            if [[ "$response_code" =~ ^2[0-9][0-9]$ ]]; then
+                                log "INFO" "Successfully signaled CloudFormation (HTTP: $response_code)"
+                            else
+                                log "WARN" "Failed to signal CloudFormation (HTTP: $response_code)"
+                            fi
+                        elif [[ -n "$STACK_NAME" && -n "$REGION" && -n "$RESOURCE_NAME" ]]; then
+                            log "INFO" "Using cfn-signal for CloudFormation signaling"
+                            if command -v /opt/aws/bin/cfn-signal >/dev/null 2>&1; then
+                                /opt/aws/bin/cfn-signal -e "$exit_code" \
+                                    --stack "$STACK_NAME" \
+                                    --resource "$RESOURCE_NAME" \
+                                    --region "$REGION" || log "WARN" "cfn-signal failed"
+                            else
+                                log "WARN" "cfn-signal not available"
+                            fi
+                        else
+                            log "INFO" "No CloudFormation signaling configured"
+                        fi
+                    }
+
+                    # Error handler
+                    cleanup_and_exit() {
+                        local exit_code=$?
+                        local line_number="${1:-unknown}"
+                        log "ERROR" "Script failed at line $line_number with exit code $exit_code"
+                        signal_cloudformation "$exit_code" "EasyRSA CA certificate setup failed at line $line_number"
+                        exit "$exit_code"
+                    }
+
+                    # Set up error handling
+                    trap 'cleanup_and_exit $LINENO' ERR
+
+                    easy_rsa_ca_cert() {
+                        log "INFO" "Creating CA certificate with EasyRSA."
+                        
+                        # Create working directory with proper permissions
+                        log "INFO" "Creating directories: $WORKING_DIR and $CERT_DIR"
+                        mkdir -p "$WORKING_DIR" "$CERT_DIR"
+                        
+                        # Ensure directories are writable
+                        chmod 755 "$WORKING_DIR" "$CERT_DIR"
+                        
+                        cd "$WORKING_DIR/easy-rsa/easyrsa3"
+                        
+                        # Build CA
+                        log "INFO" "Building CA certificate..."
+                        ./easyrsa --batch build-ca nopass <<< "$CA_NAME"
+                        
+                        # Copy certificates to organized directory
+                        log "INFO" "Organizing certificates in $CERT_DIR..."
+                        cp pki/ca.crt "$CERT_DIR/"
+                        
+                        # Set proper permissions
+                        chmod 644 "$CERT_DIR"/*.crt
+                        
+                        log "INFO" "Certificates created and organized successfully"
+                        ls -la "$CERT_DIR/"
+                    }
+
+                    copy_to_s3() {
+                        if [[ -z "$BUCKET" ]]; then
+                            log "INFO" "No S3 bucket specified, skipping S3 copy"
+                            return 0
+                        fi
+                        
+                        log "INFO" "Copying certificates to S3..."
+                        
+                        cd "$CERT_DIR"
+                        
+                        # Copy certificates to S3 with error handling
+                        local s3_prefix="s3://$BUCKET/$BUCKET_KEY"
+                        
+                        if ! aws s3 cp ca.crt "$s3_prefix/ca.crt" --region "$REGION"; then
+                            log "WARN" "Failed to copy CA certificate to S3"
+                        else
+                            log "INFO" "CA certificate copied to: $s3_prefix/ca.crt"
+                        fi
+                    }
+
+                    # Main execution
+                    main() {
+                        log "INFO" "Starting CA certificate creation with EasyRSA..."
+                        log "INFO" "Parameters: Project=$PROJECT_NAME, Environment=$ENVIRONMENT_NAME"
+                        log "INFO" "Certificate details: CA=$CA_NAME, Region=$REGION"
+                        log "INFO" "Working directory: $WORKING_DIR"
+                        log "INFO" "Certificates directory: $CERT_DIR"
+                        
+                        # Check if running as root or with sudo
+                        if [[ $EUID -ne 0 ]]; then
+                            log "WARN" "Not running as root, some operations might fail"
+                        fi
+                        
+                        easy_rsa_ca_cert
+                        copy_to_s3
+                        
+                        log "INFO" "CA certificate completed successfully"
+                        log "INFO" "Certificates stored in: $CERT_DIR"
+                        log "INFO" "Certificate stored in S3"
+                        
+                        signal_cloudformation 0 "CA certificate created and imported completed successfully"
+                    }
+
+                    # Execute main function
+                    main "$@"
+
+  SsmDocumentToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: SaveInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:SsmResourceToS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Region: !Ref AWS::Region
+      ResourceType: "Document"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:SSM:Document:${Name}"
+      Value: !Ref SsmDocument
+
+Outputs:
+  SsmDocumentName:
+    Description: "Name of the created SSM Document"
+    Value: !Ref SsmDocument
+    Export:
+      Name: !Sub "${ProjectName}-${EnvironmentName}-${Name}-Name"
+
+  SsmDocumentArn:
+    Description: "ARN of the created SSM Document"
+    Value: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:document/${SsmDocument}"
+    Export:
+      Name: !Sub "${ProjectName}-${EnvironmentName}-${Name}-Arn"

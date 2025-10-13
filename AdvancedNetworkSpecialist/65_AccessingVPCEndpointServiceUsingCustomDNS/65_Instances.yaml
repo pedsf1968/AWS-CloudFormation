@@ -52,7 +52,7 @@ Parameters:
 
   # Base Instance parameters
   BaseInstanceImageId:
-    Default: ami-08461dc8cd9e834e0
+    Default: ami-096dd88190a75cd20
     Description: "Base Instance AMI"
     Type: AWS::EC2::Image::Id
   BaseInstanceName:
@@ -63,7 +63,7 @@ Parameters:
     Description: "Profile of the Base Instance"
     Type: String
   BaseInstanceType:
-    Default: t2.micro
+    Default: t3a.micro
     Description: "Base Instances type"
     Type: String
   BaseInstanceSecurityGroup:
@@ -75,7 +75,7 @@ Parameters:
 
   # Bastion parameters
   BastionInstanceImageId:
-    Default: ami-08461dc8cd9e834e0
+    Default: ami-096dd88190a75cd20
     Description: "Bastion Instance AMI"
     Type: AWS::EC2::Image::Id
   BastionInstanceName:
@@ -83,7 +83,7 @@ Parameters:
     Description: "Bastion Instances name"
     Type: String
   BastionInstanceType:
-    Default: t2.micro
+    Default: t3a.micro
     Description: "Bastion Instances type"
     Type: String
   BastionInstanceSecurityGroup:
@@ -95,7 +95,7 @@ Parameters:
 
   # Consumer parameters
   ConsumerImageId:
-    Default: ami-08461dc8cd9e834e0
+    Default: ami-096dd88190a75cd20
     Description: "Consumer Instance AMI"
     Type: AWS::EC2::Image::Id
   ConsumerInstanceName:
@@ -103,7 +103,7 @@ Parameters:
     Description: "Consumer Instances name"
     Type: String
   ConsumerInstanceType:
-    Default: t2.micro
+    Default: t3a.micro
     Description: "Consumer Instances type"
     Type: String
   ConsumerSecurityGroup:
@@ -123,7 +123,7 @@ Parameters:
     Description: "WebServer Instances name"
     Type: String
   WebServerInstanceType:
-    Default: t2.micro
+    Default: t3a.micro
     Description: "WebServer Instances type"
     Type: String
   WebServerInstanceSecurityGroup:
@@ -159,7 +159,7 @@ Resources:
         InstanceType: !Ref BaseInstanceType
         SecurityGroupIds: !Ref BaseInstanceSecurityGroup
         KeyName: !Ref KeyName
-        SSMDocumentName: !Sub "${ProjectName}-${EnvironmentName}-ApacheHttpdSSMDocument"
+        SSMDocumentName: !Sub "${ProjectName}-${EnvironmentName}-ApacheHttpdSsmDocument"
         SubnetId: !Ref BaseInstanceSubnetId
 
   BastionInstance:

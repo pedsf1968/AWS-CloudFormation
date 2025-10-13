@@ -41,6 +41,9 @@ Parameters:
   InternetGatewayId:
     Description: "Internet Gateway ID"
     Type: String
+  NatGatewayId:
+    Description: "NAT Gateway ID"
+    Type: String
   RouteTablePrivateNames:
     Description: "Names of all Private Route Tables"
     Type: CommaDelimitedList
@@ -133,7 +136,50 @@ Resources:
         SubnetId: !Select [ 1, !Ref SubnetPrivateIds ]
         VpcId: !Ref VpcId
 
+  SubnetPrivateRouteAStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/VPC/Route.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        DestinationCidrBlock: "0.0.0.0/0"
+        RouteTableId: !GetAtt SubnetPrivateRouteTableAStack.Outputs.RouteTableId
+        RouteTableName: !Select [ 0, !Ref RouteTablePrivateNames ]
+        TargetType: "NatGateway"
+        TargetId: !Ref NatGatewayId
+
+  SubnetPrivateRouteBStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/VPC/Route.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        DestinationCidrBlock: "0.0.0.0/0"
+        RouteTableId: !GetAtt SubnetPrivateRouteTableBStack.Outputs.RouteTableId
+        RouteTableName: !Select [ 1, !Ref RouteTablePrivateNames ]
+        TargetType: "NatGateway"
+        TargetId: !Ref NatGatewayId
+
 Outputs:
+  SubnetPrivateRouteAId:
+    Description: "Private Subnet Route A ID"
+    Value: !GetAtt SubnetPrivateRouteAStack.Outputs.RouteId
   SubnetPrivateRouteTableAAssociationId:
     Description: "Private Route Table Association ID"
     Value: SubnetPrivateRouteTableAStack.Outputs.SubnetRouteTableAssociationId
@@ -141,6 +187,9 @@ Outputs:
     Description: "Private Subnet Route Table ID"
     Value: !GetAtt SubnetPrivateRouteTableAStack.Outputs.RouteTableId
 
+  SubnetPrivateRouteBId:
+    Description: "Private Subnet Route B ID"
+    Value: !GetAtt SubnetPrivateRouteBStack.Outputs.RouteId
   SubnetPrivateRouteTableBAssociationId:
     Description: "Private Route Table Association ID"
     Value: SubnetPrivateRouteTableBStack.Outputs.SubnetRouteTableAssociationId

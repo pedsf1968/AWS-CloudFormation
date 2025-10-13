@@ -60,7 +60,7 @@ Parameters:
     Description: "Save resources information in s3 file"
     Type: String
   FunctionName:
-    Default: EC2ResourceToS3
+    Default: Ec2ResourceToS3
     Type: String
   LogFormat:
     AllowedValues: [Text, JSON]

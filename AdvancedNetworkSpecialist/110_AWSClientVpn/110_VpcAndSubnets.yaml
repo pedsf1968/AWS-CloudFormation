@@ -41,18 +41,22 @@ Parameters:
   AvailabilityZone:
     Description: "The AZ of the subnet"
     Type: String
-  SubnetCidrBlocks:
-    Default: "192.168.200.0/24,192.168.0.0/24,192.168.100.0/24"
+  SubnetPrivateCidrBlocks:
+    Default: "192.168.0.0/24,192.168.100.0/24"
     Description: "Subnets CIDR for Application and VPN Target"
     Type: CommaDelimitedList
-  SubnetsMapPublicIpOnLaunch:
-    Default: "true,false,false"
-    Description: "To allow the subnet to be public"
-    Type: CommaDelimitedList
-  SubnetNames:
-    Default: "Public,Application,VPNTarget"
+  SubnetPrivateNames:
+    Default: "Application,VPNTarget"
     Description: Subnet names
     Type: CommaDelimitedList
+  SubnetPublicCidrBlock:
+    Default: "192.168.200.0/24"
+    Description: "Subnets CIDR for Application and VPN Target"
+    Type: String
+  SubnetPublicName:
+    Default: "Bastion"
+    Description: Subnet names
+    Type: String
 
   VpcCidrBlock:
     Default: 192.168.0.0/16
@@ -95,9 +99,9 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Ref AvailabilityZone
-        CidrBlock: !Select [ 0, !Ref SubnetCidrBlocks ]
-        MapPublicIpOnLaunch: !Select [ 0, !Ref SubnetsMapPublicIpOnLaunch ]
-        SubnetName: !Select [ 0, !Ref SubnetNames ]
+        CidrBlock: !Ref SubnetPublicCidrBlock
+        MapPublicIpOnLaunch: true
+        SubnetName: !Ref SubnetPublicName
         VpcId: !GetAtt VpcStack.Outputs.VpcId
 
   SubnetPrivateAStack:
@@ -115,9 +119,9 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Ref AvailabilityZone
-        CidrBlock: !Select [ 1, !Ref SubnetCidrBlocks ]
-        MapPublicIpOnLaunch: !Select [ 1, !Ref SubnetsMapPublicIpOnLaunch ]
-        SubnetName: !Select [ 1, !Ref SubnetNames ]
+        CidrBlock: !Select [ 0, !Ref SubnetPrivateCidrBlocks ]
+        MapPublicIpOnLaunch: false
+        SubnetName: !Select [ 0, !Ref SubnetPrivateNames ]
         VpcId: !GetAtt VpcStack.Outputs.VpcId
 
   SubnetPrivateBStack:
@@ -135,9 +139,9 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Ref AvailabilityZone
-        CidrBlock: !Select [ 2, !Ref SubnetCidrBlocks ]
-        MapPublicIpOnLaunch: !Select [ 2, !Ref SubnetsMapPublicIpOnLaunch ]
-        SubnetName: !Select [ 2, !Ref SubnetNames ]
+        CidrBlock: !Select [ 1, !Ref SubnetPrivateCidrBlocks ]
+        MapPublicIpOnLaunch: false
+        SubnetName: !Select [ 1, !Ref SubnetPrivateNames ]
         VpcId: !GetAtt VpcStack.Outputs.VpcId
 
 Outputs:

@@ -107,6 +107,8 @@ Resources:
             Statement:
               - Action:
                   - acm:ImportCertificate
+                  - cloudformation:SignalResource
+                  - ssm:GetParameter
                   - ssm:PutParameter
                 Resource: "*"
                 Effect: Allow

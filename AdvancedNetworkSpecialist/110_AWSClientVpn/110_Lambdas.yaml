@@ -93,7 +93,7 @@ Resources:
       TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/Lambda/GetParametersFromS3.yaml"
       TimeoutInMinutes: 5
 
-  EC2ResourceToS3Stack:
+  Ec2ResourceToS3Stack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     DependsOn:
@@ -112,9 +112,30 @@ Resources:
           - "false"
         SaveInS3File: !Ref SaveInS3File
         ApplicationLogLevel: !Ref ApplicationLogLevel
-      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/Lambda/EC2ResourceToS3.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/Lambda/Ec2ResourceToS3.yaml"
       TimeoutInMinutes: 5
 
+  SsmResourceToS3Stack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - IAMResourceToS3Stack
+    UpdateReplacePolicy: Delete
+    Properties:
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        CreateRole: !If
+          - CreateRole
+          - "true"
+          - "false"
+        SaveInS3File: !Ref SaveInS3File
+        ApplicationLogLevel: !Ref ApplicationLogLevel
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/Lambda/SsmResourceToS3.yaml"
+      TimeoutInMinutes: 5
 
   UpdateParametersFromS3Stack:
     Type: AWS::CloudFormation::Stack
@@ -139,6 +160,32 @@ Resources:
       TimeoutInMinutes: 5
 
 Outputs:
+  IAMResourceToS3LambdaFunctionArn:
+    Description: "IAMResourceToS3 Lambda Arn"
+    Value: !GetAtt IAMResourceToS3Stack.Outputs.LambdaFunctionArn
+  IAMResourceToS3RoleArn:
+    Description: "IAMResourceToS3 Lambda Role Arn"
+    Value: !If
+          - CreateRole
+          - !GetAtt IAMResourceToS3Stack.Outputs.RoleArn
+          - ""
+  IAMResourceToS3LogGroupId:
+    Description: IAMResourceToS3 Lambda Log Group Id
+    Value: !GetAtt IAMResourceToS3Stack.Outputs.LogGroupId
+
+  Ec2ResourceToS3LambdaFunctionArn:
+    Description: "Ec2ResourceToS3 Lambda Arn"
+    Value: !GetAtt Ec2ResourceToS3Stack.Outputs.LambdaFunctionArn
+  Ec2ResourceToS3RoleArn:
+    Description: "Ec2ResourceToS3 Lambda Role Arn"
+    Value: !If
+          - CreateRole
+          - !GetAtt Ec2ResourceToS3Stack.Outputs.RoleArn
+          - ""
+  Ec2ResourceToS3LogGroupId:
+    Description: Ec2ResourceToS3 Lambda Log Group Id
+    Value: !GetAtt Ec2ResourceToS3Stack.Outputs.LogGroupId
+
   GetParametersFromS3LambdaFunctionArn:
     Description: "GetParametersFromS3 Lambda Arn"
     Value: !GetAtt GetParametersFromS3Stack.Outputs.LambdaFunctionArn
@@ -152,31 +199,18 @@ Outputs:
     Description: GetParametersFromS3 Lambda Log Group Id
     Value: !GetAtt GetParametersFromS3Stack.Outputs.LogGroupId
 
-  EC2ResourceToS3LambdaFunctionArn:
-    Description: "EC2ResourceToS3 Lambda Arn"
-    Value: !GetAtt EC2ResourceToS3Stack.Outputs.LambdaFunctionArn
-  EC2ResourceToS3RoleArn:
-    Description: "EC2ResourceToS3 Lambda Role Arn"
+  SsmResourceToS3LambdaFunctionArn:
+    Description: "SsmResourceToS3 Lambda Arn"
+    Value: !GetAtt SsmResourceToS3Stack.Outputs.LambdaFunctionArn
+  SsmResourceToS3RoleArn:
+    Description: "SsmResourceToS3 Lambda Role Arn"
     Value: !If
           - CreateRole
-          - !GetAtt EC2ResourceToS3Stack.Outputs.RoleArn
+          - !GetAtt SsmResourceToS3Stack.Outputs.RoleArn
           - ""
-  EC2ResourceToS3LogGroupId:
-    Description: EC2ResourceToS3 Lambda Log Group Id
-    Value: !GetAtt EC2ResourceToS3Stack.Outputs.LogGroupId
-
-  IAMResourceToS3LambdaFunctionArn:
-    Description: "IAMResourceToS3 Lambda Arn"
-    Value: !GetAtt IAMResourceToS3Stack.Outputs.LambdaFunctionArn
-  IAMResourceToS3RoleArn:
-    Description: "IAMResourceToS3 Lambda Role Arn"
-    Value: !If
-          - CreateRole
-          - !GetAtt IAMResourceToS3Stack.Outputs.RoleArn
-          - ""
-  IAMResourceToS3LogGroupId:
-    Description: IAMResourceToS3 Lambda Log Group Id
-    Value: !GetAtt IAMResourceToS3Stack.Outputs.LogGroupId
+  SsmResourceToS3LogGroupId:
+    Description: SsmResourceToS3 Lambda Log Group Id
+    Value: !GetAtt SsmResourceToS3Stack.Outputs.LogGroupId
 
   UpdateParametersFromS3LambdaFunctionArn:
     Description: "ARN of UpdateParametersFromS3 Lambda"

@@ -137,7 +137,7 @@ Resources:
     Properties:
       ImageId: !Ref ImageId
       KeyName: !Ref KeyName
-      InstanceType: t2.micro
+      InstanceType: t3a.micro
       IamInstanceProfile: !Ref InstanceProfile # Reference Instance Profile
       SecurityGroups:
       - !Ref WebServerSecurityGroup

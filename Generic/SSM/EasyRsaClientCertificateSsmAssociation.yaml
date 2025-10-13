@@ -1,0 +1,157 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description: CloudFormation SSM Association to create client certificate with EasyRSA
+
+Parameters:
+  # Global parameters
+  Bucket:
+    AllowedPattern: "^[a-zA-Z0-9_.-]+$"
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation bucket URL
+    Type: String
+  BucketKey:
+    AllowedPattern: "^[a-zA-Z0-9_.-]+$"
+    Default: "110_AWSClientVpn"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    AllowedPattern: "^[a-zA-Z0-9_.-]+$"
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  BucketRegion:
+    AllowedPattern: "^[a-zA-Z0-9_.-]+$"
+    AllowedValues: ["eu-west-3", "eu-central-1"]
+    Default: "eu-west-3"
+    Description: "Region where is the Bucket"
+    Type: String
+  EnvironmentName:
+    AllowedPattern: "^[a-zA-Z0-9_.-]+$"
+    AllowedValues: ["dev", "test", "prod"]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefixes all resources"
+    Type: String
+  ProjectName:
+    AllowedPattern: "^[a-zA-Z0-9_.-]+$"
+    ConstraintDescription: "Must be 1-20 characters"
+    Default: "OpenVPN"
+    Description: "Project name that prefixes all resources"
+    MinLength: 1
+    MaxLength: 20
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+  # Stack parameters
+  CertificatesDirectory:
+    Default: "/opt/certificates"
+    Description: "Directory for certificates"
+    Type: "String"
+  ClientName: 
+    AllowedPattern: "^[a-zA-Z0-9._-]+$"
+    ConstraintDescription: "Must contain only alphanumeric characters, periods, hyphens, and underscores"
+    Default: "client1.domain.kr"
+    Description: "Default client certificate base name"
+    MaxLength: 64
+    MinLength: 1
+    Type: String
+  InstanceId:
+    Description: "ID of the EC2 instance"
+    Type: String
+  InstallDirectory:
+    Default: "/opt/openvpn-setup"
+    Description: "Working directory for installation"
+    Type: String
+  Name:
+    AllowedPattern: "^[a-zA-Z0-9_.-]+$"
+    ConstraintDescription: "Must contain only alphanumeric characters, hyphens, periods, and underscores"
+    Description: "Name of the SSM Document"
+    Default: "EasyRsaClientCertificate"
+    MaxLength: 64
+    MinLength: 3
+    Type: String
+  OutputS3BucketName:
+    Description: "The Bucket name for logs"
+    Type: String
+  OutputS3KeyPrefix:
+    Default: "logs/"
+    Description: "Logs prefix"
+    Type: String
+
+Conditions:
+  SaveInS3File: !Equals [ !Ref SaveInS3File, "true"]
+
+Resources:
+  AssociationWaitConditionHandle:
+    Type: AWS::CloudFormation::WaitConditionHandle
+
+  AssociationWaitCondition:
+    Type: AWS::CloudFormation::WaitCondition
+    DependsOn: 
+      - SsmAssociation
+    Properties:
+      Count: 1
+      Handle: !Ref AssociationWaitConditionHandle
+      Timeout: 600
+
+  SsmAssociation:
+    Type: AWS::SSM::Association
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      AssociationName: !Sub "${ProjectName}-${EnvironmentName}-${Name}"
+      Name: !Sub "${ProjectName}-${EnvironmentName}-${Name}"
+      OutputLocation:
+        S3Location:
+          OutputS3BucketName: !Ref OutputS3BucketName
+          OutputS3KeyPrefix: !Ref OutputS3KeyPrefix
+      Parameters:
+        EnvironmentName:
+          - !Ref EnvironmentName
+        ProjectName:
+          - !Ref ProjectName
+        Region: 
+          - !Ref AWS::Region
+        ResourceName:
+          - "AssociationWaitCondition"
+        StackName: 
+          - !Ref AWS::StackName
+        WaitHandleUrl:
+          - !Ref AssociationWaitConditionHandle
+        CertificatesDirectory:
+          - !Ref CertificatesDirectory
+        ClientName: 
+          - !Ref ClientName
+        InstallDirectory:
+          - !Ref InstallDirectory
+      Targets:
+      - Key: InstanceIds
+        Values:
+        - !Ref InstanceId
+
+  SsmAssociationToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: SaveInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:SsmResourceToS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Region: !Ref AWS::Region
+      ResourceType: "Association"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:SSM:Association:${Name}"
+      Value: !Ref SsmAssociation
+
+Outputs:
+  CertificateParameterStore:
+    Description: "SSM Parameter Store Key for clientcertificate ARN"
+    Value: !Sub "/${ProjectName}/${EnvironmentName}/certificates/${ClientName}/arn"
+    Export:
+      Name: !Sub "${AWS::StackName}-CertificateParameterStore"

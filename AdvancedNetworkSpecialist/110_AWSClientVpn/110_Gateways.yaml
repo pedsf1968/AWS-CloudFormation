@@ -42,6 +42,13 @@ Parameters:
     Default: "Default"
     Description: "Internet Gateway name"
     Type: String
+  NgwName:
+    Default: "Default"
+    Description: "Nat Gateway name"
+    Type: String
+  SubnetPublicId:
+    Description: "Public Subnet ID"
+    Type: String
   VpcId:
     Description: "VPC ID"
     Type: String
@@ -65,6 +72,23 @@ Resources:
         Name: !Ref IgwName
         VpcId: !Ref VpcId
 
+  NatGatewayStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/VPC/NatGateway.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        Name: !Ref NgwName
+        SubnetId: !Ref SubnetPublicId
+
 Outputs:
   InternetGatewayAttachmentId:
     Description: "Internet Gateway Attachment ID"
@@ -72,3 +96,6 @@ Outputs:
   InternetGatewayId:
     Description: "Internet Gateway ID"
     Value: !GetAtt InternetGatewayStack.Outputs.InternetGatewayId
+  NatGatewayId:
+    Description: "NAT Gateway ID"
+    Value: !GetAtt NatGatewayStack.Outputs.NatGatewayId

@@ -37,7 +37,7 @@ Parameters:
   
   # Stack parameters
   DocumentName:
-    Default: BindServerSSMDocument
+    Default: BindServerSsmDocument
     Type: String
 
 Resources:
@@ -267,7 +267,7 @@ Outputs:
     Export:
       Name: !Sub "${ProjectName}-${EnvironmentName}-${DocumentName}-Name"
   
-  SSMDocumentArn:
+  SsmDocumentArn:
     Description: "ARN of the created SSM Document"
     Value: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:document/${DocumentName}"
     Export:

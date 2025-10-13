@@ -3,15 +3,12 @@ Parameters:
   InstanceType:
     Description: EC2 instance type.
     Type: String
-    Default: t2.micro
+    Default: t3a.micro
     AllowedValues:
-    - t2.micro
-    - t2.small
-    - t2.medium
-    - m3.medium
-    - m3.large
-    - m3.xlarge
-    - m3.2xlarge
+    - t3a.nano
+    - t3a.micro
+    - t3a.small
+    - t3a.medium
   SubnetID:
     Description: Subnet ID
     Type: AWS::EC2::Subnet::Id

@@ -42,14 +42,14 @@ Parameters:
 
   # Application parameters
   ApplicationInstanceImageId:
-    Default: ami-08461dc8cd9e834e0
+    Default: ami-096dd88190a75cd20
     Description: "Application Instance AMI"
     Type: String
   ApplicationInstanceName:
     Description: "Application Instance name"
     Type: String
   ApplicationInstanceType:
-    Default: t2.micro
+    Default: t3a.micro
     Description: "Bastion Instances type"
     Type: String
   ApplicationInstanceSubnetIds:
@@ -60,14 +60,14 @@ Parameters:
     Type: String
   # Bastion parameters
   BastionInstanceImageId:
-    Default: ami-08461dc8cd9e834e0
+    Default: ami-096dd88190a75cd20
     Description: "Bastion Instance AMI"
     Type: String
   BastionInstanceName:
     Description: "Bastion Instance name"
     Type: String
   BastionInstanceType:
-    Default: t2.micro
+    Default: t3a.micro
     Description: "Bastion Instances type"
     Type: String
   BastionInstanceSecurityGroup:

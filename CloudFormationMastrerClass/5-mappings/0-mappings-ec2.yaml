@@ -51,7 +51,7 @@ Mappings:
       HVM64: ami-0518bb0e75d3619ca
   EnvironmentToInstanceType:
     development:
-      instanceType: t2.micro
+      instanceType: t3a.micro
     # we want a bigger instance type in production
     production:
       instanceType: t2.small

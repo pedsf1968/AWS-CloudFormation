@@ -37,7 +37,7 @@ Parameters:
   
   # Stack parameters
   DocumentName:
-    Default: EC2ResourceToS3
+    Default: Ec2ResourceToS3
     Type: String
 
 Resources:
@@ -184,7 +184,7 @@ Outputs:
     Export:
       Name: !Sub "${ProjectName}-${EnvironmentName}-${DocumentName}-Name"
   
-  SSMDocumentArn:
+  SsmDocumentArn:
     Description: "ARN of the created SSM Document"
     Value: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:document/${DocumentName}"
     Export:

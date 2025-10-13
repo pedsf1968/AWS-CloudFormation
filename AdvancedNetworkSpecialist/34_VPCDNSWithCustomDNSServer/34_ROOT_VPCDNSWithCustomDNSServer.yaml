@@ -144,7 +144,7 @@ Parameters:
     Description: "Bastion Instances DNS prefix"
     Type: String
   BastionInstanceImageId:
-    Default: ami-08461dc8cd9e834e0
+    Default: ami-096dd88190a75cd20
     Description: "Bastion Instance AMI"
     Type: AWS::EC2::Image::Id
   BastionInstanceName:
@@ -152,7 +152,7 @@ Parameters:
     Description: "Bastion Instances name"
     Type: String
   BastionInstanceType:
-    Default: t2.micro
+    Default: t3a.micro
     Description: "Bastion Instances type"
     Type: String
   ApplicationInstanceShortName:
@@ -160,7 +160,7 @@ Parameters:
     Description: "Application Instances DNS prefix"
     Type: String
   ApplicationInstanceImageId:
-    Default: ami-08461dc8cd9e834e0
+    Default: ami-096dd88190a75cd20
     Description: "Application Instance AMI"
     Type: AWS::EC2::Image::Id
   ApplicationInstanceName:
@@ -168,7 +168,7 @@ Parameters:
     Description: "Application Instances name"
     Type: String
   ApplicationInstanceType:
-    Default: t2.micro
+    Default: t3a.micro
     Description: "Application Instances type"
     Type: String
   DatabaseInstanceShortName:
@@ -176,7 +176,7 @@ Parameters:
     Description: "Database Instances DNS prefix"
     Type: String
   DatabaseInstanceImageId:
-    Default: ami-08461dc8cd9e834e0
+    Default: ami-096dd88190a75cd20
     Description: "Database Instance AMI"
     Type: AWS::EC2::Image::Id
   DatabaseInstanceName:
@@ -184,7 +184,7 @@ Parameters:
     Description: "Database Instances name"
     Type: String
   DatabaseInstanceType:
-    Default: t2.micro
+    Default: t3a.micro
     Description: "Database Instances type"
     Type: String
   DnsInstanceShortName:
@@ -200,7 +200,7 @@ Parameters:
     Description: "DNS server Instances name"
     Type: String
   DnsInstanceType:
-    Default: t2.micro
+    Default: t3a.micro
     Description: "DNS server Instances type"
     Type: String
   KeyName:

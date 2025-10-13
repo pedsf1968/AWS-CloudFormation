@@ -12,7 +12,7 @@ Resources:
     Properties:
       AvailabilityZone: eu-west-3a
       ImageId: ami-0a4b7ff081ca1ded9
-      InstanceType: t2.micro
+      InstanceType: t3a.micro
       SecurityGroups:
         - !Ref SSHSecurityGroup
         - !Ref ServerSecurityGroup

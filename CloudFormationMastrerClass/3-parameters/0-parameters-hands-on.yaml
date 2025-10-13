@@ -16,7 +16,7 @@ Parameters:
     AllowedValues:
       - t1.micro
       - t2.nano
-      - t2.micro
+      - t3a.micro
       - t2.small
     ConstraintDescription: must be a valid EC2 instance type.
 

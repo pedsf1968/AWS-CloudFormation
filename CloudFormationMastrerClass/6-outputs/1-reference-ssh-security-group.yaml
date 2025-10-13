@@ -9,7 +9,7 @@ Resources:
     Type: AWS::EC2::Instance
     Properties:
       ImageId: !Ref ImageId
-      InstanceType: t2.micro
+      InstanceType: t3a.micro
       SecurityGroups:
         # we reference the output here, using the Fn::ImportValue function
         - !ImportValue SSHSecurityGroup

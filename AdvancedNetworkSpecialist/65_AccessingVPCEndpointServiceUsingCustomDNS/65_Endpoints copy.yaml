@@ -135,7 +135,7 @@ Resources:
   VPCEndpointInfo:
     Type: AWS::CloudFormation::CustomResource
     Properties:
-      ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:VPCEndpointDNSResolver"
+      ServiceToken: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:VpcEndpointDnsResolver"
       ServiceTimeout: 60
       VPCEndpointId: !GetAtt ConsumerVPCEndpoint.Outputs.VpcEndpointId
       Region: !Ref AWS::Region

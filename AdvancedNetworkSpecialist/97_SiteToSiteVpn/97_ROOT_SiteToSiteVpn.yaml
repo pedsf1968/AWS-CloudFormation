@@ -115,7 +115,7 @@ Parameters:
     Description: "Name of the Customer side Instance"
     Type: String
   CustomerInstanceType:
-    Default: t2.micro
+    Default: t3a.micro
     Description: "Type of the Customer side Instance"
     Type: String
   CustomerRegion:
@@ -165,7 +165,7 @@ Parameters:
     Description: "Name of the Customer side Instance"
     Type: String
   CloudInstanceType:
-    Default: t2.micro
+    Default: t3a.micro
     Description: "Type of the AWS side Instance"
     Type: String
   CloudRegion:

@@ -19,4 +19,4 @@ Resources:
     Type: AWS::AutoScaling::LaunchConfiguration
     Properties: 
       ImageId: !Ref ImageId
-      InstanceType: t2.micro
+      InstanceType: t3a.micro

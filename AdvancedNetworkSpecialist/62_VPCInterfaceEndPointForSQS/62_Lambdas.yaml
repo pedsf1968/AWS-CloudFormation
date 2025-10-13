@@ -71,7 +71,7 @@ Resources:
       TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/Lambda/IAMResourceToS3.yaml"
       TimeoutInMinutes: 5
 
-  EC2ResourceToS3Stack:
+  Ec2ResourceToS3Stack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     DependsOn:
@@ -86,10 +86,10 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         ApplicationLogLevel: !Ref ApplicationLogLevel
-      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/Lambda/EC2ResourceToS3.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/Lambda/Ec2ResourceToS3.yaml"
       TimeoutInMinutes: 5
 
-  SQSResourceToS3Stack:
+  SqsResourceToS3Stack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     DependsOn:
@@ -104,7 +104,7 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         ApplicationLogLevel: !Ref ApplicationLogLevel
-      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/Lambda/SQSResourceToS3.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/Lambda/SqsResourceToS3.yaml"
       TimeoutInMinutes: 5
 
   UpdateParametersFromS3Stack:
@@ -139,31 +139,31 @@ Outputs:
     Description: IAMResourceToS3 Lambda Log Group Id
     Value: !GetAtt IAMResourceToS3Stack.Outputs.LogGroupId
 
-  EC2ResourceToS3LambdaFunctionArn:
-    Description: "EC2ResourceToS3 Lambda Arn"
-    Value: !GetAtt EC2ResourceToS3Stack.Outputs.LambdaFunctionArn
-  EC2ResourceToS3RoleArn:
-    Description: "EC2ResourceToS3 Lambda Role Arn"
+  Ec2ResourceToS3LambdaFunctionArn:
+    Description: "Ec2ResourceToS3 Lambda Arn"
+    Value: !GetAtt Ec2ResourceToS3Stack.Outputs.LambdaFunctionArn
+  Ec2ResourceToS3RoleArn:
+    Description: "Ec2ResourceToS3 Lambda Role Arn"
     Value: !If
           - CreateRole
-          - !GetAtt EC2ResourceToS3Stack.Outputs.RoleArn
+          - !GetAtt Ec2ResourceToS3Stack.Outputs.RoleArn
           - ""
-  EC2ResourceToS3LogGroupId:
-    Description: EC2ResourceToS3 Lambda Log Group Id
-    Value: !GetAtt EC2ResourceToS3Stack.Outputs.LogGroupId
+  Ec2ResourceToS3LogGroupId:
+    Description: Ec2ResourceToS3 Lambda Log Group Id
+    Value: !GetAtt Ec2ResourceToS3Stack.Outputs.LogGroupId
 
-  SQSResourceToS3LambdaFunctionArn:
-    Description: "SQSResourceToS3 Lambda Arn"
-    Value: !GetAtt SQSResourceToS3Stack.Outputs.LambdaFunctionArn
-  SQSResourceToS3RoleArn:
-    Description: "SQSResourceToS3 Lambda Role Arn"
+  SqsResourceToS3LambdaFunctionArn:
+    Description: "SqsResourceToS3 Lambda Arn"
+    Value: !GetAtt SqsResourceToS3Stack.Outputs.LambdaFunctionArn
+  SqsResourceToS3RoleArn:
+    Description: "SqsResourceToS3 Lambda Role Arn"
     Value: !If
           - CreateRole
-          - !GetAtt SQSResourceToS3Stack.Outputs.RoleArn
+          - !GetAtt SqsResourceToS3Stack.Outputs.RoleArn
           - ""
-  SQSResourceToS3LogGroupId:
-    Description: SQSResourceToS3 Lambda Log Group Id
-    Value: !GetAtt SQSResourceToS3Stack.Outputs.LogGroupId
+  SqsResourceToS3LogGroupId:
+    Description: SqsResourceToS3 Lambda Log Group Id
+    Value: !GetAtt SqsResourceToS3Stack.Outputs.LogGroupId
 
   UpdateParametersFromS3LambdaFunctionArn:
     Description: "ARN of UpdateParametersFromS3 Lambda"
