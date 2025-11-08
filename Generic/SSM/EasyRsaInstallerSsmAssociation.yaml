@@ -88,7 +88,7 @@ Resources:
     Properties:
       Count: 1
       Handle: !Ref AssociationWaitConditionHandle
-      Timeout: 600
+      Timeout: 240
 
   SsmAssociation:
     Type: AWS::SSM::Association

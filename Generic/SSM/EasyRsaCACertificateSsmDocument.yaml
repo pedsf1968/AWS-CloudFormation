@@ -162,7 +162,7 @@ Resources:
           "aws:runShellScript":
             properties:
               - id: "0.aws:runShellScript"
-                timeoutSeconds: 300
+                timeoutSeconds: 120
                 runCommand:
                   - |
                     #!/bin/bash
@@ -253,7 +253,11 @@ Resources:
                         chmod 755 "$WORKING_DIR" "$CERT_DIR"
                         
                         cd "$WORKING_DIR/easy-rsa/easyrsa3"
-                        
+
+                        # Remove previous CA
+                        log "INFO" "Removing CA certificate..."
+                        ./easyrsa init-pki <<< yes
+
                         # Build CA
                         log "INFO" "Building CA certificate..."
                         ./easyrsa --batch build-ca nopass <<< "$CA_NAME"

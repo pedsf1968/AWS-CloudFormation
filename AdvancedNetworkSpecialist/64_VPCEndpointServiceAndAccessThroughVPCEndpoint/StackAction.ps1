@@ -28,13 +28,9 @@
 .PARAMETER DryRun
     Show what would be done without executing
 .EXAMPLE
-    .\StackAction.ps1 -Action "create-stack" -StackName "my-stack"
+    .\Deploy-Stack.ps1 -Action "create-stack" -StackName "my-stack"
 .EXAMPLE
-    .\StackAction.ps1 -DryRun -TemplateName "root-template.yaml"
-
-    .\StackAction.ps1 -Action "delete-stack" -StackName "my-stack"
-
-    .\StackAction.ps1 -Action "interactive"
+    .\Deploy-Stack.ps1 -DryRun -TemplateName "root-template.yaml"
 #>
 
 [CmdletBinding(SupportsShouldProcess)]
@@ -133,12 +129,13 @@ function Get-DefaultValues {
 function Get-FilesToUpload {
     param([String]$FilterType = "all")
     
-    $wildcards = @(".yaml",".yml")
+    $wildcards = @(".yaml", ".yml")
     
     switch ($FilterType) {
         "all" {
             Write-Host "Push all files to S3 Bucket"
-            $files = Get-ChildItem -Path . -Filter $baseFilter -File
+            $files = Get-ChildItem -Path . -File |
+                Where-Object {$_.extension -in $wildcards}
         }
         "recent" {
             Write-Host "Push files modify during last $Days days and $Minutes minutes to S3 Bucket"
@@ -212,67 +209,6 @@ function Test-StackExists {
         return $false
     }
 }
-function Wait-StackDeletion {
-    param(
-        [String]$StackName,
-        [String]$Region,
-        [Int]$TimeoutMinutes = 30,
-        [Int]$CheckIntervalSeconds = 30
-    )
-    
-    Write-Log "Monitoring stack deletion: $StackName" -Level "Info"
-    $timeoutTime = (Get-Date).AddMinutes($TimeoutMinutes)
-    $lastStatus = ""
-    
-    while ((Get-Date) -lt $timeoutTime) {
-        try {
-            # Vérifier le statut de la stack
-            $stackInfo = aws cloudformation describe-stacks --stack-name $StackName --region $Region --query 'Stacks[0].{Status:StackStatus,Reason:StackStatusReason}' --output json 2>$null
-            
-            if ($LASTEXITCODE -ne 0) {
-                # La stack n'existe plus (erreur car elle est supprimée)
-                Write-Log "Stack '$StackName' successfully deleted!" -Level "Success"
-                return $true
-            }
-            
-            $status = ($stackInfo | ConvertFrom-Json).Status
-            
-            # Afficher le statut seulement s'il a changé
-            if ($status -ne $lastStatus) {
-                Write-Log "Stack status: $status" -Level "Info"
-                $lastStatus = $status
-            }
-            
-            # Vérifier les statuts finaux
-            switch ($status) {
-                "DELETE_COMPLETE" {
-                    Write-Log "Stack '$StackName' deleted successfully!" -Level "Success"
-                    return $true
-                }
-                "DELETE_FAILED" {
-                    $reason = ($stackInfo | ConvertFrom-Json).Reason
-                    Write-Log "Stack deletion failed: $reason" -Level "Error"
-                    return $false
-                }
-                "DELETE_IN_PROGRESS" {
-                    Write-Host "." -NoNewline -ForegroundColor Yellow
-                }
-                default {
-                    Write-Log "Unexpected status during deletion: $status" -Level "Warning"
-                }
-            }
-            
-            Start-Sleep -Seconds $CheckIntervalSeconds
-        }
-        catch {
-            Write-Log "Error checking stack status: $($_.Exception.Message)" -Level "Error"
-            Start-Sleep -Seconds $CheckIntervalSeconds
-        }
-    }
-    
-    Write-Log "Timeout reached ($TimeoutMinutes minutes). Stack deletion may still be in progress." -Level "Warning"
-    return $false
-}
 
 function Invoke-StackOperation {
     param([String]$Operation)
@@ -311,30 +247,8 @@ function Invoke-StackOperation {
             "delete" {
                 Write-Log "Deleting stack: $StackName"
                 # Remove termination protection first
-                Write-Log "Removing termination protection..."
                 aws cloudformation update-termination-protection --stack-name $StackName --no-enable-termination-protection --region $Region 2>$null
-                
-                # Initiate deletion
                 aws cloudformation delete-stack --stack-name $StackName --region $Region
-                
-                if ($LASTEXITCODE -eq 0) {
-                    Write-Log "Stack deletion initiated successfully" -Level "Success"
-                    
-                    # Demander si l'utilisateur veut surveiller la suppression
-                    if ($Action -eq "interactive") {
-                        $monitor = Read-Host "Do you want to monitor the deletion progress? (y/n)"
-                        if ($monitor.ToLower() -in @("y", "yes", "o", "oui")) {
-                            return Wait-StackDeletion -StackName $StackName -Region $Region
-                        }
-                    } else {
-                        # En mode non-interactif, surveiller automatiquement
-                        return Wait-StackDeletion -StackName $StackName -Region $Region
-                    }
-                    return $true
-                } else {
-                    Write-Log "Failed to initiate stack deletion" -Level "Error"
-                    return $false
-                }
             }
         }
 
@@ -356,104 +270,13 @@ function Invoke-StackOperation {
     }
 }
 
-# Fonction utilitaire pour supprimer plusieurs stacks avec surveillance
-function Remove-MultipleStacks {
-    param(
-        [String[]]$StackNames,
-        [String]$Region,
-        [Int]$TimeoutMinutes = 30
-    )
-    
-    Write-Log "Starting deletion of $($StackNames.Count) stacks" -Level "Info"
-    
-    # Initier la suppression de toutes les stacks
-    $deletionJobs = @()
-    foreach ($stackName in $StackNames) {
-        if (Test-StackExists -StackName $stackName) {
-            Write-Log "Initiating deletion of stack: $stackName"
-            
-            # Supprimer la protection contre la terminaison
-            aws cloudformation update-termination-protection --stack-name $stackName --no-enable-termination-protection --region $Region 2>$null
-            
-            # Lancer la suppression
-            aws cloudformation delete-stack --stack-name $stackName --region $Region
-            
-            if ($LASTEXITCODE -eq 0) {
-                $deletionJobs += $stackName
-                Write-Log "Deletion initiated for: $stackName" -Level "Success"
-            } else {
-                Write-Log "Failed to initiate deletion for: $stackName" -Level "Error"
-            }
-        } else {
-            Write-Log "Stack '$stackName' does not exist" -Level "Warning"
-        }
-    }
-    
-    if ($deletionJobs.Count -eq 0) {
-        Write-Log "No stacks to delete" -Level "Warning"
-        return $true
-    }
-    
-    # Surveiller la suppression de toutes les stacks
-    Write-Log "Monitoring deletion of $($deletionJobs.Count) stacks..." -Level "Info"
-    $timeoutTime = (Get-Date).AddMinutes($TimeoutMinutes)
-    $completedStacks = @()
-    
-    while ($deletionJobs.Count -gt $completedStacks.Count -and (Get-Date) -lt $timeoutTime) {
-        foreach ($stackName in $deletionJobs) {
-            if ($stackName -in $completedStacks) {
-                continue
-            }
-            
-            try {
-                $stackInfo = aws cloudformation describe-stacks --stack-name $stackName --region $Region --query 'Stacks[0].StackStatus' --output text 2>$null
-                
-                if ($LASTEXITCODE -ne 0) {
-                    # Stack supprimée avec succès
-                    Write-Log "✓ Stack '$stackName' deleted successfully" -Level "Success"
-                    $completedStacks += $stackName
-                } elseif ($stackInfo -eq "DELETE_FAILED") {
-                    Write-Log "✗ Stack '$stackName' deletion failed" -Level "Error"
-                    $completedStacks += $stackName
-                } elseif ($stackInfo -eq "DELETE_IN_PROGRESS") {
-                    Write-Host "." -NoNewline -ForegroundColor Yellow
-                }
-            }
-            catch {
-                # En cas d'erreur, considérer que la stack est supprimée
-                Write-Log "✓ Stack '$stackName' appears to be deleted" -Level "Success"
-                $completedStacks += $stackName
-            }
-        }
-        
-        if ($deletionJobs.Count -gt $completedStacks.Count) {
-            Start-Sleep -Seconds 15
-        }
-    }
-    
-    Write-Host "" # Nouvelle ligne après les points
-    
-    $successCount = $completedStacks.Count
-    $totalCount = $deletionJobs.Count
-    
-    Write-Log "Deletion summary: $successCount/$totalCount stacks processed" -Level "Info"
-    
-    if ($successCount -eq $totalCount) {
-        Write-Log "All stacks deleted successfully!" -Level "Success"
-        return $true
-    } else {
-        Write-Log "Some stacks may still be deleting or failed to delete" -Level "Warning"
-        return $false
-    }
-}
-
 function Show-InteractiveMenu {
     $continue = $true
     
     while ($continue) {
-        Write-Host "`n" + "="*60
+        Write-Host $("="*60)
         Write-Host "CloudFormation Stack Management" -ForegroundColor Cyan
-        Write-Host "="*60
+        Write-Host $("="*60) "`n"
         Write-Host "Current Configuration:" -ForegroundColor Yellow
         Write-Host "  Bucket: $Bucket"
         Write-Host "  Key: $BucketKey"
@@ -469,7 +292,7 @@ function Show-InteractiveMenu {
         Write-Host "  4. Delete stack"
         Write-Host "  5. Check stack status"
         Write-Host "  q. Quit"
-        Write-Host "="*60
+        Write-Host $("="*60) "`n"
 
         $choice = Read-Host "Choose an action"
         
