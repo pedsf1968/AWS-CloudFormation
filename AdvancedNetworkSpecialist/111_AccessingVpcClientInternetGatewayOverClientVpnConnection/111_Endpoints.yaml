@@ -9,7 +9,7 @@ Parameters:
     Description: CloudFormation buket URL
     Type: String
   BucketKey:
-    Default: "110_AWSClientVpn"
+    Default: "111_AccessingVpcClientInternetGatewayOverClientVpnConnection"
     Description: Key to find object in the bucket
     Type: String
   BucketObject:
@@ -114,3 +114,19 @@ Resources:
         TransportProtocol: !Ref TransportProtocol
         VpcId: !Ref VpcId
         VpnPort: !Ref VpnPort
+
+  ClientVPNAuthorizationToInternetRule:
+    Type: AWS::EC2::ClientVpnAuthorizationRule
+    Properties:
+      AuthorizeAllGroups: true
+      ClientVpnEndpointId: !GetAtt ClientVpnEndpoint.Outputs.ClientVpnEndpointId
+      Description: Allow access to Internet
+      TargetNetworkCidr: "0.0.0.0/0"
+
+  ClientVPNAuthorizationToInternetRoute:
+    Type: AWS::EC2::ClientVpnRoute
+    Properties:
+      ClientVpnEndpointId: !GetAtt ClientVpnEndpoint.Outputs.ClientVpnEndpointId
+      Description: Allow access to Internet
+      DestinationCidrBlock: "0.0.0.0/0"
+      TargetVpcSubnetId: !Ref TargetSubnetId

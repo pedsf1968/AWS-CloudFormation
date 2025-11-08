@@ -129,12 +129,13 @@ function Get-DefaultValues {
 function Get-FilesToUpload {
     param([String]$FilterType = "all")
     
-    $wildcards = @(".yaml",".yml")
+    $wildcards = @(".yaml", ".yml")
     
     switch ($FilterType) {
         "all" {
             Write-Host "Push all files to S3 Bucket"
-            $files = Get-ChildItem -Path . -Filter $baseFilter -File
+            $files = Get-ChildItem -Path . -File |
+                Where-Object {$_.extension -in $wildcards}
         }
         "recent" {
             Write-Host "Push files modify during last $Days days and $Minutes minutes to S3 Bucket"
@@ -273,9 +274,9 @@ function Show-InteractiveMenu {
     $continue = $true
     
     while ($continue) {
-        Write-Host "`n" + "="*60
+        Write-Host $("="*60)
         Write-Host "CloudFormation Stack Management" -ForegroundColor Cyan
-        Write-Host "="*60
+        Write-Host $("="*60) "`n"
         Write-Host "Current Configuration:" -ForegroundColor Yellow
         Write-Host "  Bucket: $Bucket"
         Write-Host "  Key: $BucketKey"
@@ -291,7 +292,7 @@ function Show-InteractiveMenu {
         Write-Host "  4. Delete stack"
         Write-Host "  5. Check stack status"
         Write-Host "  q. Quit"
-        Write-Host "="*60
+        Write-Host $("="*60) "`n"
 
         $choice = Read-Host "Choose an action"
         

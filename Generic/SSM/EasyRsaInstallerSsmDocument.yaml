@@ -143,7 +143,7 @@ Resources:
           "aws:runShellScript":
             properties:
               - id: "0.aws:runShellScript"
-                timeoutSeconds: 300
+                timeoutSeconds: 180
                 runCommand:
                   - |
                     #!/bin/bash

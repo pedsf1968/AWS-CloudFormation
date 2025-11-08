@@ -1,6 +1,6 @@
-# aws cloudformation validate-template --template-body file:/110_ROOT_SiteToSiteVpn.yaml
-# aws cloudformation create-stack --stack-name ANS-110 --template-body file:/110_ROOT_SiteToSiteVpn.yaml --region ${BucketRegion} --capabilities CAPABILITY_IAM
-# aws cloudformation delete-stack --stack-name ANS-110 --region ${BucketRegion}
+# aws cloudformation validate-template --template-body file:/111_ROOT_SiteToSiteVpn.yaml
+# aws cloudformation create-stack --stack-name ANS-111 --template-body file:/111_ROOT_SiteToSiteVpn.yaml --region ${BucketRegion} --capabilities CAPABILITY_IAM
+# aws cloudformation delete-stack --stack-name ANS-111 --region ${BucketRegion}
 # aws cloudformation list-stacks --stack-status-filter @('CREATE_COMPLETE','DELETE_FAILED') --query 'StackSummaries[*].StackName' --output json | ConvertFrom-Json | ForEach-Object { Write-Host $_ ; aws cloudformation delete-stack --stack-name $_}
 # 1 - Launch ROOT Stack
 # 2 - Go to console VPC/Client endpoint/
@@ -75,7 +75,7 @@ Parameters:
     Description: CloudFormation buket URL
     Type: String
   BucketKey:
-    Default: "110_AWSClientVpn"
+    Default: "111_AccessingVpcClientInternetGatewayOverClientVpnConnection"
     Description: Key to find object in the bucket
     Type: String
   BucketObject:
@@ -202,7 +202,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Retain
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/110_Lambdas.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/111_Lambdas.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -220,7 +220,7 @@ Resources:
       - Lambdas
     UpdateReplacePolicy: Retain
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/110_Roles.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/111_Roles.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -237,7 +237,7 @@ Resources:
       - Lambdas
     UpdateReplacePolicy: Retain
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/110_VpcAndSubnets.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/111_VpcAndSubnets.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -262,7 +262,7 @@ Resources:
       - Lambdas
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/110_Gateways.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/111_Gateways.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -283,7 +283,7 @@ Resources:
       - Lambdas
     UpdateReplacePolicy: Retain
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/110_RouteTables.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/111_RouteTables.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -308,7 +308,7 @@ Resources:
       - Lambdas
     UpdateReplacePolicy: Retain
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/110_SecurityGroups.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/111_SecurityGroups.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -328,7 +328,7 @@ Resources:
       - Lambdas
     UpdateReplacePolicy: Retain
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/110_SsmDocuments.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/111_SsmDocuments.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -346,8 +346,8 @@ Resources:
       - SsmDocuments
     UpdateReplacePolicy: Retain
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/110_Instances.yaml"
-      TimeoutInMinutes: 5
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/111_Instances.yaml"
+      TimeoutInMinutes: 10
       Parameters:
         Bucket: !Ref Bucket
         BucketKey: !Ref BucketKey
@@ -388,7 +388,7 @@ Resources:
       - Instances
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/110_Endpoints.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/111_Endpoints.yaml"
       TimeoutInMinutes: 10
       Parameters:
         Bucket: !Ref Bucket

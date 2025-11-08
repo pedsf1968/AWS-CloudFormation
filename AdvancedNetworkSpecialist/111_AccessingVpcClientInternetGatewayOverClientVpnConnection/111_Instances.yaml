@@ -9,7 +9,7 @@ Parameters:
     Description: CloudFormation buket URL
     Type: String
   BucketKey:
-    Default: "110_AWSClientVpn"
+    Default: "111_AccessingVpcClientInternetGatewayOverClientVpnConnection"
     Description: Key to find object in the bucket
     Type: String
   BucketObject:
