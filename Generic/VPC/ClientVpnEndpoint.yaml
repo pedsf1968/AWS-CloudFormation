@@ -100,13 +100,13 @@ Parameters:
     Description: "DNS servers for DNS resolution (max 2 servers)"
     Type: CommaDelimitedList
   SecurityGroupId:
-    Type: AWS::EC2::SecurityGroup::Id
     Description: "Security group ID to apply to the target network"
+    Type: AWS::EC2::SecurityGroup::Id
   SplitTunnel:
-    Type: String
-    Default: "false"
     AllowedValues: ["true", "false"]
+    Default: "false"
     Description: "Enable split-tunnel on the AWS Client VPN endpoint"
+    Type: String
   TransportProtocol:
     Default: "udp"
     Description: "The transport protocol for the VPN connection"
@@ -158,7 +158,6 @@ Parameters:
     Default: ""
     Description: "The ARN of the IAM SAML identity provider for self-service portal"
     Type: String
-    
   TargetNetworkCidr:
     Default: "192.168.1.0/24"
     Description: "The IPv4 address range, in CIDR notation, of the network to which the authorization rule applies"

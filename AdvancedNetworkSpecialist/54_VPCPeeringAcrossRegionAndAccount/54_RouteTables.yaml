@@ -105,7 +105,7 @@ Resources:
         SubnetId: !Ref SubnetId
 
   # Route, Route Table and Associations
-  SubnetPublicRouteStack:
+  PublicSubnetRouteStack:
     Type: AWS::CloudFormation::Stack
     Condition: IsFirstAccount
     DeletionPolicy: Delete
@@ -126,7 +126,7 @@ Resources:
         TargetType: "InternetGateway"
         TargetId: !Ref InternetGatewayId
 
-  SubnetPrivateRouteStack:
+  PrivateSubnetRouteStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete

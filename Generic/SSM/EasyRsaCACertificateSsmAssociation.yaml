@@ -47,7 +47,7 @@ Parameters:
     Type: String
 
   # Stack parameters
-  CaName:
+  RootCaName:
     Default: "OpenVPN-CA"
     Description: "Default CA certificate name"
     MaxLength: 64
@@ -78,6 +78,52 @@ Parameters:
   OutputS3KeyPrefix:
     Default: "logs/"
     Description: "Logs prefix"
+    Type: String
+
+  # EasyRSA parameters
+  EasyRsaReqCountry:
+    Default: "KR"
+    Description: "Country for the CA certificate"
+    Type: String
+  EasyRsaReqProvince:
+    Default: "Gyeonggi-Do"
+    Description: "Province for the CA certificate"
+    Type: String
+  EasyRsaReqCity:
+    Default: "Seoul"
+    Description: "City for the CA certificate"
+    Type: String
+  EasyRsaReqOrg:
+    Default: "Copyleft Certificate Co"
+    Description: "Organization for the CA certificate"
+    Type: String
+  EasyRsaReqEmail:
+    Default: "me@example.net"
+    Description: "Email for the CA certificate"
+    Type: String
+  EasyRsaReqOu:
+    Default: "My Organizational Unit"
+    Description: "Organizational Unit for the CA certificate"
+    Type: String
+  EasyRsaCaExpire:
+    Default: 3650
+    Description: "Number of days the CA certificate is valid"
+    Type: String
+  EasyRsaCertExpire:
+    Default: 825
+    Description: "Number of days the certificate is valid"
+    Type: String
+  EasyRsaKeySize:
+    Default: 2048
+    Description: "Key size for the certificate"
+    Type: String
+  EasyRsaAlgo:
+    Default: "rsa"
+    Description: "Algorithm for the certificate"
+    Type: String
+  EasyRsaDigest:
+    Default: "sha256"
+    Description: "Digest algorithm for the certificate"
     Type: String
 
 Conditions:
@@ -120,12 +166,35 @@ Resources:
           - !Ref AWS::StackName
         WaitHandleUrl:
           - !Ref AssociationWaitConditionHandle
-        CaName:
-          - !Ref CaName
+        RootCaName:
+          - !Ref RootCaName
         CertificatesDirectory:
           - !Ref CertificatesDirectory
         InstallDirectory:
           - !Ref InstallDirectory
+        # EasyRSA parameters
+        EasyRsaReqCountry:
+           - !Ref EasyRsaReqCountry
+        EasyRsaReqProvince:
+          - !Ref EasyRsaReqProvince
+        EasyRsaReqCity:
+          - !Ref EasyRsaReqCity
+        EasyRsaReqOrg:
+          - !Ref EasyRsaReqOrg
+        EasyRsaReqEmail:
+          - !Ref EasyRsaReqEmail
+        EasyRsaReqOu:
+          - !Ref EasyRsaReqOu
+        EasyRsaCaExpire:
+          - !Ref EasyRsaCaExpire
+        EasyRsaCertExpire:
+          - !Ref EasyRsaCertExpire
+        EasyRsaKeySize:
+          - !Ref EasyRsaKeySize
+        EasyRsaAlgo:
+          - !Ref EasyRsaAlgo
+        EasyRsaDigest:
+          - !Ref EasyRsaDigest
       Targets:
       - Key: InstanceIds
         Values:

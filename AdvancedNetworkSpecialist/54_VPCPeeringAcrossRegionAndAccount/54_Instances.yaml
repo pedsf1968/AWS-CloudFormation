@@ -66,7 +66,7 @@ Parameters:
     Description: "Subnet ID"
     Type: String
 
-Resources:     
+Resources:
   # Instances and Security Groups
   Instance:
     Type: AWS::CloudFormation::Stack

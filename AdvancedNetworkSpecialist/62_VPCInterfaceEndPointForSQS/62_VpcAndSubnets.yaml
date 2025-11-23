@@ -38,19 +38,19 @@ Parameters:
     Type: String
   
   # Stack parameters
-  SubnetPrivateNames:
+  PrivateSubnetNames:
     Default: "ec2-connect-endpoint-private-subnet,ec2-private-subnet,vpc-endpoint-private-subnet"
     Description: "Subnet names"
     Type: String
-  SubnetPrivateCidrBlocks:
+  PrivateSubnetCidrBlocks:
     Default: "10.10.1.0/24,10.10.2.0/24,10.10.3.0/24"
     Description: "Private Subnet CIDR"
     Type: String
-  SubnetPublicName:
+  PublicSubnetName:
     Default: "public-subnet"
     Description: "Subnet names"
     Type: String
-  SubnetPublicCidrBlock:
+  PublicSubnetCidrBlock:
     Default: "10.10.0.0/24"
     Description: "Public Subnet CIDR"
     Type: String
@@ -85,7 +85,7 @@ Resources:
         InstanceTenancy: default
         VpcName: !Ref VpcName
 
-  SubnetPrivateAStack:
+  PrivateSubnetAStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -99,13 +99,13 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         AvailabilityZone: !Select [ 0, !GetAZs ]
-        CidrBlock: !Select [0, !Split [",", !Ref SubnetPrivateCidrBlocks]]
+        CidrBlock: !Select [0, !Split [",", !Ref PrivateSubnetCidrBlocks]]
         MapPublicIpOnLaunch: "false"
         SaveInS3File: !Ref SaveInS3File
-        SubnetName: !Select [0, !Split [",", !Ref SubnetPrivateNames]]
+        SubnetName: !Select [0, !Split [",", !Ref PrivateSubnetNames]]
         VpcId: !GetAtt VpcStack.Outputs.VpcId
 
-  SubnetPrivateBStack:
+  PrivateSubnetBStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -119,13 +119,13 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         AvailabilityZone: !Select [ 0, !GetAZs ]
-        CidrBlock: !Select [1, !Split [",", !Ref SubnetPrivateCidrBlocks]]
+        CidrBlock: !Select [1, !Split [",", !Ref PrivateSubnetCidrBlocks]]
         MapPublicIpOnLaunch: "false"
         SaveInS3File: !Ref SaveInS3File
-        SubnetName: !Select [1, !Split [",", !Ref SubnetPrivateNames]]
+        SubnetName: !Select [1, !Split [",", !Ref PrivateSubnetNames]]
         VpcId: !GetAtt VpcStack.Outputs.VpcId
 
-  SubnetPrivateCStack:
+  PrivateSubnetCStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -139,13 +139,13 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         AvailabilityZone: !Select [ 0, !GetAZs ]
-        CidrBlock: !Select [2, !Split [",", !Ref SubnetPrivateCidrBlocks]]
+        CidrBlock: !Select [2, !Split [",", !Ref PrivateSubnetCidrBlocks]]
         MapPublicIpOnLaunch: "false"
         SaveInS3File: !Ref SaveInS3File
-        SubnetName: !Select [2, !Split [",", !Ref SubnetPrivateNames]]
+        SubnetName: !Select [2, !Split [",", !Ref PrivateSubnetNames]]
         VpcId: !GetAtt VpcStack.Outputs.VpcId
 
-  SubnetPublicStack:
+  PublicSubnetStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -159,25 +159,25 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         AvailabilityZone: !Select [ 0, !GetAZs ]
-        CidrBlock: !Ref SubnetPublicCidrBlock
+        CidrBlock: !Ref PublicSubnetCidrBlock
         MapPublicIpOnLaunch: "true"
         SaveInS3File: !Ref SaveInS3File
-        SubnetName: !Ref SubnetPublicName
+        SubnetName: !Ref PublicSubnetName
         VpcId: !GetAtt VpcStack.Outputs.VpcId
 
 Outputs:
   VpcId:
     Description: "VPC Id"
     Value: !GetAtt VpcStack.Outputs.VpcId
-  SubnetPrivateAId:
+  PrivateSubnetAId:
     Description: "Private Subnet A Id"
-    Value: !GetAtt SubnetPrivateAStack.Outputs.SubnetId
-  SubnetPrivateBId:
+    Value: !GetAtt PrivateSubnetAStack.Outputs.SubnetId
+  PrivateSubnetBId:
     Description: "Private Subnet B Id"
-    Value: !GetAtt SubnetPrivateBStack.Outputs.SubnetId
-  SubnetPrivateCId:
+    Value: !GetAtt PrivateSubnetBStack.Outputs.SubnetId
+  PrivateSubnetCId:
     Description: "Private Subnet C Id"
-    Value: !GetAtt SubnetPrivateCStack.Outputs.SubnetId
-  SubnetPublicId:
+    Value: !GetAtt PrivateSubnetCStack.Outputs.SubnetId
+  PublicSubnetId:
     Description: "Public Subnets Id"
-    Value: !GetAtt SubnetPublicStack.Outputs.SubnetId
+    Value: !GetAtt PublicSubnetStack.Outputs.SubnetId

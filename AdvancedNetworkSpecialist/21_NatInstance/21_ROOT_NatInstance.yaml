@@ -29,8 +29,8 @@ Metadata:
           default: "Subnets configuration"
         Parameters:
           - SubnetName
-          - SubnetPrivateCidrBlock
-          - SubnetPublicCidrBlock
+          - PrivateSubnetCidrBlock
+          - PublicSubnetCidrBlock
       - Label:
           default: "IGW, Route Tables and Routes"
         Parameters:
@@ -94,11 +94,11 @@ Parameters:
     Default: "Subnet"
     Description: Subnet name
     Type: String
-  SubnetPrivateCidrBlock:
+  PrivateSubnetCidrBlock:
     Default: 10.100.1.0/24
     Description: "Private Subnet CIDR"
     Type: String
-  SubnetPublicCidrBlock:
+  PublicSubnetCidrBlock:
     Default: 10.100.0.0/24
     Description: "Public Subnet CIDR"
     Type: String
@@ -205,8 +205,8 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
-        SubnetPublicCidrBlock: !Ref SubnetPublicCidrBlock
-        SubnetPrivateCidrBlock: !Ref SubnetPrivateCidrBlock
+        PublicSubnetCidrBlock: !Ref PublicSubnetCidrBlock
+        PrivateSubnetCidrBlock: !Ref PrivateSubnetCidrBlock
         SubnetName: !Ref SubnetName
         VpcCidrBlock: !Ref VpcCidrBlock
         VpcName: !Ref VpcName
@@ -252,8 +252,8 @@ Resources:
         InternetGatewayId: !GetAtt Gateways.Outputs.InternetGatewayId
         NatInstanceId: !GetAtt Instances.Outputs.NatInstanceId
         RouteTableNames: "A,B"
-        SubnetPrivateId: !GetAtt VpcAndSubnets.Outputs.SubnetPrivateId
-        SubnetPublicId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId
+        PrivateSubnetId: !GetAtt VpcAndSubnets.Outputs.PrivateSubnetId
+        PublicSubnetId: !GetAtt VpcAndSubnets.Outputs.PublicSubnetId
         VpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
 
   SecurityGroups:
@@ -277,7 +277,7 @@ Resources:
         ApplicationInstanceVpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
         BastionInstanceIngressCidrIp: "0.0.0.0/0"
         BastionInstanceVpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
-        NatInstanceIngressCidrIp: !Ref SubnetPrivateCidrBlock
+        NatInstanceIngressCidrIp: !Ref PrivateSubnetCidrBlock
         NatInstanceVpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
         VpcCidrBlock: !Ref VpcCidrBlock
 
@@ -303,15 +303,15 @@ Resources:
         ApplicationInstanceProfile: !GetAtt Roles.Outputs.InstanceProfileId
         ApplicationInstanceType: !Ref ApplicationInstanceType
         ApplicationInstanceSecurityGroup: !GetAtt SecurityGroups.Outputs.ApplicationInstanceSecurityGroupId
-        ApplicationInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.SubnetPrivateId
+        ApplicationInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.PrivateSubnetId
         BastionInstanceImageId: !Ref BastionInstanceImageId
         BastionInstanceName: !Ref BastionInstanceName
         BastionInstanceType: !Ref BastionInstanceType
         BastionInstanceSecurityGroup: !GetAtt SecurityGroups.Outputs.BastionInstanceSecurityGroupId
-        BastionInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId
+        BastionInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.PublicSubnetId
         NatInstanceImageId: !Ref NatInstanceImageId
         NatInstanceName: !Ref NatInstanceName
         NatInstanceType: !Ref NatInstanceType
         NatInstanceSecurityGroup: !GetAtt SecurityGroups.Outputs.NatInstanceSecurityGroupId
-        NatInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId
+        NatInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.PublicSubnetId
         KeyName: !Ref KeyName

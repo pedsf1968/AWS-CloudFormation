@@ -45,11 +45,11 @@ Parameters:
     Description: "Subnet names"
     Type: String
     Default: "A,B,C"
-  SubnetPrivateCidrBlocks:
+  PrivateSubnetCidrBlocks:
     Description: "Subnet CIDRs"
     Type: String
     Default: "10.0.1.0/24,10.1.1.0/24,10.2.1.0/24"
-  SubnetPublicCidrBlocks:
+  PublicSubnetCidrBlocks:
     Description: "Subnet CIDRs"
     Type: String
     Default: "10.0.0.0/24"
@@ -114,7 +114,7 @@ Resources:
         CidrBlock: !Select [ 2, !Split [ ",", !Ref VpcCidrBlocks ] ]
         VpcName: !Select [ 2, !Split [ ",",!Ref VpcNames ] ]
 
-  SubnetPrivateAStack:
+  PrivateSubnetAStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -129,12 +129,12 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Select [ 0, !GetAZs ]
-        CidrBlock: !Select [ 0, !Split [ ",", !Ref SubnetPrivateCidrBlocks]]
+        CidrBlock: !Select [ 0, !Split [ ",", !Ref PrivateSubnetCidrBlocks]]
         MapPublicIpOnLaunch: "false"
         SubnetName: !Join [ "", [!Select [ 0, !Split [ ",", !Ref SubnetNames]], "-Private"] ]
         VpcId: !GetAtt VpcAStack.Outputs.VpcId
 
-  SubnetPublicAStack:
+  PublicSubnetAStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -149,12 +149,12 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Select [ 0, !GetAZs ]
-        CidrBlock: !Select [ 0, !Split [ ",", !Ref SubnetPublicCidrBlocks]]
+        CidrBlock: !Select [ 0, !Split [ ",", !Ref PublicSubnetCidrBlocks]]
         MapPublicIpOnLaunch: "true"
         SubnetName: !Join [ "", [ !Select [ 0, !Split [ ",", !Ref SubnetNames]], "-Public"]]
         VpcId: !GetAtt VpcAStack.Outputs.VpcId
 
-  SubnetPrivateBStack:
+  PrivateSubnetBStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -169,12 +169,12 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Select [ 1, !GetAZs ]
-        CidrBlock: !Select [ 1, !Split [ ",", !Ref SubnetPrivateCidrBlocks]]
+        CidrBlock: !Select [ 1, !Split [ ",", !Ref PrivateSubnetCidrBlocks]]
         MapPublicIpOnLaunch: "false"
         SubnetName: !Join [ "", [!Select [ 1, !Split [ ",", !Ref SubnetNames]], "-Private"] ]
         VpcId: !GetAtt VpcBStack.Outputs.VpcId
 
-  SubnetPrivateCStack:
+  PrivateSubnetCStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -189,7 +189,7 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Select [ 2, !GetAZs ]
-        CidrBlock: !Select [ 2, !Split [ ",", !Ref SubnetPrivateCidrBlocks]]
+        CidrBlock: !Select [ 2, !Split [ ",", !Ref PrivateSubnetCidrBlocks]]
         MapPublicIpOnLaunch: "false"
         SubnetName: !Join [ "", [!Select [ 2, !Split [ ",", !Ref SubnetNames]], "-Private"] ]
         VpcId: !GetAtt VpcCStack.Outputs.VpcId
@@ -202,13 +202,13 @@ Outputs:
       - - !GetAtt VpcAStack.Outputs.VpcId
         - !GetAtt VpcBStack.Outputs.VpcId
         - !GetAtt VpcCStack.Outputs.VpcId
-  SubnetPrivateIds:
+  PrivateSubnetIds:
     Description: "Private Subnet Ids"
     Value: !Join 
       - ","
-      - - !GetAtt SubnetPrivateAStack.Outputs.SubnetId
-        - !GetAtt SubnetPrivateBStack.Outputs.SubnetId
-        - !GetAtt SubnetPrivateCStack.Outputs.SubnetId
-  SubnetPublicId:
+      - - !GetAtt PrivateSubnetAStack.Outputs.SubnetId
+        - !GetAtt PrivateSubnetBStack.Outputs.SubnetId
+        - !GetAtt PrivateSubnetCStack.Outputs.SubnetId
+  PublicSubnetId:
     Description: "Public Subnets Ids"
-    Value: !GetAtt SubnetPublicAStack.Outputs.SubnetId
+    Value: !GetAtt PublicSubnetAStack.Outputs.SubnetId

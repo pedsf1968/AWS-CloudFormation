@@ -94,6 +94,12 @@ Parameters:
       The name of the key pair. You can create a key pair using CreateKeyPair
       or ImportKeyPair.
     Type: String
+  PrivateIpAddress:
+    Default: ""
+    Description: >-
+      The primary private IPv4 address. You must specify a value from the IPv4
+      address range of the subnet.
+    Type: String
   SecurityGroupIds: # Required: Conditional
     Default: ""
     Description: >-
@@ -135,6 +141,7 @@ Parameters:
 Conditions:
   hasElasticIP: !Equals [!Ref ElasticIP, "true"]
   hasNoUserData: !Equals [!Ref UserData, ""]
+  hasPrivateIpAddress: !Not [!Equals [!Ref PrivateIpAddress, ""]]
   isSavedInS3File: !Equals [!Ref SaveInS3File, "true"]
 
 Resources:
@@ -148,11 +155,15 @@ Resources:
       KeyName: !Ref KeyName
       # Network interfaces with security groups specified within
       NetworkInterfaces:
-        - DeviceIndex: 0
-          SubnetId: !Ref SubnetId
-          AssociatePublicIpAddress: !Ref AssociatePublicIpAddress
+        - AssociatePublicIpAddress: !Ref AssociatePublicIpAddress
           DeleteOnTermination: true
+          DeviceIndex: 0
           GroupSet: !Ref SecurityGroupIds
+          PrivateIpAddress: !If 
+            - hasPrivateIpAddress
+            - !Ref PrivateIpAddress
+            - !Ref "AWS::NoValue"
+          SubnetId: !Ref SubnetId
       # Remove the separate SecurityGroupIds property
       SourceDestCheck: !Ref SourceDestCheck
       Tags:

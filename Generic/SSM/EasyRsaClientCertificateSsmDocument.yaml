@@ -47,7 +47,7 @@ Parameters:
     Type: String
 
   # Stack parameters
-  CaName:
+  RootCaName:
     Default: "OpenVPN-CA"
     Description: "Default CA certificate name"
     MaxLength: 64
@@ -125,9 +125,9 @@ Resources:
             default: !Ref BucketKey
             description: "S3 bucket key prefix"
             type: "String"
-          CaName:
+          RootCaName:
             allowedPattern: "^[a-zA-Z0-9\\s._-]+$"
-            default: !Ref CaName
+            default: !Ref RootCaName
             description: "Certificate Authority name for OpenVPN"
             type: "String"
           CertificatesDirectory:
@@ -184,7 +184,7 @@ Resources:
                     # Variables - Using proper path expansion
                     readonly BUCKET="{{Bucket}}"
                     readonly BUCKET_KEY="{{BucketKey}}"
-                    readonly CA_NAME="{{CaName}}"
+                    readonly CA_NAME="{{RootCaName}}"
                     readonly CERT_DIR="{{CertificatesDirectory}}"
                     readonly CLIENT_NAME="{{ClientName}}"
                     readonly ENVIRONMENT_NAME="{{EnvironmentName}}"

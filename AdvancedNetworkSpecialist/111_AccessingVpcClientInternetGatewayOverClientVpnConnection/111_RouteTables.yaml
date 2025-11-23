@@ -50,10 +50,10 @@ Parameters:
   RouteTablePublicName:
     Description: "Name Public Route Table"
     Type: String
-  SubnetPrivateIds:
+  PrivateSubnetIds:
     Description: "Private Subnets ID"
     Type: CommaDelimitedList
-  SubnetPublicId:
+  PublicSubnetId:
     Description: "Public Subnet ID"
     Type: String
   VpcId:
@@ -62,7 +62,7 @@ Parameters:
 
 Resources:  
   # Route, Route Table and Associations
-  SubnetPublicRouteTableStack:
+  PublicSubnetRouteTableStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -78,9 +78,9 @@ Resources:
         SaveInS3File: !Ref SaveInS3File
         VpcId: !Ref VpcId
         RouteTableName: !Ref RouteTablePublicName
-        SubnetId: !Ref SubnetPublicId
+        SubnetId: !Ref PublicSubnetId
 
-  SubnetPublicRouteStack:
+  PublicSubnetRouteStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -95,12 +95,12 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         DestinationCidrBlock: "0.0.0.0/0"
-        RouteTableId: !GetAtt SubnetPublicRouteTableStack.Outputs.RouteTableId
+        RouteTableId: !GetAtt PublicSubnetRouteTableStack.Outputs.RouteTableId
         RouteTableName: !Ref RouteTablePublicName
         TargetType: "InternetGateway"
         TargetId: !Ref InternetGatewayId
 
-  SubnetPrivateRouteTableAStack:
+  PrivateSubnetRouteTableAStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -115,10 +115,10 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         RouteTableName: !Select [ 0, !Ref RouteTablePrivateNames ]
-        SubnetId: !Select [ 0, !Ref SubnetPrivateIds ]
+        SubnetId: !Select [ 0, !Ref PrivateSubnetIds ]
         VpcId: !Ref VpcId
 
-  SubnetPrivateRouteTableBStack:
+  PrivateSubnetRouteTableBStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -133,10 +133,10 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         RouteTableName: !Select [ 1, !Ref RouteTablePrivateNames ]
-        SubnetId: !Select [ 1, !Ref SubnetPrivateIds ]
+        SubnetId: !Select [ 1, !Ref PrivateSubnetIds ]
         VpcId: !Ref VpcId
 
-  SubnetPrivateRouteAStack:
+  PrivateSubnetRouteAStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -151,12 +151,12 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         DestinationCidrBlock: "0.0.0.0/0"
-        RouteTableId: !GetAtt SubnetPrivateRouteTableAStack.Outputs.RouteTableId
+        RouteTableId: !GetAtt PrivateSubnetRouteTableAStack.Outputs.RouteTableId
         RouteTableName: !Select [ 0, !Ref RouteTablePrivateNames ]
         TargetType: "NatGateway"
         TargetId: !Ref NatGatewayId
 
-  SubnetPrivateRouteBStack:
+  PrivateSubnetRouteBStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -171,38 +171,38 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         DestinationCidrBlock: "0.0.0.0/0"
-        RouteTableId: !GetAtt SubnetPrivateRouteTableBStack.Outputs.RouteTableId
+        RouteTableId: !GetAtt PrivateSubnetRouteTableBStack.Outputs.RouteTableId
         RouteTableName: !Select [ 1, !Ref RouteTablePrivateNames ]
         TargetType: "NatGateway"
         TargetId: !Ref NatGatewayId
 
 Outputs:
-  SubnetPrivateRouteAId:
+  PrivateSubnetRouteAId:
     Description: "Private Subnet Route A ID"
-    Value: !GetAtt SubnetPrivateRouteAStack.Outputs.RouteId
-  SubnetPrivateRouteTableAAssociationId:
+    Value: !GetAtt PrivateSubnetRouteAStack.Outputs.RouteId
+  PrivateSubnetRouteTableAAssociationId:
     Description: "Private Route Table Association ID"
-    Value: SubnetPrivateRouteTableAStack.Outputs.SubnetRouteTableAssociationId
-  SubnetPrivateRouteTableAId:
+    Value: PrivateSubnetRouteTableAStack.Outputs.SubnetRouteTableAssociationId
+  PrivateSubnetRouteTableAId:
     Description: "Private Subnet Route Table ID"
-    Value: !GetAtt SubnetPrivateRouteTableAStack.Outputs.RouteTableId
+    Value: !GetAtt PrivateSubnetRouteTableAStack.Outputs.RouteTableId
 
-  SubnetPrivateRouteBId:
+  PrivateSubnetRouteBId:
     Description: "Private Subnet Route B ID"
-    Value: !GetAtt SubnetPrivateRouteBStack.Outputs.RouteId
-  SubnetPrivateRouteTableBAssociationId:
+    Value: !GetAtt PrivateSubnetRouteBStack.Outputs.RouteId
+  PrivateSubnetRouteTableBAssociationId:
     Description: "Private Route Table Association ID"
-    Value: SubnetPrivateRouteTableBStack.Outputs.SubnetRouteTableAssociationId
-  SubnetPrivateRouteTableBId:
+    Value: PrivateSubnetRouteTableBStack.Outputs.SubnetRouteTableAssociationId
+  PrivateSubnetRouteTableBId:
     Description: "Private Subnet Route Table ID"
-    Value: !GetAtt SubnetPrivateRouteTableBStack.Outputs.RouteTableId
+    Value: !GetAtt PrivateSubnetRouteTableBStack.Outputs.RouteTableId
 
-  SubnetPublicRouteId:
+  PublicSubnetRouteId:
     Description: "Public Subnet Route IDs"
-    Value: !GetAtt SubnetPublicRouteStack.Outputs.RouteId
-  SubnetPublicRouteTableAssociationId:
+    Value: !GetAtt PublicSubnetRouteStack.Outputs.RouteId
+  PublicSubnetRouteTableAssociationId:
     Description: "Public Route Table Association ID"
-    Value: !GetAtt SubnetPublicRouteTableStack.Outputs.SubnetRouteTableAssociationId
-  SubnetPublicRouteTableId:
+    Value: !GetAtt PublicSubnetRouteTableStack.Outputs.SubnetRouteTableAssociationId
+  PublicSubnetRouteTableId:
     Description: "Public Subnet Route Table ID"
-    Value: !GetAtt SubnetPublicRouteTableStack.Outputs.RouteTableId
+    Value: !GetAtt PublicSubnetRouteTableStack.Outputs.RouteTableId

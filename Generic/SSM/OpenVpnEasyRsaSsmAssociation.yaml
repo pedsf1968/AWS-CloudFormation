@@ -51,7 +51,7 @@ Parameters:
     Default: "OpenVpnEasyRsaSsmAssociation"
     Description: "Specify a descriptive name for the association."
     Type: String
-  CaName:
+  RootCaName:
     Default: "OpenVPN-CA"
     Description: "Default CA certificate name"
     MaxLength: 64
@@ -126,8 +126,8 @@ Resources:
           - !Ref ProjectName
         EnvironmentName: 
           - !Ref EnvironmentName
-        CaName:
-          - !Ref CaName
+        RootCaName:
+          - !Ref RootCaName
         ClientBaseName: 
           - !Ref ClientBaseName
         StackName: 

@@ -29,7 +29,7 @@ Metadata:
           default: "Subnets configuration"
         Parameters:
           - SubnetName
-          - SubnetPublicCidrBlock
+          - PublicSubnetCidrBlock
       - Label:
           default: "IGW, Route Tables and Routes"
         Parameters:
@@ -86,7 +86,7 @@ Parameters:
     Default: "Subnet"
     Description: Subnet name
     Type: String
-  SubnetPublicCidrBlock:
+  PublicSubnetCidrBlock:
     Default: 10.100.0.0/24
     Description: "Public Subnet CIDR"
     Type: String
@@ -169,7 +169,7 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
-        SubnetPublicCidrBlock: !Ref SubnetPublicCidrBlock
+        PublicSubnetCidrBlock: !Ref PublicSubnetCidrBlock
         SubnetName: !Ref SubnetName
         VpcCidrBlock: !Ref VpcCidrBlock
         VpcName: !Ref VpcName
@@ -214,7 +214,7 @@ Resources:
         SaveInS3File: !Ref SaveInS3File
         RouteTableNames: "A,B"
         InternetGatewayId: !GetAtt Gateways.Outputs.InternetGatewayId
-        SubnetPublicId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId
+        PublicSubnetId: !GetAtt VpcAndSubnets.Outputs.PublicSubnetId
         VpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
 
   SecurityGroups:
@@ -258,5 +258,5 @@ Resources:
         BastionInstanceName: !Ref BastionInstanceName
         BastionInstanceType: !Ref BastionInstanceType
         BastionInstanceSecurityGroup: !GetAtt SecurityGroups.Outputs.BastionInstanceSecurityGroupId
-        BastionInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId
+        BastionInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.PublicSubnetId
         KeyName: !Ref KeyName

@@ -1,0 +1,642 @@
+# aws cloudformation validate-template --template-body file:/113_ROOT_VpcPeeringConnectionOverClientVpn.yaml
+# aws cloudformation create-stack --stack-name ANS-113 --template-body file:/113_ROOT_VpcPeeringConnectionOverClientVpn.yaml --region ${BucketRegion} --capabilities CAPABILITY_IAM
+# aws cloudformation delete-stack --stack-name ANS-113 --region ${BucketRegion}
+# aws cloudformation list-stacks --stack-status-filter @('UPDATE_COMPLETE','CREATE_COMPLETE','DELETE_FAILED','UPDATE_FAILED') --query 'StackSummaries[*].StackName' --output json | ConvertFrom-Json | ForEach-Object { Write-Host $_ ; aws cloudformation delete-stack --stack-name $_}
+# 1 - Launch ROOT Stack
+# 2 - Go to console VPC/Client endpoint/
+# 3 - Select Client VPN endpoint
+# 5 - Download client configuration
+# 6 - Download client certificate and key from S3
+# 7 - Modify opvn configuration like below
+#
+# Add xxxxx. prefix to the endpoint URL
+# remote xxxxx.cvpn-endpoint-0f9e9a8da14044a36.prod.clientvpn.eu-west-3.amazonaws.com 443
+# 
+# Add Cert and Key
+# reneg-sec 0
+# cert client1.domain.kr.crt
+# key client1.domain.kr.key
+# 7 - Load the configuration in your OpenVPN client
+# 8 - Connect to the VPN
+# 9 - Check you can access the Application instance private IP of your Application instance
+
+AWSTemplateFormatVersion: "2010-09-09"
+Description: This template create a VPN between two accounts
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Project Configuration"
+        Parameters:
+          - ProjectName
+          - EnvironmentName
+      - Label:
+          default: "Configuration"
+        Parameters:
+          - BucketRegion
+          - Bucket
+          - BucketKey
+          - BucketObject
+          - SaveInS3File
+          - Phase
+      - Label:
+          default: "Principal Accounts"
+        Parameters:
+          - PrincipalAccountId
+          - PrincipalRegion
+          - PrincipalKeyName
+          - PrincipalVpcName
+          - PrincipalVpcCidrBlock
+          - PrincipalPublicSubnetName
+          - PrincipalPublicSubnetCidrBlock
+          - PrincipalSecureSubnetName
+          - PrincipalSecureSubnetCidrBlock
+          - PrincipalPrivateSubnetName
+          - PrincipalPrivateSubnetCidrBlock
+          - InternetGatewayName
+          - NatGatewayName
+          - BastionInstanceImageId
+          - BastionInstanceName
+          - BastionInstanceType
+          - BastionInstanceIngressCidrIp
+          - CaServerInstanceImageId
+          - CaServerInstanceName
+          - CaServerInstanceType
+      - Label:
+          default: "Peer Accounts"
+        Parameters:
+          - PeerAccountId
+          - PeerRegion
+          - PeerKeyName
+          - PeerVpcName
+          - PeerVpcCidrBlock
+          - PeerPrivateSubnetName
+          - PeerPrivateSubnetCidrBlock
+          - ApplicationInstanceImageId
+          - ApplicationInstanceName
+          - ApplicationInstanceType
+      - Label:
+          default: "Client Network"
+        Parameters:
+          - ClientCidrBlock
+      - Label:
+          default: "Certificates"
+        Parameters:
+          - RootCaName
+          - ServerName
+          - ClientName
+          - VpcPeeringConnectionName
+
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "113_VpcPeeringConnectionOverClientVpn"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  BucketRegion:
+    AllowedValues: ["eu-west-3", "eu-central-1"]
+    Default: "eu-west-3"
+    Description: "Region where is the Bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: ["dev", "staging", "test", "prod"]
+    ConstraintDescription: "Must specify dev, staging, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: ["false", "true"]
+    Default: "true"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+  # Accounts parameters
+  PrincipalAccountId:
+    Default: '612187453729'
+    Description: Principal AWS Account ID for VPC peering
+    Type: String
+  PrincipalRegion:
+    Description: Region of the Principal AWS Account for VPC peering
+    Type: String
+    Default: eu-west-3
+  PrincipalKeyName:
+    Default: "dso-paris"
+    Description: "Instances Key name"
+    Type: String
+  PeerAccountId:
+    Default: '612187453729'
+    Description: Peer AWS Account ID for VPC peering
+    Type: String
+  PeerRegion:
+    Description: Region of the Peer AWS Account for VPC peering
+    Type: String
+    Default: eu-central-1
+  PeerKeyName:
+    Default: "dso-francfort"
+    Description: "Instances Key name"
+    Type: String
+  Phase:
+    AllowedValues: [ "Phase1", "Phase2" ]
+    Default: Phase1
+    Description: "Deploy successively Phase1 and Phase2 and alternate between th two Accounts"
+    Type: String
+
+  # Network parameters
+  InternetGatewayName:
+    Default: "Principal-IGW"
+    Type: String
+  NatGatewayName:
+    Default: "Principal-NGW"
+    Type: String
+  VpcPeeringConnectionName:
+    Default: "VpcPeeringConnection"
+    Description: Name of the VPC Peering Connection
+    Type: String
+
+  # Principal network
+  PrincipalVpcName:
+    Default: "Principal-VPC"
+    Description: "VPC name"
+    Type: String
+  PrincipalVpcCidrBlock:
+    AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
+    Default: 10.10.0.0/16
+    Description: "The IPv4 network range for the VPC, in CIDR notation."
+    Type: String
+  PrincipalPublicSubnetName:
+    Default: "Principal-Public"
+    Description: "Public Subnet names for Principal VPC"
+    Type: String
+  PrincipalPublicSubnetCidrBlock:
+    AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
+    Default: "10.10.0.0/24"
+    Description: "Public Subnet CIDR for Principal VPC"
+    Type: String
+  PrincipalSecureSubnetName:
+    Default: "Principal-Secure"
+    Description: "Secure Subnet name for Principal VPC"
+    Type: String
+  PrincipalSecureSubnetCidrBlock:
+    AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
+    Default: "10.10.1.0/24"
+    Description: "Secure Subnet CIDR for Principal VPC"
+    Type: String
+  PrincipalPrivateSubnetName:
+    Default: "Principal-Private"
+    Description: "Private Subnet name for Principal VPC"
+    Type: String
+  PrincipalPrivateSubnetCidrBlock:
+    AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
+    Default: "10.10.2.0/24"
+    Description: "Private Subnet CIDR for Principal VPC"
+    Type: String
+
+  # Peer network
+  PeerVpcName:
+    Default: "Peer-VPC"
+    Description: "Peer VPC name"
+    Type: String
+  PeerVpcCidrBlock:
+    AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
+    Default: 10.20.0.0/16
+    Description: "The IPv4 network range for the Peer VPC, in CIDR notation."
+    Type: String
+  PeerPrivateSubnetName:
+    Default: "Peer-Private"
+    Description: "Peer private Subnet name"
+    Type: String
+  PeerPrivateSubnetCidrBlock:
+    AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
+    Default: "10.20.1.0/24"
+    Description: "Private Subnet CIDR for Peer VPC"
+    Type: String
+
+
+  ClientCidrBlock:
+    AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
+    ConstraintDescription: "Must be a valid CIDR block between /12 and /22"
+    Default: "10.30.0.0/16"
+    Description: "IPv4 address range in CIDR notation for client IP addresses (must be between /22 and /12)"
+    Type: String
+
+  # Instances parameters
+  BastionInstanceImageId:
+    Default: ami-00769f46ca3bb4381 
+    Description: "Bastion Instance AMI"
+    Type: String
+  BastionInstanceIngressCidrIp:
+    Description: "Ingress CIDR IP for Bastion Instance"
+    Default: " 88.188.126.220/32"
+    Type: String
+  BastionInstanceName:
+    Default: "Bastion"
+    Description: "Bastion Instance name"
+    Type: String
+  BastionInstanceType:
+    Default: t3a.micro
+    Description: "Bastion Instance type"
+    Type: String
+  CaServerInstanceImageId:
+    Default: ami-00769f46ca3bb4381 
+    Description: "CA Server Instance AMI"
+    Type: String
+  CaServerInstanceName:
+    Default: "ca-server"
+    Description: "CA Server Instance name"
+    Type: String
+  CaServerInstanceType:
+    Default: t3a.micro
+    Description: "CA Instance type"
+    Type: String
+  ApplicationInstanceImageId:
+    Default: ami-0a6793a25df710b06
+    Description: "Application Instance AMI"
+    Type: String
+  ApplicationInstanceName:
+    Default: "Application"
+    Description: "Application Instances name"
+    Type: String
+  ApplicationInstanceType:
+    Default: t3a.micro
+    Description: "Application Instances type"
+    Type: String
+
+  RootCaName:
+    Default: "root-ca.domain.kr"
+    Description: "The name of the CA certificate"
+    Type: String
+  ClientName:
+    Default: "client1.domain.kr"
+    Description: "The full name of the client certificate"
+    Type: String
+  ServerName:
+    Default: "application.domain.kr"  
+    Description: "The full name of the server certificate"
+    Type: String
+
+Conditions:
+  IsPrincipalAccount: !And 
+    - !Equals [!Ref "AWS::AccountId", !Ref PrincipalAccountId]
+    - !Equals [!Ref "AWS::Region", !Ref PrincipalRegion]
+  IsPeerAccount: !And 
+    - !Equals [!Ref "AWS::AccountId", !Ref PeerAccountId]
+    - !Equals [!Ref "AWS::Region", !Ref PeerRegion]
+  IsPrincipalAccountAndPhase2: !And
+    - !Equals [!Ref "AWS::AccountId", !Ref PrincipalAccountId]
+    - !Equals [!Ref "AWS::Region", !Ref PrincipalRegion]
+    - !Equals [!Ref Phase, "Phase2"]
+  IsPeerAccountAndPhase2: !And
+    - !Equals [!Ref "AWS::AccountId", !Ref PeerAccountId]
+    - !Equals [!Ref "AWS::Region", !Ref PeerRegion]
+    - !Equals [!Ref Phase, "Phase2"]
+
+Resources:
+  Lambdas:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/113_Lambdas.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        ApplicationLogLevel: INFO
+
+  Roles:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsPrincipalAccount
+    DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/113_Roles.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        PeerRequesterAccountId: !Ref PeerAccountId
+
+  PrincipalVpcAndSubnets:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsPrincipalAccount
+    DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/113_VpcAndSubnets.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        AvailabilityZone: !Select [0, !GetAZs ]
+        # Principal parameters
+        PrincipalPrivateSubnetCidrBlock: !Ref PrincipalPrivateSubnetCidrBlock
+        PrincipalPrivateSubnetName: !Ref PrincipalPrivateSubnetName
+        PrincipalPublicSubnetCidrBlock: !Ref PrincipalPublicSubnetCidrBlock
+        PrincipalPublicSubnetName: !Ref PrincipalPublicSubnetName
+        PrincipalSecureSubnetCidrBlock: !Ref PrincipalSecureSubnetCidrBlock
+        PrincipalSecureSubnetName: !Ref PrincipalSecureSubnetName
+        PrincipalVpcCidrBlock: !Ref PrincipalVpcCidrBlock
+        PrincipalVpcName: !Ref PrincipalVpcName
+
+  PeerVpcAndSubnets:
+    Condition: IsPeerAccount
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/113_VpcAndSubnets.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        AvailabilityZone: !Select [0, !GetAZs ]
+        # Peer Parameters
+        PeerPrivateSubnetName: !Ref PeerPrivateSubnetName
+        PeerPrivateSubnetCidrBlock: !Ref PeerPrivateSubnetCidrBlock
+        PeerVpcCidrBlock: !Ref PeerVpcCidrBlock
+        PeerVpcName: !Ref PeerVpcName
+
+  # Make VPC peering with the Principal account from the Peer account
+  VPCPeering:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsPeerAccount
+    DependsOn:
+      - Lambdas
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/113_VpcPeering.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        PeerOwnerId: !Ref PrincipalAccountId
+        PeerRegion: !Ref PrincipalRegion
+        PeerVpcName: !Ref PrincipalVpcName
+        VpcId: !GetAtt PeerVpcAndSubnets.Outputs.PeerVpcId
+        VpcPeeringConnectionName: !Ref VpcPeeringConnectionName
+
+  Gateways:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsPrincipalAccount
+    DeletionPolicy: Delete
+    DependsOn:
+      - Roles
+      - Lambdas
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/113_Gateways.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        IgwName: !Ref InternetGatewayName
+        NgwName: !Ref NatGatewayName
+        PublicSubnetId: !GetAtt PrincipalVpcAndSubnets.Outputs.PrincipalPublicSubnetId
+        VpcId: !GetAtt PrincipalVpcAndSubnets.Outputs.PrincipalVpcId
+
+  PrincipalRouteTables:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsPrincipalAccount
+    DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/113_PrincipalRouteTables.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        BucketRegion: !Ref BucketRegion
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        InternetGatewayId: !GetAtt Gateways.Outputs.InternetGatewayId
+        NatGatewayId: !GetAtt Gateways.Outputs.NatGatewayId
+        PrincipalPrivateSubnetId: !GetAtt PrincipalVpcAndSubnets.Outputs.PrincipalPrivateSubnetId
+        PrincipalPrivateSubnetRouteTableName: "VPN Target"
+        PrincipalPublicSubnetId: !GetAtt PrincipalVpcAndSubnets.Outputs.PrincipalPublicSubnetId
+        PrincipalPublicSubnetRouteTableName: "Bastion"
+        PrincipalSecureSubnetId: !GetAtt PrincipalVpcAndSubnets.Outputs.PrincipalSecureSubnetId
+        PrincipalSecureSubnetRouteTableName: "CA Server"
+        PrincipalVpcId: !GetAtt PrincipalVpcAndSubnets.Outputs.PrincipalVpcId
+
+  PeerRouteTables:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsPeerAccount
+    DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/113_PeerRouteTables.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        BucketRegion: !Ref BucketRegion
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        PeerPrivateSubnetId: !GetAtt PeerVpcAndSubnets.Outputs.PeerPrivateSubnetId
+        PeerPrivateSubnetRouteTableName: "Private"
+        PeerVpcId: !GetAtt PeerVpcAndSubnets.Outputs.PeerVpcId
+
+  PrincipalSecurityGroups:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsPrincipalAccount
+    DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/113_PrincipalSecurityGroups.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        BastionInstanceIngressCidrIp: !Ref BastionInstanceIngressCidrIp
+        PrincipalVpcId: !GetAtt PrincipalVpcAndSubnets.Outputs.PrincipalVpcId
+
+  PeerSecurityGroups:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsPeerAccount
+    DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/113_PeerSecurityGroups.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        ApplicationInstanceIngressCidrIp: !GetAtt PeerVpcAndSubnets.Outputs.PeerVpcCidrBlock
+        PeerVpcId: !GetAtt PeerVpcAndSubnets.Outputs.PeerVpcId
+
+  SsmDocuments:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsPrincipalAccount
+    DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/113_SsmDocuments.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        BucketRegion: !Ref BucketRegion
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+
+  PrincipalInstances:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsPrincipalAccountAndPhase2
+    DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
+      - SsmDocuments
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/113_PrincipalInstances.yaml"
+      TimeoutInMinutes: 10
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        # Bastion parameters
+        BastionInstanceImageId: !Ref BastionInstanceImageId
+        BastionInstanceName: !Ref BastionInstanceName
+        BastionInstanceProfile: !GetAtt Roles.Outputs.BastionInstanceProfileId
+        BastionInstanceSecurityGroup: !GetAtt PrincipalSecurityGroups.Outputs.BastionInstanceSecurityGroupId
+        BastionInstanceSubnetId: !GetAtt PrincipalVpcAndSubnets.Outputs.PrincipalPublicSubnetId
+        BastionInstanceType: !Ref BastionInstanceType
+        # CA Server parameters
+        CaServerInstanceImageId: !Ref CaServerInstanceImageId
+        CaServerInstanceName: !Ref CaServerInstanceName
+        CaServerInstanceProfile: !GetAtt Roles.Outputs.CaServerInstanceProfileId
+        CaServerInstanceSecurityGroup: !GetAtt PrincipalSecurityGroups.Outputs.CaServerInstanceSecurityGroupId
+        CaServerInstanceSubnetId: !GetAtt PrincipalVpcAndSubnets.Outputs.PrincipalSecureSubnetId
+        CaServerInstanceType: !Ref CaServerInstanceType
+        # Certificates parameters
+        RootCaName: !Ref RootCaName
+        ServerName: !Ref ServerName
+        ClientName: !Ref ClientName
+        KeyName: !Ref PrincipalKeyName
+
+  PeerInstances:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsPeerAccountAndPhase2
+    DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/113_PeerInstances.yaml"
+      TimeoutInMinutes: 10
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        # Application server parameters
+        ApplicationInstanceImageId: !Ref ApplicationInstanceImageId
+        ApplicationInstanceName: !Ref ApplicationInstanceName
+#        ApplicationInstanceProfile: !GetAtt Roles.Outputs.ApplicationInstanceProfileId
+        ApplicationInstanceSecurityGroup: !GetAtt PeerSecurityGroups.Outputs.ApplicationInstanceSecurityGroupId
+        ApplicationInstanceSubnetId: !GetAtt PeerVpcAndSubnets.Outputs.PeerPrivateSubnetId
+        ApplicationInstanceType: !Ref ApplicationInstanceType
+        KeyName: !Ref PeerKeyName
+
+  # Endpoints:
+  #   Type: AWS::CloudFormation::Stack
+  #   DeletionPolicy: Delete
+  #   DependsOn:
+  #     - Lambdas
+  #     - Instances
+  #   UpdateReplacePolicy: Delete
+  #   Properties:
+  #     TemplateURL: !Sub "https://${Bucket}.s3.eu-west-3.amazonaws.com/${BucketKey}/113_Endpoints.yaml"
+  #     TimeoutInMinutes: 10
+  #     Parameters:
+  #       Bucket: !Ref Bucket
+  #       BucketKey: !Ref BucketKey
+  #       BucketObject: !Ref BucketObject
+  #       BucketRegion: !Ref BucketRegion
+  #       EnvironmentName: !Ref EnvironmentName
+  #       ProjectName: !Ref ProjectName
+  #       SaveInS3File: !Ref SaveInS3File
+  #       ClientVpnEndpointName: "MyClientVPNEndpoint"
+  #       ClientCidrBlock: !Ref ClientCidrBlock
+  #       ClientRootCertificateChainArn: !Sub "/${ProjectName}/${EnvironmentName}/certificates/${ClientName}/arn"
+  #       Description: "My Client VPN Endpoint"
+  #       SecurityGroupId: !GetAtt SecurityGroups.Outputs.ENISecurityGroupId
+  #       ServerCertificateArn: !Sub "/${ProjectName}/${EnvironmentName}/certificates/${ServerName}/arn"
+  #       TargetNetworkCidr: !GetAtt VpcAndSubnets.Outputs.PrincipalVpcCidrBlock
+  #       TargetSubnetId: !GetAtt VpcAndSubnets.Outputs.PrincipalPrivateSubnetId
+  #       TransportProtocol: "udp"
+  #       VpcId: !GetAtt VpcAndSubnets.Outputs.PrincipalVpcId
+  #       VpnPort: 443

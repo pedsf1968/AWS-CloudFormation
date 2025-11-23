@@ -44,10 +44,10 @@ Metadata:
         Parameters:
           - VpcCidrBlock
           - VpcName
-          - SubnetPrivateCidrBlocks
-          - SubnetPrivateNames
-          - SubnetPublicCidrBlock
-          - SubnetPublicName
+          - PrivateSubnetCidrBlocks
+          - PrivateSubnetNames
+          - PublicSubnetCidrBlock
+          - PublicSubnetName
       - Label:
           default: "Instances"
         Parameters:
@@ -111,19 +111,19 @@ Parameters:
     Default: "My"
     Type: String
 
-  SubnetPrivateCidrBlocks:
+  PrivateSubnetCidrBlocks:
     Default: "192.168.0.0/24,192.168.100.0/24"
     Description: "Subnets CIDR for Application and VPN Target"
     Type: String
-  SubnetPrivateNames:
+  PrivateSubnetNames:
     Default: "Application,VPNTarget"
     Description: Subnet names
     Type: String
-  SubnetPublicCidrBlock:
+  PublicSubnetCidrBlock:
     Default: "192.168.200.0/24"
-    Description: "Subnets CIDR for Application and VPN Target"
+    Description: "Subnets CIDR for Bastion"
     Type: String
-  SubnetPublicName:
+  PublicSubnetName:
     Default: "Bastion"
     Description: Subnet names
     Type: String
@@ -183,7 +183,7 @@ Parameters:
     Description: "Instances Key name"
     Type: String
 
-  CaName:
+  RootCaName:
     Default: "root-ca.domain.kr"
     Description: "The name of the CA certificate"
     Type: String
@@ -247,10 +247,10 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Select [0, !GetAZs ]
-        SubnetPrivateCidrBlocks: !Ref SubnetPrivateCidrBlocks
-        SubnetPrivateNames: !Ref SubnetPrivateNames
-        SubnetPublicCidrBlock: !Ref SubnetPublicCidrBlock
-        SubnetPublicName: !Ref SubnetPublicName
+        PrivateSubnetCidrBlocks: !Ref PrivateSubnetCidrBlocks
+        PrivateSubnetNames: !Ref PrivateSubnetNames
+        PublicSubnetCidrBlock: !Ref PublicSubnetCidrBlock
+        PublicSubnetName: !Ref PublicSubnetName
         VpcCidrBlock: !Ref VpcCidrBlock
         VpcName: !Ref VpcName
 
@@ -273,7 +273,7 @@ Resources:
         SaveInS3File: !Ref SaveInS3File
         IgwName: !Ref InternetGatewayName
         NgwName: !Ref NatGatewayName
-        SubnetPublicId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId
+        PublicSubnetId: !GetAtt VpcAndSubnets.Outputs.PublicSubnetId
         VpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
 
   RouteTables:
@@ -297,8 +297,8 @@ Resources:
         NatGatewayId: !GetAtt Gateways.Outputs.NatGatewayId
         RouteTablePrivateNames: "Application,VPNTarget"
         RouteTablePublicName: "Bastion"
-        SubnetPrivateIds: !GetAtt VpcAndSubnets.Outputs.SubnetPrivateIds
-        SubnetPublicId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId
+        PrivateSubnetIds: !GetAtt VpcAndSubnets.Outputs.PrivateSubnetIds
+        PublicSubnetId: !GetAtt VpcAndSubnets.Outputs.PublicSubnetId
         VpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
 
   SecurityGroups:
@@ -359,14 +359,14 @@ Resources:
         BastionInstanceName: !Ref BastionInstanceName
         BastionInstanceProfile: !GetAtt Roles.Outputs.BastionInstanceProfileId
         BastionInstanceSecurityGroup: !GetAtt SecurityGroups.Outputs.BastionInstanceSecurityGroupId
-        BastionInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId
+        BastionInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.PublicSubnetId
         BastionInstanceType: !Ref BastionInstanceType
-        CaName: !Ref CaName
+        RootCaName: !Ref RootCaName
         CaServerInstanceImageId: !Ref CaServerInstanceImageId
         CaServerInstanceName: !Ref CaServerInstanceName
         CaServerInstanceProfile: !GetAtt Roles.Outputs.CaServerInstanceProfileId
         CaServerInstanceSecurityGroup: !GetAtt SecurityGroups.Outputs.CaServerInstanceSecurityGroupId
-        CaServerInstanceSubnetId: !Select [0, !Split [ ",", !GetAtt VpcAndSubnets.Outputs.SubnetPrivateIds ]]
+        CaServerInstanceSubnetId: !Select [0, !Split [ ",", !GetAtt VpcAndSubnets.Outputs.PrivateSubnetIds ]]
         CaServerInstanceType: !Ref CaServerInstanceType
         ClientName: !Ref ClientName
         ApplicationInstanceImageId: !Ref ApplicationInstanceImageId
@@ -375,7 +375,7 @@ Resources:
         ApplicationInstanceSecurityGroup: !GetAtt SecurityGroups.Outputs.ApplicationInstanceSecurityGroupId
         ApplicationInstanceSubnetId: !Select
           - 0
-          - !Split [ ",", !GetAtt VpcAndSubnets.Outputs.SubnetPrivateIds ]
+          - !Split [ ",", !GetAtt VpcAndSubnets.Outputs.PrivateSubnetIds ]
         ApplicationInstanceType: !Ref ApplicationInstanceType
         KeyName: !Ref KeyName
         ServerName: !Ref ServerName
@@ -405,7 +405,7 @@ Resources:
         SecurityGroupId: !GetAtt SecurityGroups.Outputs.ENISecurityGroupId
         ServerCertificateArn: !Sub "/${ProjectName}/${EnvironmentName}/certificates/${ServerName}/arn"
         TargetNetworkCidr: !GetAtt VpcAndSubnets.Outputs.VpcCidrBlock
-        TargetSubnetId: !Select [1, !Split [ ",", !GetAtt VpcAndSubnets.Outputs.SubnetPrivateIds ]]
+        TargetSubnetId: !Select [1, !Split [ ",", !GetAtt VpcAndSubnets.Outputs.PrivateSubnetIds ]]
         TransportProtocol: "udp"
         VpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
         VpnPort: 443

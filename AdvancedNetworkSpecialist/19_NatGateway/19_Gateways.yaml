@@ -46,7 +46,7 @@ Parameters:
     Default: "Default"
     Description: "Nat Gateway name"
     Type: String
-  SubnetPublicId:
+  PublicSubnetId:
     Description: "Public Subnet ID"
     Type: String
   VpcId:
@@ -87,7 +87,7 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         Name: !Ref NgwName
-        SubnetId: !Ref SubnetPublicId
+        SubnetId: !Ref PublicSubnetId
 
 Outputs:
   InternetGatewayAttachmentId:

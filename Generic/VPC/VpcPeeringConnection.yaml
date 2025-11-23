@@ -34,16 +34,18 @@ Parameters:
 
   # Stack parameters
   PeerOwnerId:
-    AllowedPattern: "^[0-9]{12}$"
     ConstraintDescription: "Must be a valid account id"
+    Default: ""
     Description: The AWS account ID of the owner of the accepter VPC.
     Type: String
   PeerRegion:
+    Default: ""
     Description: |
       The Region code for the accepter VPC, if the accepter VPC is located in a
       Region other than the Region in which you make the request.
     Type: String
   PeerRoleArn:
+    Default: ""
     Description: |
       The Amazon Resource Name (ARN) of the VPC peer role for the peering
       connection in another AWS account. This is required when you are peering
@@ -58,21 +60,24 @@ Parameters:
     Description: The ID of the VPC
     Type: String
   VpcPeeringConnectionName:
-    Default: VpcPeeringConnection
-    Description: Name of the VPC Peering Connection
+    Default: "VpcPeeringConnection"
+    Description: "Name of the VPC Peering Connection"
     Type: String
 
 Conditions:
   SaveInS3File: !Equals [ !Ref SaveInS3File, "true"]
+  HasPeerOwnerId: !Not [ !Equals [ !Ref PeerOwnerId, "" ] ]
+  HasPeerRegion: !Not [ !Equals [ !Ref PeerRegion, "" ] ]
+  HasPeerRoleArn: !Not [ !Equals [ !Ref PeerRoleArn, "" ] ]
 
 Resources:
   # Create VPC Peering Connection
   VpcPeeringConnection:
     Type: AWS::EC2::VPCPeeringConnection
     Properties:
-      PeerOwnerId: !Ref PeerOwnerId
-      PeerRegion: !Ref PeerRegion
-      PeerRoleArn: !Ref PeerRoleArn
+      PeerOwnerId: !If [ HasPeerOwnerId, !Ref PeerOwnerId, !Ref "AWS::AccountId" ]
+      PeerRegion: !If [ HasPeerRegion, !Ref PeerRegion, !Ref "AWS::Region" ]
+      PeerRoleArn: !If [ HasPeerRoleArn, !Ref PeerRoleArn, !Ref "AWS::NoValue" ]
       PeerVpcId: !Ref PeerVpcId
       Tags:
         - Key: EnvironmentName

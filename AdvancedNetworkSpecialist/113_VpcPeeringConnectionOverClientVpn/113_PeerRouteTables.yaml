@@ -1,0 +1,98 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template create Tables and Route Tables
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "113_VpcPeeringConnectionOverClientVpn"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  BucketRegion:
+    AllowedValues: ["eu-west-3", "eu-central-1"]
+    Default: "eu-west-3"
+    Description: "Region where is the Bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: ["dev", "staging", "test", "prod"]
+    ConstraintDescription: "Must specify dev, staging, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: ["false", "true"]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+  
+  # Peer network
+  PeerPrivateSubnetId:
+    Description: "Private Subnets ID for Peer VPC"
+    Type: String
+  PeerPrivateSubnetRouteTableName:
+    Description: "Private Subnet Route Tables name for Peer VPC"
+    Type: String
+  PeerVpcId:
+    Description: "Peer VPC ID"
+    Type: String
+
+Resources:  
+  # Route, Route Table and Associations
+
+  PeerPrivateSubnetRouteTableStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/VPC/RouteTable.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        RouteTableName: !Ref PeerPrivateSubnetRouteTableName
+        SubnetId: !Ref PeerPrivateSubnetId
+        VpcId: !Ref PeerVpcId
+
+  # PeerPrivateSubnetRouteStack:
+  #   Type: AWS::CloudFormation::Stack
+  #   DeletionPolicy: Delete
+  #   UpdateReplacePolicy: Delete
+  #   Properties:
+  #     TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/VPC/Route.yaml"
+  #     TimeoutInMinutes: 5
+  #     Parameters:
+  #       Bucket: !Ref Bucket
+  #       BucketKey: !Ref BucketKey
+  #       BucketObject: !Ref BucketObject
+  #       EnvironmentName: !Ref EnvironmentName
+  #       ProjectName: !Ref ProjectName
+  #       SaveInS3File: !Ref SaveInS3File
+  #       DestinationCidrBlock: "0.0.0.0/0"
+  #       RouteTableId: !GetAtt PeerPrivateSubnetRouteTableStack.Outputs.RouteTableId
+  #       RouteTableName: PeerPrivateRouteTableName
+  #       TargetType: "NatGateway"
+  #       TargetId: !Ref NatGatewayId
+
+Outputs:
+  PeerPrivateSubnetRouteTableAssociationId:
+    Description: "Peer Private Route Table Association ID"
+    Value: !GetAtt PeerPrivateSubnetRouteTableStack.Outputs.SubnetRouteTableAssociationId
+  PeerPrivateSubnetRouteTableId:
+    Description: "Peer Private Subnet Route Table ID"
+    Value: !GetAtt PeerPrivateSubnetRouteTableStack.Outputs.RouteTableId

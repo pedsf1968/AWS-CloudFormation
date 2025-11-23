@@ -11,7 +11,7 @@ Parameters:
     Type: String
   BucketKey:
     AllowedPattern: "^[a-zA-Z0-9_.-]+$"
-    Default: "110_AWSClientVpn"
+    Default: "113_AWSClientVpn"
     Description: Key to find object in the bucket
     Type: String
   BucketObject:
@@ -47,7 +47,7 @@ Parameters:
     Type: String
 
   # Stack parameters
-  CaName:
+  RootCaName:
     Default: "OpenVPN-CA"
     Description: "Default CA certificate name"
     MaxLength: 64
@@ -62,7 +62,7 @@ Parameters:
     Description: "Working directory for installation"
     Type: String
   LogFile:
-    Default: "/var/log/openvpn-easyrsa-install.log"
+    Default: "/var/log/openvpn-easyrsa-cacert.log"
     Description: "Log file path"
     Type: String
   Name:
@@ -117,9 +117,9 @@ Resources:
             default: !Ref BucketKey
             description: "S3 bucket key prefix"
             type: "String"
-          CaName:
+          RootCaName:
             allowedPattern: "^[a-zA-Z0-9\\s._-]+$"
-            default: !Ref CaName
+            default: !Ref RootCaName
             description: "Certificate Authority name"
             type: "String"
           CertificatesDirectory:
@@ -158,6 +158,53 @@ Resources:
             default: ""
             description: "CloudFormation WaitCondition URL (optional)"
             type: "String"
+
+        # EasyRSA parameters
+          EasyRsaReqCountry:
+            default: "KR"
+            description: "Country for the CA certificate"
+            type: String
+          EasyRsaReqProvince:
+            default: "Gyeonggi-Do"
+            description: "Province for the CA certificate"
+            type: String
+          EasyRsaReqCity:
+            default: "Seoul"
+            description: "City for the CA certificate"
+            type: String
+          EasyRsaReqOrg:
+            default: "Copyleft Certificate Co"
+            description: "Organization for the CA certificate"
+            type: String
+          EasyRsaReqEmail:
+            default: "me@example.net"
+            description: "Email for the CA certificate"
+            type: String
+          EasyRsaReqOu:
+            default: "My Organizational Unit"
+            description: "Organizational Unit for the CA certificate"
+            type: String
+          EasyRsaCaExpire:
+            default: "3650"
+            description: "Number of days the CA certificate is valid"
+            type: String
+          EasyRsaCertExpire:
+            default: "825"
+            description: "Number of days the certificate is valid"
+            type: String
+          EasyRsaKeySize:
+            default: "2048"
+            description: "Key size for the certificate"
+            type: String
+          EasyRsaAlgo:
+            default: "rsa"
+            description: "Algorithm for the certificate"
+            type: String
+          EasyRsaDigest:
+            default: "sha256"
+            description: "Digest algorithm for the certificate"
+            type: String
+
         runtimeConfig:
           "aws:runShellScript":
             properties:
@@ -177,10 +224,21 @@ Resources:
                     readonly STACK_NAME="{{StackName}}"
                     readonly REGION="{{Region}}"
                     readonly RESOURCE_NAME="{{ResourceName}}"
-                    readonly CA_NAME="{{CaName}}"
+                    readonly CA_NAME="{{RootCaName}}"
                     readonly WORKING_DIR="{{InstallDirectory}}"
                     readonly LOG_FILE="{{LogFile}}"
                     readonly CERT_DIR="{{CertificatesDirectory}}"
+                    readonly EASYRSA_REQ_COUNTRY="{{EasyRsaReqCountry}}"
+                    readonly EASYRSA_REQ_PROVINCE="{{EasyRsaReqProvince}}"
+                    readonly EASYRSA_REQ_CITY="{{EasyRsaReqCity}}"
+                    readonly EASYRSA_REQ_ORG="{{EasyRsaReqOrg}}"
+                    readonly EASYRSA_REQ_EMAIL="{{EasyRsaReqEmail}}"
+                    readonly EASYRSA_REQ_OU="{{EasyRsaReqOu}}"
+                    readonly EASYRSA_CA_EXPIRE="{{EasyRsaCaExpire}}"
+                    readonly EASYRSA_CERT_EXPIRE="{{EasyRsaCertExpire}}"
+                    readonly EASYRSA_KEY_SIZE="{{EasyRsaKeySize}}"
+                    readonly EASYRSA_ALGO="{{EasyRsaAlgo}}"
+                    readonly EASYRSA_DIGEST="{{EasyRsaDigest}}"
 
                     # Logging function
                     log() {
@@ -194,9 +252,9 @@ Resources:
                         local exit_code="$1"
                         local message="$2"
                         local status=$([ "$exit_code" -eq 0 ] && echo "SUCCESS" || echo "FAILURE")
-                        
+
                         log "INFO" "Signaling CloudFormation: Status=$status, Message=$message"
-                        
+
                         if [[ -n "$WAIT_HANDLE_URL" ]]; then
                             log "INFO" "Using WaitCondition URL for signaling"
                             local response_code
@@ -209,7 +267,7 @@ Resources:
                                     \"Data\": \"EasyRSA CA certificate setup completed with exit code $exit_code\"
                                 }" \
                                 "$WAIT_HANDLE_URL" 2>/dev/null || echo "000")
-                            
+
                             if [[ "$response_code" =~ ^2[0-9][0-9]$ ]]; then
                                 log "INFO" "Successfully signaled CloudFormation (HTTP: $response_code)"
                             else
@@ -244,15 +302,38 @@ Resources:
 
                     easy_rsa_ca_cert() {
                         log "INFO" "Creating CA certificate with EasyRSA."
-                        
+
                         # Create working directory with proper permissions
                         log "INFO" "Creating directories: $WORKING_DIR and $CERT_DIR"
                         mkdir -p "$WORKING_DIR" "$CERT_DIR"
-                        
+
                         # Ensure directories are writable
                         chmod 755 "$WORKING_DIR" "$CERT_DIR"
-                        
+
                         cd "$WORKING_DIR/easy-rsa/easyrsa3"
+
+                        # Create or update vars file with required settings
+                        log "INFO" "Creating EasyRSA vars configuration file..."
+                        cat > vars <<EOF
+                    # Easy-RSA 3 parameter settings
+                    set_var EASYRSA_REQ_COUNTRY    "$EASYRSA_REQ_COUNTRY"
+                    set_var EASYRSA_REQ_PROVINCE   "$EASYRSA_REQ_PROVINCE"
+                    set_var EASYRSA_REQ_CITY       "$EASYRSA_REQ_CITY"
+                    set_var EASYRSA_REQ_ORG        "$EASYRSA_REQ_ORG"
+                    set_var EASYRSA_REQ_EMAIL      "$EASYRSA_REQ_EMAIL"
+                    set_var EASYRSA_REQ_OU         "$EASYRSA_REQ_OU"
+                    set_var EASYRSA_REQ_CN         "$CA_NAME"
+                    set_var EASYRSA_BATCH          "yes"
+                    set_var EASYRSA_CA_EXPIRE      "$EASYRSA_CA_EXPIRE"
+                    set_var EASYRSA_CERT_EXPIRE    "$EASYRSA_CERT_EXPIRE"
+                    set_var EASYRSA_KEY_SIZE       "$EASYRSA_KEY_SIZE"
+                    set_var EASYRSA_ALGO           "$EASYRSA_ALGO"
+                    set_var EASYRSA_DIGEST         "$EASYRSA_DIGEST"
+                    EOF
+
+                        log "INFO" "CA certificate common name: $CA_NAME"
+                        log "INFO" "CA certificate validity: 3650 days"
+                        log "INFO" "Server/client certificate validity: 825 days"
 
                         # Remove previous CA
                         log "INFO" "Removing CA certificate..."
@@ -260,15 +341,15 @@ Resources:
 
                         # Build CA
                         log "INFO" "Building CA certificate..."
-                        ./easyrsa --batch build-ca nopass <<< "$CA_NAME"
-                        
+                        ./easyrsa --batch build-ca nopass
+
                         # Copy certificates to organized directory
                         log "INFO" "Organizing certificates in $CERT_DIR..."
                         cp pki/ca.crt "$CERT_DIR/"
-                        
+
                         # Set proper permissions
                         chmod 644 "$CERT_DIR"/*.crt
-                        
+
                         log "INFO" "Certificates created and organized successfully"
                         ls -la "$CERT_DIR/"
                     }
@@ -278,14 +359,14 @@ Resources:
                             log "INFO" "No S3 bucket specified, skipping S3 copy"
                             return 0
                         fi
-                        
+
                         log "INFO" "Copying certificates to S3..."
-                        
+
                         cd "$CERT_DIR"
-                        
+
                         # Copy certificates to S3 with error handling
                         local s3_prefix="s3://$BUCKET/$BUCKET_KEY"
-                        
+
                         if ! aws s3 cp ca.crt "$s3_prefix/ca.crt" --region "$REGION"; then
                             log "WARN" "Failed to copy CA certificate to S3"
                         else
@@ -300,19 +381,19 @@ Resources:
                         log "INFO" "Certificate details: CA=$CA_NAME, Region=$REGION"
                         log "INFO" "Working directory: $WORKING_DIR"
                         log "INFO" "Certificates directory: $CERT_DIR"
-                        
+
                         # Check if running as root or with sudo
                         if [[ $EUID -ne 0 ]]; then
                             log "WARN" "Not running as root, some operations might fail"
                         fi
-                        
+
                         easy_rsa_ca_cert
                         copy_to_s3
-                        
+
                         log "INFO" "CA certificate completed successfully"
                         log "INFO" "Certificates stored in: $CERT_DIR"
                         log "INFO" "Certificate stored in S3"
-                        
+
                         signal_cloudformation 0 "CA certificate created and imported completed successfully"
                     }
 

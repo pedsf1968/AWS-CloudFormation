@@ -69,6 +69,7 @@ Parameters:
     Description: "The ID of the route table for the route."
     Type: String
   RouteTableName:
+    Default: "Default-RT"
     Description: "The name of the Route Table"
     Type: String
 
@@ -123,7 +124,7 @@ Resources:
       VpcEndpointId: !If [IsVpcEndpoint, !Ref TargetId, !Ref "AWS::NoValue"]
       VpcPeeringConnectionId: !If [IsVpcPeering, !Ref TargetId, !Ref "AWS::NoValue"]
 
-  RouteTableToS3:
+  RouteToS3:
     Type: AWS::CloudFormation::CustomResource
     Condition: SaveInS3File
     DeletionPolicy: Retain

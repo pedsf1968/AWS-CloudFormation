@@ -29,8 +29,8 @@ Metadata:
           default: "Subnets configuration"
         Parameters:
           - SubnetNames
-          - SubnetPrivateCidrBlocks
-          - SubnetPublicCidrBlocks
+          - PrivateSubnetCidrBlocks
+          - PublicSubnetCidrBlocks
       - Label:
           default: "Instances"
         Parameters:
@@ -81,11 +81,11 @@ Parameters:
     Description: "Subnet names"
     Type: String
     Default: "A,B,C"
-  SubnetPrivateCidrBlocks:
+  PrivateSubnetCidrBlocks:
     Description: "Subnet CIDRs"
     Type: String
     Default: "10.0.1.0/24,10.1.1.0/24,10.2.1.0/24"
-  SubnetPublicCidrBlocks:
+  PublicSubnetCidrBlocks:
     Description: "Subnet CIDRs"
     Type: String
     Default: "10.0.0.0/24"
@@ -144,8 +144,8 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
-        SubnetPrivateCidrBlocks: !Ref SubnetPrivateCidrBlocks
-        SubnetPublicCidrBlocks: !Ref SubnetPublicCidrBlocks
+        PrivateSubnetCidrBlocks: !Ref PrivateSubnetCidrBlocks
+        PublicSubnetCidrBlocks: !Ref PublicSubnetCidrBlocks
         SubnetNames: !Ref SubnetNames
         VpcCidrBlocks: !Ref VpcCidrBlocks
         VpcNames: !Ref VpcNames
@@ -190,7 +190,7 @@ Resources:
         SaveInS3File: !Ref SaveInS3File
         IgwName: "Default"
         TgwName: "Default"
-        SubnetIds: !GetAtt VpcAndSubnets.Outputs.SubnetPrivateIds
+        SubnetIds: !GetAtt VpcAndSubnets.Outputs.PrivateSubnetIds
         VpcIds: !GetAtt VpcAndSubnets.Outputs.VpcIds
 
   RouteTables:
@@ -211,8 +211,8 @@ Resources:
         ProjectName: !Ref ProjectName
         DestinationCidrBlock: "10.0.0.0/8"
         VpcIds: !GetAtt VpcAndSubnets.Outputs.VpcIds
-        SubnetPrivateIds: !GetAtt VpcAndSubnets.Outputs.SubnetPrivateIds
-        SubnetPublicId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId
+        PrivateSubnetIds: !GetAtt VpcAndSubnets.Outputs.PrivateSubnetIds
+        PublicSubnetId: !GetAtt VpcAndSubnets.Outputs.PublicSubnetId
         RouteTableNames: "A,B,C"
         InternetGatewayId: !GetAtt Gateway.Outputs.InternetGatewayId
         TransitGatewayId: !GetAtt Gateway.Outputs.TransitGatewayId
@@ -238,9 +238,9 @@ Resources:
         ApplicationInstanceName: "Application"
         ApplicationInstanceType: !Ref InstanceType
         ApplicationInstanceSecurityGroups: !GetAtt SecurityGroups.Outputs.ApplicationInstanceSecurityGroupIds
-        ApplicationInstanceSubnetIds: !GetAtt VpcAndSubnets.Outputs.SubnetPrivateIds
+        ApplicationInstanceSubnetIds: !GetAtt VpcAndSubnets.Outputs.PrivateSubnetIds
         BastionInstanceImageId: !Ref InstanceImageId
         BastionInstanceName: "Bastion"
         BastionInstanceType: !Ref InstanceType
         BastionInstanceSecurityGroup: !GetAtt SecurityGroups.Outputs.BastionInstanceSecurityGroupId
-        BastionInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId
+        BastionInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.PublicSubnetId

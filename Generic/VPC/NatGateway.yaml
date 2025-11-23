@@ -45,7 +45,7 @@ Parameters:
     Description: "Create elastic IP for the NAT Gateway"
     Type: String
   Name:
-    Default: "Default"
+    Default: "Default-NGW"
     Description: "NAT Gateway name"
     Type: String
   SubnetId:

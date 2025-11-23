@@ -1,0 +1,114 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template deploys a VPC, and Subnets
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "113_VpcPeeringConnectionOverClientVpn"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  BucketRegion:
+    AllowedValues: ["eu-west-3", "eu-central-1"]
+    Default: "eu-west-3"
+    Description: "Region where is the Bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: ["dev", "staging", "test", "prod"]
+    ConstraintDescription: "Must specify dev, staging, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: ["false", "true"]
+    Default: "false"
+    Description: "Save resources information in s3 file"
+    Type: String
+  
+# Stack parameters
+  AvailabilityZone:
+    Description: "The AZ of the subnet"
+    Type: String
+
+  # Peer network
+  PeerVpcName:
+    Default: "PeerVPC"
+    Description: "Peer VPC name"
+    Type: String
+  PeerVpcCidrBlock:
+    AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
+    Default: 10.20.0.0/16
+    Description: "The IPv4 network range for the Peer VPC, in CIDR notation."
+    Type: String
+  PeerPrivateSubnetName:
+    Default: "Peer"
+    Description: "Peer private Subnet name"
+    Type: String
+  PeerPrivateSubnetCidrBlock:
+    AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
+    Default: "10.20.1.0/24"
+    Description: "Private Subnet CIDR for Peer VPC"
+    Type: String
+
+Resources:
+  PeerVpcStack:
+    Type: AWS::CloudFormation::Stack
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/VPC/Vpc.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        CidrBlock: !Ref PeerVpcCidrBlock
+        VpcName: !Ref PeerVpcName
+
+  PeerPrivateSubnetStack:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/VPC/Subnet.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        AvailabilityZone: !Ref AvailabilityZone
+        CidrBlock: !Ref PeerPrivateSubnetCidrBlock
+        MapPublicIpOnLaunch: false
+        SubnetName: !Ref PeerPrivateSubnetName
+        VpcId: !GetAtt PeerVpcStack.Outputs.VpcId
+
+Outputs:
+  PeerVpcId:
+    Description: "Id of the Peer VPC"
+    Value: !GetAtt PeerVpcStack.Outputs.VpcId
+  PeerVpcCidrBlock:
+    Description: "Cidr of the Peer VPC"
+    Value: !GetAtt PeerVpcStack.Outputs.VpcCidrBlock
+  PeerPrivateSubnetId:
+    Description: "Id of the Peer Private Subnet"
+    Value: !GetAtt PeerPrivateSubnetStack.Outputs.SubnetId
+  PeerPrivateSubnetCidr:
+    Description: "Cidr of the Peer Private Subnets"
+    Value: !GetAtt PeerPrivateSubnetStack.Outputs.SubnetCidrBlock

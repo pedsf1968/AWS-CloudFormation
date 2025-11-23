@@ -47,7 +47,7 @@ Parameters:
     Type: String
 
   # Stack parameters
-  CaName:
+  RootCaName:
     Default: "OpenVPN-CA"
     Description: "Default CA certificate name"
     MaxLength: 64
@@ -128,8 +128,8 @@ Resources:
           - !Ref AWS::StackName
         WaitHandleUrl:
           - !Ref AssociationWaitConditionHandle
-        CaName:
-          - !Ref CaName
+        RootCaName:
+          - !Ref RootCaName
         CertificatesDirectory:
           - !Ref CertificatesDirectory
         InstallDirectory:

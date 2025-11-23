@@ -50,10 +50,10 @@ Parameters:
   RouteTableNames:
     Description: "Names of all Route Tables"
     Type: String
-  SubnetPrivateIds:
+  PrivateSubnetIds:
     Description: "Private Subnets IDs"
     Type: String
-  SubnetPublicId:
+  PublicSubnetId:
     Description: "Public Subnets ID"
     Type: String
   TransitGatewayId:
@@ -79,7 +79,7 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         RouteTableName: !Join [ "-", [ !Select [ 0, !Split [ ",", !Ref RouteTableNames ] ], "Public" ] ]
-        SubnetId: !Ref SubnetPublicId
+        SubnetId: !Ref PublicSubnetId
         VpcId: !Select [ 0, !Split [ ",", !Ref VpcIds ] ]
 
   SubnetAPublicRouteStack:
@@ -117,7 +117,7 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         RouteTableName: !Join [ "-", [ !Select [ 0, !Split [ ",", !Ref RouteTableNames ] ], "Private" ] ]
-        SubnetId: !Select [ 0, !Split [ ",", !Ref SubnetPrivateIds ] ]
+        SubnetId: !Select [ 0, !Split [ ",", !Ref PrivateSubnetIds ] ]
         VpcId: !Select [ 0, !Split [ ",", !Ref VpcIds ] ]
 
   SubnetAPrivateRouteStack:
@@ -155,7 +155,7 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         RouteTableName: !Join [ "-", [ !Select [ 1, !Split [ ",", !Ref RouteTableNames ] ], "Private" ] ]
-        SubnetId: !Select [ 1, !Split [ ",", !Ref SubnetPrivateIds ] ]
+        SubnetId: !Select [ 1, !Split [ ",", !Ref PrivateSubnetIds ] ]
         VpcId: !Select [ 1, !Split [ ",", !Ref VpcIds ] ]
 
   SubnetBPrivateRouteStack:
@@ -193,7 +193,7 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         RouteTableName: !Join [ "-", [ !Select [ 2, !Split [ ",", !Ref RouteTableNames ] ], "Private" ] ]
-        SubnetId: !Select [ 2, !Split [ ",", !Ref SubnetPrivateIds ] ]
+        SubnetId: !Select [ 2, !Split [ ",", !Ref PrivateSubnetIds ] ]
         VpcId: !Select [ 2, !Split [ ",", !Ref VpcIds ] ]
 
   SubnetCPrivateRouteStack:
@@ -217,7 +217,7 @@ Resources:
         TargetId: !Ref TransitGatewayId
 
 Outputs:
-  SubnetPrivateRouteTableIds:
+  PrivateSubnetRouteTableIds:
     Description: "Private Subnet Route Table IDs"
     Value: !Join
       - ","
@@ -225,7 +225,7 @@ Outputs:
         - !GetAtt SubnetBPrivateRouteTableStack.Outputs.RouteTableId
         - !GetAtt SubnetCPrivateRouteTableStack.Outputs.RouteTableId
 
-  SubnetPrivateRouteTableAssociationIds:
+  PrivateSubnetRouteTableAssociationIds:
     Description: "Private Route Table Association IDs"
     Value: !Join
       - ","
@@ -233,11 +233,11 @@ Outputs:
         - !GetAtt SubnetBPrivateRouteTableStack.Outputs.SubnetRouteTableAssociationId
         - !GetAtt SubnetCPrivateRouteTableStack.Outputs.SubnetRouteTableAssociationId
 
-  SubnetPublicRouteTableIds:
+  PublicSubnetRouteTableIds:
     Description: "Public Subnet Route IDs"
     Value: !GetAtt SubnetAPublicRouteTableStack.Outputs.RouteTableId
 
-  SubnetPublicRouteTableAssociationIds:
+  PublicSubnetRouteTableAssociationIds:
     Description: "Public Route Table Association IDs"
     Value: !GetAtt SubnetAPublicRouteTableStack.Outputs.SubnetRouteTableAssociationId
 
