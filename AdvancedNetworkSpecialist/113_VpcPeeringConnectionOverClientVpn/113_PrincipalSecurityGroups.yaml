@@ -46,7 +46,7 @@ Parameters:
     Description: "Ingress CIDR IP for CA Server Instance"
     Default: "0.0.0.0/0"
     Type: String
-  PrincipalVpcId:
+  VpcId:
     Description: "Id of the Principal VPC"
     Type: String
 
@@ -71,7 +71,7 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${ProjectName}-${EnvironmentName}-Default-SG"
-      VpcId: !Ref PrincipalVpcId
+      VpcId: !Ref VpcId
 
   BastionInstanceSecurityGroupToS3:
     Type: AWS::CloudFormation::CustomResource
@@ -106,7 +106,7 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${ProjectName}-${EnvironmentName}-ENI-SG"
-      VpcId: !Ref PrincipalVpcId
+      VpcId: !Ref VpcId
 
   ENISecurityGroupToS3:
     Type: AWS::CloudFormation::CustomResource
@@ -144,7 +144,7 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${ProjectName}-${EnvironmentName}-CA-Server-SG"
-      VpcId: !Ref PrincipalVpcId
+      VpcId: !Ref VpcId
 
   CaServerSecurityGroupToS3:
     Type: AWS::CloudFormation::CustomResource

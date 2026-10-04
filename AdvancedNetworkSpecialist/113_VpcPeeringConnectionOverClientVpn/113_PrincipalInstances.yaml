@@ -38,28 +38,44 @@ Parameters:
     Type: String
 
   # Stack parameters
-  RootCaName:
-    Default: "OpenVPN-CA"
-    Description: "The name of the CA certificate"
+  ClientBaseName:
+    AllowedPattern: "^[a-zA-Z0-9._-]+$"
+    ConstraintDescription: "Must contain only alphanumeric characters, periods, hyphens, and underscores"
+    Default: "client1"
+    Description: "Default client certificate base name"
+    MaxLength: 64
+    MinLength: 1
     Type: String
-  ClientName:
-    Default: "client1.domain.kr"
-    Description: "The base name of the client certificate"
+  DomainName:
+    AllowedPattern: "^[a-zA-Z0-9.-]+$"
+    ConstraintDescription: "Must be a valid domain name"
+    Default: "domain.kr"
+    Description: "Base domain name for certificates"
+    MaxLength: 253
+    MinLength: 4
     Type: String
   KeyName:
     Default: "dso-paris"
     Description: "Instances Key name"
     Type: String
-  ServerName:
-    Default: "application.domain.kr"
-    Description: "The base name of the server certificate"
+  ServerBaseName:
+    AllowedPattern: "^[a-zA-Z0-9._-]+$"
+    ConstraintDescription: "Must contain only alphanumeric characters, periods, hyphens, and underscores"
+    Default: "application"
+    Description: "The full name of the server certificate"
+    MaxLength: 64
+    MinLength: 1
+    Type: String
+  RootCaBaseName:
+    AllowedPattern: "^[a-zA-Z0-9._-]+$"
+    ConstraintDescription: "Must contain only alphanumeric characters, periods, hyphens, and underscores"
+    Default: "root-ca"
+    Description: "The name of the CA certificate"
+    MaxLength: 64
+    MinLength: 1
     Type: String
 
   # Bastion parameters
-  BastionInstanceImageId:
-    Default: ami-00769f46ca3bb4381
-    Description: "Bastion Instance AMI"
-    Type: AWS::EC2::Image::Id
   BastionInstanceName:
     Default: "bastion"
     Description: "Bastion Instances name"
@@ -78,12 +94,8 @@ Parameters:
     Description: "Bastion Subnet ID"
     Type: String
 
-  CaServerInstanceImageId:
-    Default: ami-00769f46ca3bb4381
-    Description: "CA Instance AMI"
-    Type: AWS::EC2::Image::Id
   CaServerInstanceName:
-    Default: "ca-server"
+    Default: "ca"
     Description: "CA Instance name"
     Type: String
   CaServerInstanceProfile:
@@ -98,6 +110,20 @@ Parameters:
     Type: String
   CaServerInstanceSubnetId:
     Description: "CA Subnet ID"
+    Type: String
+
+  # EasyRSA parameters
+  CertificatesDirectory:
+    Default: "/opt/certificates"
+    Description: "Directory for certificates"
+    Type: "String"
+  InstallDirectory:
+    Default: "/opt"
+    Description: "Working directory for installation"
+    Type: String
+  LogDirectory:
+    Default: "/var/log/easy-rsa"
+    Description: "Log directory path"
     Type: String
 
 Resources:
@@ -119,7 +145,6 @@ Resources:
         AvailabilityZone: !Select [0, !GetAZs ]
         IamInstanceProfile: !Ref BastionInstanceProfile
         ElasticIP: "true"
-        ImageId: !Ref BastionInstanceImageId
         InstanceName: !Ref BastionInstanceName
         InstanceType: !Ref BastionInstanceType
         KeyName: !Ref KeyName
@@ -143,7 +168,6 @@ Resources:
         SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Select [0, !GetAZs ]
         IamInstanceProfile: !Ref CaServerInstanceProfile
-        ImageId: !Ref CaServerInstanceImageId
         InstanceName: !Ref CaServerInstanceName
         InstanceType: !Ref CaServerInstanceType
         KeyName: !Ref KeyName
@@ -165,8 +189,11 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
-        InstallDirectory: "/opt/openvpn-setup"
+
+        CertificatesDirectory: !Ref CertificatesDirectory
+        InstallDirectory: !Ref InstallDirectory
         InstanceId: !GetAtt CaInstance.Outputs.InstanceId
+        LogDirectory: !Ref LogDirectory
         OutputS3BucketName: !Ref Bucket
 
   EasyRsaCACertificateSsmAssociation:
@@ -186,10 +213,12 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
-        RootCaName: !Ref RootCaName
-        InstallDirectory: "/opt/openvpn-setup"
+        DomainName: !Ref DomainName
+        InstallDirectory: !Ref InstallDirectory
         InstanceId: !GetAtt CaInstance.Outputs.InstanceId
+        LogDirectory: !Ref LogDirectory
         OutputS3BucketName: !Ref Bucket
+        RootCaBaseName: !Ref RootCaBaseName
 
   EasyRsaServerCertificateSsmAssociation:
     Type: AWS::CloudFormation::Stack
@@ -209,32 +238,37 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
+        DomainName: !Ref DomainName
+        InstallDirectory: !Ref InstallDirectory
         InstanceId: !GetAtt CaInstance.Outputs.InstanceId
-        ServerName: !Ref ServerName
+        LogDirectory: !Ref LogDirectory
         OutputS3BucketName: !Ref Bucket
+        RootCaBaseName: !Ref RootCaBaseName
+        ServerBaseName: !Ref ServerBaseName
 
-  EasyRsaClientCertificateSsmAssociation:
-    Type: AWS::CloudFormation::Stack
-    DeletionPolicy: Delete
-    DependsOn:
-      - EasyRsaInstallerSsmAssociation
-      - EasyRsaCACertificateSsmAssociation
-      - EasyRsaServerCertificateSsmAssociation
-    UpdateReplacePolicy: Delete
-    Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/SSM/EasyRsaClientCertificateSsmAssociation.yaml"
-      TimeoutInMinutes: 5
-      Parameters:
-        Bucket: !Ref Bucket
-        BucketKey: !Ref BucketKey
-        BucketObject: !Ref BucketObject
-        BucketRegion: !Ref BucketRegion
-        EnvironmentName: !Ref EnvironmentName
-        ProjectName: !Ref ProjectName
-        SaveInS3File: !Ref SaveInS3File
-        ClientName: !Ref ClientName
-        InstanceId: !GetAtt CaInstance.Outputs.InstanceId
-        OutputS3BucketName: !Ref Bucket
+  # EasyRsaClientCertificateSsmAssociation:
+  #   Type: AWS::CloudFormation::Stack
+  #   DeletionPolicy: Delete
+  #   DependsOn:
+  #     - EasyRsaInstallerSsmAssociation
+  #     - EasyRsaCACertificateSsmAssociation
+  #     - EasyRsaServerCertificateSsmAssociation
+  #   UpdateReplacePolicy: Delete
+  #   Properties:
+  #     TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/SSM/EasyRsaClientCertificateSsmAssociation.yaml"
+  #     TimeoutInMinutes: 5
+  #     Parameters:
+  #       Bucket: !Ref Bucket
+  #       BucketKey: !Ref BucketKey
+  #       BucketObject: !Ref BucketObject
+  #       BucketRegion: !Ref BucketRegion
+  #       EnvironmentName: !Ref EnvironmentName
+  #       ProjectName: !Ref ProjectName
+  #       SaveInS3File: !Ref SaveInS3File
+  #       ClientBaseName: !Ref ClientBaseName
+  #       DomainName: !Ref DomainName
+  #       InstanceId: !GetAtt CaInstance.Outputs.InstanceId
+  #       OutputS3BucketName: !Ref Bucket
 
 Outputs:
   BastionInstanceId:

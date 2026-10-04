@@ -81,7 +81,7 @@ Resources:
         - Key: EnvironmentName
           Value: !Ref EnvironmentName
         - Key: Name
-          Value: !Sub "${ProjectName}-${EnvironmentName}-${Name}-NGW"
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${Name}"
         - Key: ManagedBy
           Value: "CloudFormation"
         - Key: ProjectName

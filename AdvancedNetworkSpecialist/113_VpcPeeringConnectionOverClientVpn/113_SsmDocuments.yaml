@@ -120,9 +120,9 @@ Outputs:
     Description: "ARN of the created SSM Document"
     Value: !GetAtt EasyRsaServerCertificateSsmDocument.Outputs.SsmDocumentArn
 
-  EasyRsaClientCertificateSsmDocumentName:
-    Description: "Name of the created SSM Document"
-    Value: !GetAtt EasyRsaClientCertificateSsmDocument.Outputs.SsmDocumentName
-  EasyRsaClientCertificateSsmDocumentArn:
-    Description: "ARN of the created SSM Document"
-    Value: !GetAtt EasyRsaClientCertificateSsmDocument.Outputs.SsmDocumentArn
+  # EasyRsaClientCertificateSsmDocumentName:
+  #   Description: "Name of the created SSM Document"
+  #   Value: !GetAtt EasyRsaClientCertificateSsmDocument.Outputs.SsmDocumentName
+  # EasyRsaClientCertificateSsmDocumentArn:
+  #   Description: "ARN of the created SSM Document"
+  #   Value: !GetAtt EasyRsaClientCertificateSsmDocument.Outputs.SsmDocumentArn

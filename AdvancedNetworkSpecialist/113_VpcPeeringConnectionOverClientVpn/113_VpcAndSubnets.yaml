@@ -42,46 +42,46 @@ Parameters:
     Description: "The AZ of the subnet"
     Type: String
 
-  # Principal network
-  PrincipalVpcName:
-    Default: "PrincipalVPC"
+  #  network
+  VpcName:
+    Default: "Default-VPC"
     Description: "VPC name"
     Type: String
-  PrincipalVpcCidrBlock:
+  VpcCidrBlock:
     AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
     Default: 10.10.0.0/16
     Description: "The IPv4 network range for the VPC, in CIDR notation."
     Type: String
-  PrincipalPublicSubnetName:
+  PublicSubnetName:
     Default: "Public"
-    Description: "Public Subnet names for Principal VPC"
+    Description: "Public Subnet names for VPC"
     Type: String
-  PrincipalPublicSubnetCidrBlock:
+  PublicSubnetCidrBlock:
     AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
     Default: "10.10.0.0/24"
-    Description: "Public Subnet CIDR for Principal VPC"
+    Description: "Public Subnet CIDR for VPC"
     Type: String
-  PrincipalSecureSubnetName:
-    Default: "PrincipalSecure"
-    Description: "Secure Subnet name for Principal VPC"
+  SecureSubnetName:
+    Default: "Secure"
+    Description: "Secure Subnet name for  VPC"
     Type: String
-  PrincipalSecureSubnetCidrBlock:
+  SecureSubnetCidrBlock:
     AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
     Default: "10.10.1.0/24"
-    Description: "Secure Subnet CIDR for Principal VPC"
+    Description: "Secure Subnet CIDR for  VPC"
     Type: String
-  PrincipalPrivateSubnetName:
-    Default: "PrincipalPrivate"
-    Description: "Private Subnet name for Principal VPC"
+  PrivateSubnetName:
+    Default: "Private"
+    Description: "Private Subnet name for  VPC"
     Type: String
-  PrincipalPrivateSubnetCidrBlock:
+  PrivateSubnetCidrBlock:
     AllowedPattern: "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$"
     Default: "10.10.2.0/24"
-    Description: "Private Subnet CIDR for Principal VPC"
+    Description: "Private Subnet CIDR for  VPC"
     Type: String
 
 Resources:
-  PrincipalVpcStack:
+  VpcStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -95,10 +95,10 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
-        CidrBlock: !Ref PrincipalVpcCidrBlock
-        VpcName: !Ref PrincipalVpcName
+        CidrBlock: !Ref VpcCidrBlock
+        VpcName: !Ref VpcName
 
-  PrincipalPublicSubnetStack:
+  PublicSubnetStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -113,12 +113,12 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Ref AvailabilityZone
-        CidrBlock: !Ref PrincipalPublicSubnetCidrBlock
+        CidrBlock: !Ref   PublicSubnetCidrBlock
         MapPublicIpOnLaunch: true
-        SubnetName: !Ref PrincipalPublicSubnetName
-        VpcId: !GetAtt PrincipalVpcStack.Outputs.VpcId
+        SubnetName: !Ref PublicSubnetName
+        VpcId: !GetAtt VpcStack.Outputs.VpcId
 
-  PrincipalSecureSubnetStack:
+  SecureSubnetStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -133,12 +133,12 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Ref AvailabilityZone
-        CidrBlock: !Ref PrincipalSecureSubnetCidrBlock
+        CidrBlock: !Ref SecureSubnetCidrBlock
         MapPublicIpOnLaunch: false
-        SubnetName: !Ref PrincipalSecureSubnetName
-        VpcId: !GetAtt PrincipalVpcStack.Outputs.VpcId
+        SubnetName: !Ref SecureSubnetName
+        VpcId: !GetAtt VpcStack.Outputs.VpcId
 
-  PrincipalPrivateSubnetStack:
+  PrivateSubnetStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -153,33 +153,33 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Ref AvailabilityZone
-        CidrBlock: !Ref PrincipalPrivateSubnetCidrBlock
+        CidrBlock: !Ref PrivateSubnetCidrBlock
         MapPublicIpOnLaunch: false
-        SubnetName: !Ref PrincipalPrivateSubnetName
-        VpcId: !GetAtt PrincipalVpcStack.Outputs.VpcId
+        SubnetName: !Ref PrivateSubnetName
+        VpcId: !GetAtt VpcStack.Outputs.VpcId
 
 Outputs:
-  PrincipalVpcId:
-    Description: "Id of the Principal VPC"
-    Value: !GetAtt PrincipalVpcStack.Outputs.VpcId
-  PrincipalVpcCidrBlock:
-    Description: "Cidr of the Principal VPC"
-    Value: !GetAtt PrincipalVpcStack.Outputs.VpcCidrBlock
-  PrincipalPublicSubnetId:
-    Description: "Id of the Principal Public Subnet"
-    Value: !GetAtt PrincipalPublicSubnetStack.Outputs.SubnetId
-  PrincipalPublicSubnetCidr:
-    Description: "Cidr of the Principal Public Subnet"
-    Value: !GetAtt PrincipalPublicSubnetStack.Outputs.SubnetCidrBlock
-  PrincipalSecureSubnetId:
-    Description: "Id of the Principal Secure Subnet"
-    Value: !GetAtt PrincipalSecureSubnetStack.Outputs.SubnetId
-  PrincipalSecureSubnetCidr:
-    Description: "Cidr of the Principal Secure Subnets"
-    Value: !GetAtt PrincipalSecureSubnetStack.Outputs.SubnetCidrBlock
-  PrincipalPrivateSubnetId:
-    Description: "Id of the Principal Private Subnet"
-    Value: !GetAtt PrincipalPrivateSubnetStack.Outputs.SubnetId
-  PrincipalPrivateSubnetCidr:
-    Description: "Cidr of the Principal Private Subnets"
-    Value: !GetAtt PrincipalPrivateSubnetStack.Outputs.SubnetCidrBlock
+  VpcId:
+    Description: "Id of the VPC"
+    Value: !GetAtt VpcStack.Outputs.VpcId
+  VpcCidrBlock:
+    Description: "Cidr of the VPC"
+    Value: !GetAtt VpcStack.Outputs.VpcCidrBlock
+  PublicSubnetId:
+    Description: "Id of the Public Subnet"
+    Value: !GetAtt PublicSubnetStack.Outputs.SubnetId
+  PublicSubnetCidr:
+    Description: "Cidr of the Public Subnet"
+    Value: !GetAtt PublicSubnetStack.Outputs.SubnetCidrBlock
+  SecureSubnetId:
+    Description: "Id of the Secure Subnet"
+    Value: !GetAtt SecureSubnetStack.Outputs.SubnetId
+  SecureSubnetCidr:
+    Description: "Cidr of the Secure Subnets"
+    Value: !GetAtt SecureSubnetStack.Outputs.SubnetCidrBlock
+  PrivateSubnetId:
+    Description: "Id of the Private Subnet"
+    Value: !GetAtt PrivateSubnetStack.Outputs.SubnetId
+  PrivateSubnetCidr:
+    Description: "Cidr of the Private Subnets"
+    Value: !GetAtt PrivateSubnetStack.Outputs.SubnetCidrBlock

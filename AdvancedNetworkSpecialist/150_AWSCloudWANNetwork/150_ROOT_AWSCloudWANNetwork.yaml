@@ -1,0 +1,307 @@
+# aws cloudformation validate-template --template-body file:/54_VPCPeeringAcrossAccount.yaml
+# aws cloudformation create-stack --stack-name ANS-150 --template-body file://150_ROOT_AWSCloudWANNetwork.yaml --region eu-west-3 --capabilities CAPABILITY_IAM
+# aws cloudformation create-stack --stack-name ANS-150 --template-body file://150_ROOT_AWSCloudWANNetwork.yaml --region eu-central-1 --capabilities CAPABILITY_IAM
+# aws cloudformation create-stack --stack-name ANS-150 --template-body file://150_ROOT_AWSCloudWANNetwork.yaml --region ap-northeast-2 --capabilities CAPABILITY_IAM
+# aws cloudformation delete-stack --stack-name ANS-150 --region eu-west-3
+# aws cloudformation delete-stack --stack-name ANS-150 --region eu-central-1
+# aws cloudformation delete-stack --stack-name ANS-150 --region ap-northeast-2
+#
+# Steps:
+# 1 - Launch Phase1 on account 1
+# 2 - Launch Phase1 on account 2
+# 3 - Launch Phase1 on account 3
+# 4 - Launch Phase2 on account 1
+# 5 - Launch Phase3 on account 1
+
+
+AWSTemplateFormatVersion: "2010-09-09"
+Description: This template deploys a VPC, Public and Private Subnets, Internet Gateway, Route Table, Custom DNS and Instances
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Project Configuration"
+        Parameters:
+          - ProjectName
+          - EnvironmentName
+      - Label:
+          default: "Configuration"
+        Parameters:
+          - Bucket
+          - BucketKey
+          - BucketObject
+          - SaveInS3File
+          - Phase
+      - Label:
+          default: "First Accounts"
+        Parameters:
+          - FirstRegion
+      - Label:
+          default: "Second Accounts"
+        Parameters:
+          - SecondRegion
+      - Label:
+          default: "Third Accounts"
+        Parameters:
+          - ThirdRegion
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "150_AWSCloudWANNetwork"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  BucketRegion:
+    AllowedValues: ["eu-west-3", "eu-central-1"]
+    Default: "eu-west-3"
+    Description: "Region where is the Bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: ["dev", "test", "staging", "prod"]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "true"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+  Phase:
+    AllowedValues: [ "Phase1", "Phase2", "Phase3" ]
+    Default: Phase1
+    Description: "Deploy successively Phase1 and Phase2"
+    Type: String
+
+  # Network parameters
+  FirstRegion:
+    Description: Region of the first AWS Account
+    Type: String
+    Default: eu-west-3
+  SecondRegion:
+    Description: Region of the second AWS Account
+    Type: String
+    Default: eu-central-1
+  ThirdRegion:
+    Description: Region of the third AWS Account
+    Type: String
+    Default: ap-northeast-2
+
+Mappings:
+  RegionMap:
+    eu-west-3:
+      DefaultRouteTableNames: "Public-Dev-RT,Public-Prod-RT"
+      GroupNames: "Paris-Dev-SG,Paris-Prod-SG"
+      InstanceElasticIPs: "true,true"
+      InstanceIngressCidrIp: "88.188.126.220/32"
+      InstanceNames: "Dev-Instance,Prod-Instance"
+      InstanceTypes: "t3a.micro,t3a.micro"
+      InternetGatewayNames: "Paris-Dev-IGW,Paris-Prod-IGW"
+      KeyName: "dso-paris"
+      MapPublicIpOnLaunch: "true,true"
+      SubnetCidrBlocks: "10.1.0.0/24,172.17.0.0/24"
+      SubnetNames: "Public-Dev,Public-Prod"
+      VpcCidrBlocks: "10.1.0.0/16,172.17.0.0/16"
+      VpcCount: 2
+      VpcNames: "Paris-Dev,Paris-Prod"
+    eu-central-1:
+      DefaultRouteTableNames: "Public-Dev-RT"
+      GroupNames: "Frankfurt-Dev-SG"
+      InstanceElasticIPs: "true"
+      InstanceIngressCidrIp: "88.188.126.220/32"
+      InstanceNames: "Frankfurt-Dev-Instance"
+      InstanceTypes: "t3a.micro"
+      InternetGatewayNames: "Frankfurt-Dev-IGW"
+      KeyName: "dso-francfort"
+      MapPublicIpOnLaunch: "true"
+      SubnetCidrBlocks: "192.168.0.0/24"
+      SubnetNames: "Public-Dev"
+      VpcCidrBlocks: "192.168.0.0/16"
+      VpcCount: 1
+      VpcNames: "Frankfurt-Dev"
+    ap-northeast-2:
+      DefaultRouteTableNames: "Public-Dev-RT,Public-Prod-RT"
+      GroupNames: "Seoul-Dev-SG,Seoul-Prod-SG"
+      InstanceElasticIPs: "true,true"
+      InstanceIngressCidrIp: "88.188.126.220/32"
+      InstanceNames: "Seoul-Dev-Instance,Seoul-Prod-Instance"
+      InstanceTypes: "t3a.micro,t3a.micro"
+      InternetGatewayNames: "Seoul-Dev-IGW,Seoul-Prod-IGW"
+      KeyName: "dso-seoul"
+      MapPublicIpOnLaunch: "true,true"
+      SubnetNames: "Public-Dev,Public-Prod"
+      SubnetCidrBlocks: "10.0.0.0/24,172.16.0.0/24"
+      VpcCidrBlocks: "10.0.0.0/16,172.16.0.0/16"
+      VpcCount: 2
+      VpcNames: "Seoul-Dev,Seoul-Prod"
+
+Resources:
+  Lambdas:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/150_Lambdas.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        ApplicationLogLevel: DEBUG
+
+  VpcAndSubnets:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/150_VpcAndSubnets.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        SubnetCidrBlocks: !FindInMap [RegionMap, !Ref "AWS::Region", SubnetCidrBlocks]
+        SubnetNames: !FindInMap [RegionMap, !Ref "AWS::Region", SubnetNames]
+        MapPublicIpOnLaunch: !FindInMap [RegionMap, !Ref "AWS::Region", MapPublicIpOnLaunch]
+        VpcCidrBlocks: !FindInMap [RegionMap, !Ref "AWS::Region", VpcCidrBlocks]
+        VpcCount: !FindInMap [RegionMap, !Ref "AWS::Region", VpcCount]
+        VpcNames: !FindInMap [RegionMap, !Ref "AWS::Region", VpcNames]
+
+  # Create Internet Gateway and default route table for public subnet
+  Gateways:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
+      # - Roles
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/150_Gateway.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        IgwNames:  !FindInMap [RegionMap, !Ref "AWS::Region", InternetGatewayNames]
+        VpcIds: !GetAtt VpcAndSubnets.Outputs.VpcIds
+        VpcCount: !FindInMap [RegionMap, !Ref "AWS::Region", VpcCount]
+
+  SecurityGroups:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/150_SecurityGroups.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        GroupNames: !FindInMap [RegionMap, !Ref "AWS::Region", GroupNames]
+        InstanceIngressCidrIp: !FindInMap [RegionMap, !Ref "AWS::Region", InstanceIngressCidrIp]
+        InstanceVpcIds: !GetAtt VpcAndSubnets.Outputs.VpcIds
+        VpcCount: !FindInMap [RegionMap, !Ref "AWS::Region", VpcCount]
+
+  Instances:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/150_Instances.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        InstanceElasticIPs: !FindInMap [RegionMap, !Ref "AWS::Region", InstanceElasticIPs]
+        InstanceNames: !FindInMap [RegionMap, !Ref "AWS::Region", InstanceNames]
+        InstanceTypes: !FindInMap [RegionMap, !Ref "AWS::Region", InstanceTypes]
+        InstanceSecurityGroups: !GetAtt SecurityGroups.Outputs.InstanceSecurityGroupIds
+        InstanceSubnetIds: !GetAtt VpcAndSubnets.Outputs.VpcSubnetIds
+        KeyName: !FindInMap [RegionMap, !Ref "AWS::Region", KeyName]
+        VpcCount: !FindInMap [RegionMap, !Ref "AWS::Region", VpcCount]
+
+  # Create Route Tables and Routes between subnets
+  RouteTables:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/150_RouteTables.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        InternetGatewayIds: !GetAtt Gateways.Outputs.InternetGatewayIds
+        RouteTableNames: !FindInMap [RegionMap, !Ref "AWS::Region", DefaultRouteTableNames]
+        SubnetIds: !GetAtt VpcAndSubnets.Outputs.VpcSubnetIds
+        VpcIds: !GetAtt VpcAndSubnets.Outputs.VpcIds
+        VpcCount: !FindInMap [RegionMap, !Ref "AWS::Region", VpcCount]
+
+  NetworkManager:
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Delete
+    DependsOn:
+      - Lambdas
+    UpdateReplacePolicy: Retain
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/${BucketKey}/150_NetworkManager.yaml"
+      TimeoutInMinutes: 15
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        GlobalNetworkName: !Sub "${ProjectName}-${EnvironmentName}-Global-Network"
+        CoreNetworkName: !Sub "${ProjectName}-${EnvironmentName}-Core-Network"
+        EdgeLocations: !Join [ ",", [ !Ref FirstRegion, !Ref SecondRegion, !Ref ThirdRegion ] ]
+        FirstRegion: !Ref FirstRegion
+        Phase: !Ref Phase
+        SubnetNames: !FindInMap [RegionMap, !Ref "AWS::Region", SubnetNames]
+        VpcCount: !FindInMap [RegionMap, !Ref "AWS::Region", VpcCount]
+        VpcNames: !FindInMap [RegionMap, !Ref "AWS::Region", VpcNames]
+
+  

@@ -46,20 +46,12 @@ Parameters:
     Description: "Save resources information in s3 file"
     Type: String
 
-  # Stack parameters
+  # EasyRSA install parameters
   CertificatesDirectory:
     Default: "/opt/certificates"
     Description: "Directory for certificates"
     Type: "String"
-  InstallDirectory:
-    Default: "/opt/openvpn-setup"
-    Description: "Working directory for installation"
-    Type: String
-  LogFile:
-    Default: "/var/log/openvpn-easyrsa-install.log"
-    Description: "Log file path"
-    Type: String
-  Name:
+  DocumentName:
     AllowedPattern: "^[a-zA-Z0-9_.-]+$"
     ConstraintDescription: "Must contain only alphanumeric characters, hyphens, periods, and underscores"
     Description: "Name of the SSM Document"
@@ -67,8 +59,20 @@ Parameters:
     MaxLength: 64
     MinLength: 3
     Type: String
+  InstallDirectory:
+    Default: "/opt"
+    Description: "Working directory for installation"
+    Type: String
+  LogDirectory:
+    Default: "/var/log/easy-rsa"
+    Description: "Log directory path"
+    Type: String
+  LogFile:
+    Default: "easyrsa-install.log"
+    Description: "Log file name"
+    Type: String
   Purpose:
-    Default: "Install EasyRSA"
+    Default: "Create CA certificate with EasyRSA"
     Description: Purpose of the Document
     MaxLength: 256
     MinLength: 1
@@ -83,7 +87,7 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      Name: !Sub "${ProjectName}-${EnvironmentName}-${Name}"
+      Name: !Sub "${ProjectName}-${EnvironmentName}-${DocumentName}"
       DocumentType: "Command"
       DocumentFormat: "YAML"
       TargetType: "/AWS::EC2::Instance"
@@ -100,7 +104,7 @@ Resources:
         - Key: "StackName"
           Value: !Ref "AWS::StackName"
       Content:
-        schemaVersion: "1.2"
+        schemaVersion: "2.2"
         description: "Install and configure EasyRSA"
         parameters:
           EnvironmentName:
@@ -127,6 +131,8 @@ Resources:
             default: ""
             description: "CloudFormation WaitCondition URL (optional)"
             type: "String"
+
+          # EasyRSA install parameters
           CertificatesDirectory:
             default: !Ref CertificatesDirectory
             description: "Directory for certificates"
@@ -135,168 +141,182 @@ Resources:
             default: !Ref InstallDirectory
             description: "Working directory for installation"
             type: "String"
+          LogDirectory:
+            default: !Ref LogDirectory
+            description: "Log directory path"
+            type: "String"
           LogFile:
             default: !Ref LogFile
-            description: "Log file path"
+            description: "Log file name"
             type: "String"
-        runtimeConfig:
-          "aws:runShellScript":
-            properties:
-              - id: "0.aws:runShellScript"
-                timeoutSeconds: 180
-                runCommand:
-                  - |
-                    #!/bin/bash
-                    set -euo pipefail  # Strict error handling
 
-                    # Variables - Using proper path expansion
-                    readonly PROJECT_NAME="{{ProjectName}}"
-                    readonly ENVIRONMENT_NAME="{{EnvironmentName}}"
-                    readonly WAIT_HANDLE_URL="{{WaitHandleUrl}}"
-                    readonly STACK_NAME="{{StackName}}"
-                    readonly REGION="{{Region}}"
-                    readonly RESOURCE_NAME="{{ResourceName}}"
-                    readonly WORKING_DIR="{{InstallDirectory}}"
-                    readonly LOG_FILE="{{LogFile}}"
-                    readonly CERT_DIR="{{CertificatesDirectory}}"
+        mainSteps:
+          - action: "aws:runShellScript"
+            name: "installEasyRSA"
+            inputs:
+              timeoutSeconds: "120"
+              runCommand:
+                - |
+                  #!/bin/bash
+                  set -euo pipefail  # Strict error handling
 
-                    # Logging function
-                    log() {
-                        local level="$1"
-                        shift
-                        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*" | tee -a "$LOG_FILE"
-                    }
+                  # Global parameters
+                  readonly ENVIRONMENT_NAME="{{EnvironmentName}}"
+                  readonly PROJECT_NAME="{{ProjectName}}"
+                  readonly REGION="{{Region}}"
+                  readonly RESOURCE_NAME="{{ResourceName}}"
+                  readonly STACK_NAME="{{StackName}}"
+                  readonly WAIT_HANDLE_URL="{{WaitHandleUrl}}"
 
-                    # CloudFormation signaling function
-                    signal_cloudformation() {
-                        local exit_code="$1"
-                        local message="$2"
-                        local status=$([ "$exit_code" -eq 0 ] && echo "SUCCESS" || echo "FAILURE")
-                        
-                        log "INFO" "Signaling CloudFormation: Status=$status, Message=$message"
-                        
-                        if [[ -n "$WAIT_HANDLE_URL" ]]; then
-                            log "INFO" "Using WaitCondition URL for signaling"
-                            local response_code
-                            response_code=$(curl -w "%{http_code}" -s -X PUT \
-                                -H 'Content-Type: application/json' \
-                                --data-binary "{
-                                    \"Status\": \"$status\",
-                                    \"Reason\": \"$message\",
-                                    \"UniqueId\": \"$(hostname)-$(date +%s)\",
-                                    \"Data\": \"EasyRSA setup completed with exit code $exit_code\"
-                                }" \
-                                "$WAIT_HANDLE_URL" 2>/dev/null || echo "000")
-                            
-                            if [[ "$response_code" =~ ^2[0-9][0-9]$ ]]; then
-                                log "INFO" "Successfully signaled CloudFormation (HTTP: $response_code)"
-                            else
-                                log "WARN" "Failed to signal CloudFormation (HTTP: $response_code)"
-                            fi
-                        elif [[ -n "$STACK_NAME" && -n "$REGION" && -n "$RESOURCE_NAME" ]]; then
-                            log "INFO" "Using cfn-signal for CloudFormation signaling"
-                            if command -v /opt/aws/bin/cfn-signal >/dev/null 2>&1; then
-                                /opt/aws/bin/cfn-signal -e "$exit_code" \
-                                    --stack "$STACK_NAME" \
-                                    --resource "$RESOURCE_NAME" \
-                                    --region "$REGION" || log "WARN" "cfn-signal failed"
-                            else
-                                log "WARN" "cfn-signal not available"
-                            fi
-                        else
-                            log "INFO" "No CloudFormation signaling configured"
-                        fi
-                    }
+                  # EasyRSA parameters
+                  readonly CERT_DIR="{{CertificatesDirectory}}"
+                  readonly INSTALL_DIR="{{InstallDirectory}}"
+                  readonly LOG_DIR="{{LogDirectory}}"
+                  readonly LOG_FILE="{{LogFile}}"
 
-                    # Error handler
-                    cleanup_and_exit() {
-                        local exit_code=$?
-                        local line_number="${1:-unknown}"
-                        log "ERROR" "Script failed at line $line_number with exit code $exit_code"
-                        signal_cloudformation "$exit_code" "EasyRSA setup failed at line $line_number"
-                        exit "$exit_code"
-                    }
+                  # Logging function
+                  log() {
+                      local level="$1"
+                      shift
+                      echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*" | tee -a "$LOG_DIR/$LOG_FILE"
+                  }
 
-                    # Set up error handling
-                    trap 'cleanup_and_exit $LINENO' ERR
+                  # CloudFormation signaling function
+                  signal_cloudformation() {
+                      local exit_code="$1"
+                      local message="$2"
+                      local status=$([ "$exit_code" -eq 0 ] && echo "SUCCESS" || echo "FAILURE")
+                      
+                      log "INFO" "Signaling CloudFormation: Status=$status, Message=$message"
+                      
+                      if [[ -n "$WAIT_HANDLE_URL" ]]; then
+                          log "INFO" "Using WaitCondition URL for signaling"
+                          local response_code
+                          response_code=$(curl -w "%{http_code}" -s -X PUT \
+                              -H 'Content-Type: application/json' \
+                              --data-binary "{
+                                  \"Status\": \"$status\",
+                                  \"Reason\": \"$message\",
+                                  \"UniqueId\": \"$(hostname)-$(date +%s)\",
+                                  \"Data\": \"EasyRSA setup completed with exit code $exit_code\"
+                              }" \
+                              "$WAIT_HANDLE_URL" 2>/dev/null || echo "000")
+                          
+                          if [[ "$response_code" =~ ^2[0-9][0-9]$ ]]; then
+                              log "INFO" "Successfully signaled CloudFormation (HTTP: $response_code)"
+                          else
+                              log "WARN" "Failed to signal CloudFormation (HTTP: $response_code)"
+                          fi
+                      elif [[ -n "$STACK_NAME" && -n "$REGION" && -n "$RESOURCE_NAME" ]]; then
+                          log "INFO" "Using cfn-signal for CloudFormation signaling"
+                          if command -v /opt/aws/bin/cfn-signal >/dev/null 2>&1; then
+                              /opt/aws/bin/cfn-signal -e "$exit_code" \
+                                  --stack "$STACK_NAME" \
+                                  --resource "$RESOURCE_NAME" \
+                                  --region "$REGION" || log "WARN" "cfn-signal failed"
+                          else
+                              log "WARN" "cfn-signal not available"
+                          fi
+                      else
+                          log "INFO" "No CloudFormation signaling configured"
+                      fi
+                  }
 
-                    # Main installation function
-                    install_dependencies() {
-                        log "INFO" "Installing dependencies..."
-                        
-                        if command -v yum >/dev/null 2>&1; then
-                            log "INFO" "Detected RHEL/Amazon Linux - using yum"
-                            yum update -y
-                            yum install -y git awscli
-                        elif command -v apt-get >/dev/null 2>&1; then
-                            log "INFO" "Detected Ubuntu/Debian - using apt"
-                            export DEBIAN_FRONTEND=noninteractive
-                            apt-get update -y
-                            apt-get install -y git awscli
-                        else
-                            log "ERROR" "Unsupported package manager"
-                            return 1
-                        fi
-                        
-                        # Verify AWS CLI is available
-                        if ! command -v aws >/dev/null 2>&1; then
-                            log "ERROR" "AWS CLI not available after installation"
-                            return 1
-                        fi
-                    }
+                  # Error handler
+                  cleanup_and_exit() {
+                      local exit_code=$?
+                      local line_number="${1:-unknown}"
+                      log "ERROR" "Script failed at line $line_number with exit code $exit_code"
+                      signal_cloudformation "$exit_code" "EasyRSA setup failed at line $line_number"
+                      exit "$exit_code"
+                  }
 
-                    setup_easy_rsa() {
-                        log "INFO" "Setting up EasyRSA..."
-                        
-                        # Create working directory with proper permissions
-                        log "INFO" "Creating directories: $WORKING_DIR and $CERT_DIR"
-                        mkdir -p "$WORKING_DIR" "$CERT_DIR"
-                        
-                        # Ensure directories are writable
-                        chmod 755 "$WORKING_DIR" "$CERT_DIR"
-                        
-                        cd "$WORKING_DIR"
-                        
-                        # Clone EasyRSA
-                        if [[ -d "easy-rsa" ]]; then
-                            log "INFO" "EasyRSA directory exists, removing..."
-                            rm -rf easy-rsa
-                        fi
-                        
-                        log "INFO" "Cloning EasyRSA repository..."
-                        git clone --depth 1 https://github.com/OpenVPN/easy-rsa.git
-                        cd easy-rsa/easyrsa3
-                        
-                        # Make easyrsa executable
-                        chmod +x ./easyrsa
-                        
-                        # Initialize PKI
-                        log "INFO" "Initializing PKI..."
-                        ./easyrsa init-pki
-                    }
+                  # Set up error handling
+                  trap 'cleanup_and_exit $LINENO' ERR
 
-                    # Main execution
-                    main() {
-                        log "INFO" "Starting EasyRSA installation..."
-                        log "INFO" "Parameters: Project=$PROJECT_NAME, Environment=$ENVIRONMENT_NAME"
-                        log "INFO" "Working directory: $WORKING_DIR"
-                        log "INFO" "Certificates directory: $CERT_DIR"
-                        
-                        # Check if running as root or with sudo
-                        if [[ $EUID -ne 0 ]]; then
-                            log "WARN" "Not running as root, some operations might fail"
-                        fi
-                        
-                        install_dependencies
-                        setup_easy_rsa
-                        
-                        log "INFO" "EasyRSA installation completed successfully"
-                        
-                        signal_cloudformation 0 "EasyRSA installation and certificate import completed successfully"
-                    }
+                  # Main installation function
+                  install_dependencies() {
+                      log "INFO" "Installing dependencies..."
+                      
+                      if command -v yum >/dev/null 2>&1; then
+                          log "INFO" "Detected RHEL/Amazon Linux - using yum"
+                          yum update -y
+                          yum install -y git awscli
+                      elif command -v apt-get >/dev/null 2>&1; then
+                          log "INFO" "Detected Ubuntu/Debian - using apt"
+                          export DEBIAN_FRONTEND=noninteractive
+                          apt-get update -y
+                          apt-get install -y git awscli
+                      else
+                          log "ERROR" "Unsupported package manager"
+                          return 1
+                      fi
+                      
+                      # Verify AWS CLI is available
+                      if ! command -v aws >/dev/null 2>&1; then
+                          log "ERROR" "AWS CLI not available after installation"
+                          return 1
+                      fi
+                  }
 
-                    # Execute main function
-                    main "$@"
+                  setup_easy_rsa() {
+                      log "INFO" "Setting up EasyRSA..."
+                      
+                      # Create working directory with proper permissions
+                      log "INFO" "Creating directories: $INSTALL_DIR and $CERT_DIR"
+                      mkdir -p "$INSTALL_DIR" "$CERT_DIR"
+                      
+                      # Ensure directories are writable
+                      chmod 755 "$INSTALL_DIR" "$CERT_DIR"
+
+                      cd "$INSTALL_DIR"
+
+                      # Clone EasyRSA
+                      if [[ -d "easy-rsa" ]]; then
+                          log "INFO" "EasyRSA directory exists, removing..."
+                          rm -rf easy-rsa
+                      fi
+                      
+                      log "INFO" "Cloning EasyRSA repository..."
+                      git clone --depth 1 https://github.com/OpenVPN/easy-rsa.git
+                      cd easy-rsa/easyrsa3
+                      
+                      # Make easyrsa executable
+                      chmod +x ./easyrsa
+                      
+                      # Initialize PKI
+                      log "INFO" "Initializing PKI..."
+                      ./easyrsa init-pki
+                  }
+
+                  # Main execution
+                  main() {
+                      mkdir -p "$LOG_DIR"
+                      log "INFO" "Starting EasyRSA installation..."
+                      log "INFO" "Parameters:"
+                      log "INFO" "  Project: $PROJECT_NAME"
+                      log "INFO" "  Environment: $ENVIRONMENT_NAME"
+                      log "INFO" "  Certificates directory: $CERT_DIR"
+                      log "INFO" "  Install directory: $INSTALL_DIR"
+                      log "INFO" "  Log directory: $LOG_DIR"
+                      log "INFO" "  Log file: $LOG_FILE"
+                      
+                      
+                      # Check if running as root or with sudo
+                      if [[ $EUID -ne 0 ]]; then
+                          log "WARN" "Not running as root, some operations might fail"
+                      fi
+                      
+                      install_dependencies
+                      setup_easy_rsa
+                      
+                      log "INFO" "EasyRSA installation completed successfully"
+                      
+                      signal_cloudformation 0 "EasyRSA installation completed successfully"
+                  }
+
+                  # Execute main function
+                  main "$@"
 
   SsmDocumentToS3:
     Type: AWS::CloudFormation::CustomResource
@@ -311,7 +331,7 @@ Resources:
       BucketObject: !Ref BucketObject
       Region: !Ref AWS::Region
       ResourceType: "Document"
-      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:SSM:Document:${Name}"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:SSM:Document:${DocumentName}"
       Value: !Ref SsmDocument
 
 Outputs:
@@ -319,10 +339,10 @@ Outputs:
     Description: "Name of the created SSM Document"
     Value: !Ref SsmDocument
     Export:
-      Name: !Sub "${ProjectName}-${EnvironmentName}-${Name}-Name"
+      Name: !Sub "${ProjectName}-${EnvironmentName}-${DocumentName}-Name"
 
   SsmDocumentArn:
     Description: "ARN of the created SSM Document"
     Value: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:document/${SsmDocument}"
     Export:
-      Name: !Sub "${ProjectName}-${EnvironmentName}-${Name}-Arn"
+      Name: !Sub "${ProjectName}-${EnvironmentName}-${DocumentName}-Arn"

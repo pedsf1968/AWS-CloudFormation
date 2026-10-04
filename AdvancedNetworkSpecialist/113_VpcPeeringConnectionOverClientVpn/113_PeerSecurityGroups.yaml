@@ -42,7 +42,7 @@ Parameters:
     Description: "Ingress CIDR IP for Application Instance"
     Default: "0.0.0.0/0"
     Type: String
-  PeerVpcId:
+  VpcId:
     Description: "Id of the Peer VPC"
     Type: String
 
@@ -71,7 +71,7 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${ProjectName}-${EnvironmentName}-Application-SG"
-      VpcId: !Ref PeerVpcId
+      VpcId: !Ref VpcId
 
   ApplicationInstanceSecurityGroupToS3:
     Type: AWS::CloudFormation::CustomResource

@@ -1,6 +1,6 @@
 ---
 AWSTemplateFormatVersion: "2010-09-09"
-Description:  This template create Internet Gateway and Attachement
+Description:  This template create a role for remote account to create VPC Peering
 
 Parameters:
   # Global parameters
@@ -9,7 +9,7 @@ Parameters:
     Description: CloudFormation buket URL
     Type: String
   BucketKey:
-    Default: "113_VpcPeeringConnectionOverClientVpn"
+    Default: "150_AWSCloudWANNetwork"
     Description: Key to find object in the bucket
     Type: String
   BucketObject:
@@ -22,40 +22,39 @@ Parameters:
     Description: "Region where is the Bucket"
     Type: String
   EnvironmentName:
-    AllowedValues: ["dev", "staging", "test", "prod"]
-    ConstraintDescription: "Must specify dev, staging, test or prod"
+    AllowedValues: ["dev", "test", "staging", "prod"]
+    ConstraintDescription: "Must specify dev, test or prod"
     Default: "dev"
     Description: "Environment name that prefix all resources"
-    Type: String
+    Type: String    
   ProjectName:
     Default: "ANS"
     Description: "Project name that prefix all resources"
     Type: String
   SaveInS3File:
-    AllowedValues: ["false", "true"]
-    Default: "false"
+    AllowedValues: [ "false", "true" ]
+    Default: "true"
     Description: "Save resources information in s3 file"
     Type: String
 
-  # Gateway parameters
-  IgwName:
-    Default: "Principal-IGW"
-    Description: "Internet Gateway name"
-    Type: String
-  NgwName:
-    Default: "Principal-NGW"
-    Description: "Nat Gateway name"
-    Type: String
-  PublicSubnetId:
-    Description: "Public Subnet ID"
-    Type: String
-  VpcId:
-    Description: "VPC ID"
-    Type: String
+  # Stack parameters
+  IgwNames:
+    Default: "Default"
+    Description: "Internet Gateway names"
+    Type: CommaDelimitedList
+  VpcIds:
+    Description: "VPC IDs"
+    Type: CommaDelimitedList
+  VpcCount:
+    Description: Number of VPCs to create
+    Type: Number
 
-Resources:
+Conditions:
+  TwoVpcs: !Equals [ !Ref VpcCount, 2 ]
+
+Resources:  
   # Internet Gateway and Attachment
-  InternetGatewayStack:
+  InternetGateway0Stack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -69,15 +68,16 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
-        Name: !Ref IgwName
-        VpcId: !Ref VpcId
+        Name: !Select [0, !Ref IgwNames]
+        VpcId: !Select [0, !Ref VpcIds]
 
-  NatGatewayStack:
+  InternetGateway1Stack:
     Type: AWS::CloudFormation::Stack
+    Condition: TwoVpcs
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/VPC/NatGateway.yaml"
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/VPC/InternetGateway.yaml"
       TimeoutInMinutes: 5
       Parameters:
         Bucket: !Ref Bucket
@@ -86,16 +86,25 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
-        Name: !Ref NgwName
-        SubnetId: !Ref PublicSubnetId
+        Name: !Select [1, !Ref IgwNames]
+        VpcId: !Select [1, !Ref VpcIds]
 
 Outputs:
-  InternetGatewayAttachmentId:
-    Description: "Internet Gateway Attachment ID"
-    Value: !GetAtt InternetGatewayStack.Outputs.InternetGatewayAttachmentId
-  InternetGatewayId:
-    Description: "Internet Gateway ID"
-    Value: !GetAtt InternetGatewayStack.Outputs.InternetGatewayId
-  NatGatewayId:
-    Description: "NAT Gateway ID"
-    Value: !GetAtt NatGatewayStack.Outputs.NatGatewayId
+  InternetGatewayIds:
+    Description: "Internet Gateway IDs"
+    Value: !If
+      - TwoVpcs
+      - !Join
+        - ","
+        - - !GetAtt InternetGateway0Stack.Outputs.InternetGatewayId
+          - !GetAtt InternetGateway1Stack.Outputs.InternetGatewayId
+      - !GetAtt InternetGateway0Stack.Outputs.InternetGatewayId
+  InternetGatewayAttachmentIds:
+    Description: "Internet Gateway Attachment IDs"
+    Value: !If
+      - TwoVpcs
+      - !Join
+        - ","
+        - - !GetAtt InternetGateway0Stack.Outputs.InternetGatewayAttachmentId
+          - !GetAtt InternetGateway1Stack.Outputs.InternetGatewayAttachmentId
+      - !GetAtt InternetGateway0Stack.Outputs.InternetGatewayAttachmentId

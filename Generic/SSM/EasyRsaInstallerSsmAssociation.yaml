@@ -51,20 +51,28 @@ Parameters:
     Default: "/opt/certificates"
     Description: "Directory for certificates"
     Type: "String"
-  InstanceId:
-    Description: "ID of the EC2 instance"
-    Type: String
-  InstallDirectory:
-    Default: "/opt/openvpn-setup"
-    Description: "Working directory for installation"
-    Type: String
-  Name:
+  DocumentName:
     AllowedPattern: "^[a-zA-Z0-9_.-]+$"
     ConstraintDescription: "Must contain only alphanumeric characters, hyphens, periods, and underscores"
     Description: "Name of the SSM Document"
     Default: "EasyRsaInstaller"
     MaxLength: 64
     MinLength: 3
+    Type: String
+  InstallDirectory:
+    Default: "/opt"
+    Description: "Working directory for installation"
+    Type: String
+  InstanceId:
+    Description: "ID of the EC2 instance"
+    Type: String
+  LogDirectory:
+    Default: "/var/log/easy-rsa"
+    Description: "Log directory path"
+    Type: String
+  LogFile:
+    Default: "easyrsa-install.log"
+    Description: "Log file name"
     Type: String
   OutputS3BucketName:
     Description: "The Bucket name for logs"
@@ -95,8 +103,8 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      AssociationName: !Sub "${ProjectName}-${EnvironmentName}-${Name}"
-      Name: !Sub "${ProjectName}-${EnvironmentName}-${Name}"
+      AssociationName: !Sub "${ProjectName}-${EnvironmentName}-${DocumentName}"
+      Name: !Sub "${ProjectName}-${EnvironmentName}-${DocumentName}"
       OutputLocation:
         S3Location:
           OutputS3BucketName: !Ref OutputS3BucketName
@@ -118,6 +126,10 @@ Resources:
           - !Ref CertificatesDirectory
         InstallDirectory:
           - !Ref InstallDirectory
+        LogDirectory:
+          - !Ref LogDirectory
+        LogFile:
+          - !Ref LogFile
       Targets:
       - Key: InstanceIds
         Values:
@@ -136,5 +148,5 @@ Resources:
       BucketObject: !Ref BucketObject
       Region: !Ref AWS::Region
       ResourceType: "Association"
-      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:SSM:Association:${Name}"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:SSM:Association:${DocumentName}"
       Value: !Ref SsmAssociation

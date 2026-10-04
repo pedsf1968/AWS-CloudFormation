@@ -44,7 +44,7 @@ Parameters:
       "The path to the instance profile. For more information about paths, see IAM Identifiers in the IAM User Guide."
     Type: String
   RoleName:
-    Default: "Instance"
+    Default: "CA-Server-Instance-Role"
     Description: |
       "The name of the instance profile to create."
     Type: String
@@ -101,15 +101,17 @@ Resources:
                   - !Sub 'arn:${AWS::Partition}:s3:::${Bucket}/*'
                   - !Sub 'arn:${AWS::Partition}:s3:::${Bucket}'
                 Effect: Allow
-          PolicyName: s3-instance-bucket-policy
+          PolicyName: s3-bucket-policy
         - PolicyDocument:
             Version: '2012-10-17'
             Statement:
               - Action:
                   - acm:ImportCertificate
+                  - acm:AddTagsToCertificate
                   - cloudformation:SignalResource
                   - ssm:GetParameter
                   - ssm:PutParameter
+                  - ssm:AddTagsToResource
                 Resource: "*"
                 Effect: Allow
           PolicyName: certificate-manager-policy

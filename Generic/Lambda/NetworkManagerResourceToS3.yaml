@@ -1,17 +1,17 @@
 ---
 AWSTemplateFormatVersion: "2010-09-09"
 Description:
-  This template for creating lambda to get EC2 resources type and backup un S3
+  This template for creating lambda to get NetworkManager resources type and backup un S3
   # Event JSON to test Lambda
   # {
   #   "ResourceProperties": {
   #     "Bucket": "hawkfund-cloudformation",
-  #     "BucketKey": "54_VPCGatewayEndpointForS3",
+  #     "BucketKey": "150_AWSCloudWANNetwork",
   #     "BucketObject": "Data.json",
   #     "Region": "eu-west-3",
-  #     "ResourceType": "Instance",
-  #     "Key": "eu-west-3:ANS:dev:EC2:Instance:MyInstance",
-  #     "Value": "i-02e4e2dd113397d4e"
+  #     "ResourceType": "GlobalNetwork",
+  #     "Key": "eu-west-3:ANS:dev:NetworkManager:GlobalNetwork:MyGlobalNetwork",
+  #     "Value": "global-network-id"
   #   }
   # }
 
@@ -60,7 +60,7 @@ Parameters:
     Description: "Save resources information in s3 file"
     Type: String
   FunctionName:
-    Default: Ec2ResourceToS3
+    Default: NetworkManagerResourceToS3
     Type: String
   LogFormat:
     AllowedValues: [Text, JSON]
@@ -141,7 +141,12 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
-                  - "ec2:Describe*"
+                  - "networkmanager:DescribeGlobalNetworks"
+                  - "networkmanager:GetCoreNetwork"
+                  - "networkmanager:GetVpcAttachment"
+                  - "networkmanager:GetConnectAttachment"
+                  - "networkmanager:ListAttachments"
+                  - "networkmanager:GetVpcAttachment"
                 Resource:
                   - "*"
       RoleName: !Sub "${FunctionName}Role"
@@ -188,79 +193,28 @@ Resources:
           # Load configuration from environment variables
           s3_client = boto3.client('s3')
 
-          def get_node(my_dict: Dict[str, Any], paths: list) -> Dict[str, Any]:              
+          def get_node(my_dict: Dict[str, Any], paths: list) -> Dict[str, Any]:
             """Navigate through the dictionary using the given paths."""
             for key in paths:
               my_dict = my_dict.setdefault(key, {})
             return my_dict
 
           def fetch_resource_data(region: str, resource_type: str, resource_id: str) -> Dict[str, Any]:
-            logger.info(f"Fetch EC2 resource {resource_type} with ID: {resource_id}.")
-            ec2_client = boto3.client('ec2', region)
+            logger.info(f"Fetch Network Manager resource {resource_type} with ID: {resource_id}.")
+            nm_client = boto3.client("networkmanager", region_name=region)
 
-            """Fetch EC2 resource data from with retry logic."""
+            """Fetch Network Manager resource data from with retry logic."""
             try:
               match (resource_type):
-                case "ClientVpnEndpoint":
-                  response = ec2_client.describe_client_vpn_endpoints(ClientVpnEndpointIds=[ resource_id ])
-                  return response['ClientVpnEndpoints'][0]
-                case "CustomerGateway":
-                  response = ec2_client.describe_customer_gateways(CustomerGatewayIds=[ resource_id ])
-                  return response['CustomerGateways'][0]
-                case "DhcpOptions":
-                  response = ec2_client.describe_dhcp_options(DhcpOptionsIds=[ resource_id ])
-                  return response['DhcpOptions'][0]
-                case "EgressOnlyInternetGateway":
-                  response = ec2_client.describe_egress_only_internet_gateways(EgressOnlyInternetGatewayIds=[ resource_id ])
-                  return response['EgressOnlyInternetGateways'][0]
-                case "FlowLog":
-                  response = ec2_client.describe_flow_logs(FlowLogIds=[ resource_id ])
-                  return response['FlowLogs'][0]
-                case "Image":
-                  response = ec2_client.describe_images(ImageIds=[ resource_id ])
-                  return response['Images'][0]
-                case "Instance":
-                  response = ec2_client.describe_instances(InstanceIds=[resource_id])
-                  return response['Reservations'][0]['Instances'][0]
-                case "InternetGateway":
-                  response = ec2_client.describe_internet_gateways(InternetGatewayIds=[resource_id])
-                  return response['InternetGateways'][0]
-                case "NatGateway":
-                  response = ec2_client.describe_nat_gateways(NatGatewayIds=[ resource_id ])
-                  return response['NatGateways'][0]
-                case "RouteTable":
-                  response = ec2_client.describe_route_tables(RouteTableIds=[resource_id])
-                  return response['RouteTables'][0]
-                case "SecurityGroup":
-                  response = ec2_client.describe_security_groups(GroupIds=[resource_id])
-                  return response['SecurityGroups'][0]
-                case "Subnet":
-                  response = ec2_client.describe_subnets(SubnetIds=[resource_id])
-                  return response['Subnets'][0]
-                case "TransitGateway":
-                  response = ec2_client.describe_transit_gateways(TransitGatewayIds=[ resource_id ])
-                  return response['TransitGateways'][0]
-                case "TransitGatewayAttachment":
-                  response = ec2_client.describe_transit_gateway_attachments(TransitGatewayAttachmentIds=[ resource_id ])
-                  return response['TransitGatewayAttachments'][0]
-                case "TransitGatewayRouteTable":
-                  response = ec2_client.describe_transit_gateway_route_tables(TransitGatewayRouteTableIds=[ resource_id ])
-                  return response['TransitGatewayRouteTables'][0]
-                case "Vpc":
-                  response = ec2_client.describe_vpcs(VpcIds=[ resource_id ])
-                  return response['Vpcs'][0]
-                case "VpcEndpoint":
-                  response = ec2_client.describe_vpc_endpoints(VpcEndpointIds=[ resource_id ])
-                  return response['VpcEndpoints'][0]
-                case "VpnConnection":
-                  response = ec2_client.describe_vpn_connections(VpnConnectionIds=[ resource_id ])
-                  return response['VpnConnections'][0]
-                case "VpnGateway":
-                  response = ec2_client.describe_vpn_gateways(VpnGatewayIds=[ resource_id ])
-                  return response['VpnGateways'][0]
-                case "VpcPeeringConnection":
-                  response = ec2_client.describe_vpc_peering_connections(VpcPeeringConnectionIds=[ resource_id ])
-                  return response['VpcPeeringConnections'][0]
+                case "CoreNetwork":
+                  response = nm_client.get_core_network(CoreNetworkId=resource_id)
+                  return response['CoreNetwork']
+                case "GlobalNetwork":
+                  response = nm_client.describe_global_networks(GlobalNetworkIds=[resource_id])
+                  return response['GlobalNetworks'][0]
+                case "VpcAttachment":
+                  response = nm_client.get_vpc_attachment(AttachmentId=resource_id)
+                  return response['VpcAttachment']
                 case _:
                   logger.warning(f"Unsupported resource type: {resource_type}")
                   return {}
@@ -310,7 +264,7 @@ Resources:
 
             logger.info(f"Event: {event}\nContext: {context}")
             logger.info(f"Read in Bucket {bucket} file with Key {key}.")
-            logger.info(f"Fetch EC2 resource {resource_type} in Region {region} with ID: {resource_id}.")
+            logger.info(f"Fetch Network Manager resource {resource_type} in Region {region} with ID: {resource_id}.")
             logger.info(f"Save {resource_type} content with Key: {parameter_key}.")
 
             try:
