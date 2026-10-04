@@ -63,6 +63,7 @@ Parameters:
     Description: "Subnet by default is public"
     Type: String
   SubnetName:
+    Default: "Default-Subnet"
     Description: "Subnet name"
     Type: String
   VpcId:

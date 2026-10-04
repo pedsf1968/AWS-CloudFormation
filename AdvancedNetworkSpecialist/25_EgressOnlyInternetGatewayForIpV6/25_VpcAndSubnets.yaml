@@ -47,11 +47,11 @@ Parameters:
     Default: "Subnet"
     Description: Subnet name
     Type: String
-  SubnetPrivateCidrBlock:
+  PrivateSubnetCidrBlock:
     Default: 10.10.1.0/24
     Description: "Private Subnet CIDR"
     Type: String
-  SubnetPublicCidrBlock:
+  PublicSubnetCidrBlock:
     Default: 10.10.0.0/24
     Description: "Public Subnet CIDR"
     Type: String
@@ -90,7 +90,7 @@ Resources:
         InstanceTenancy: default
         VpcName: !Ref VpcName
 
-  SubnetPrivateStack:
+  PrivateSubnetStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -105,14 +105,14 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Select [ 0, !GetAZs ]
-        CidrBlock: !Ref   SubnetPrivateCidrBlock
+        CidrBlock: !Ref   PrivateSubnetCidrBlock
         EnableIpv6: !Ref EnableIpv6
         MapPublicIpOnLaunch: "false"
         Ipv6CidrBlock: !Select [0, !Cidr [ !GetAtt VpcStack.Outputs.VpcIpv6CidrBlock, 256, 64 ] ]
         SubnetName: !Sub "${SubnetName}-Private"
         VpcId: !GetAtt VpcStack.Outputs.VpcId
 
-  SubnetPublicStack:
+  PublicSubnetStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -127,7 +127,7 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         AvailabilityZone: !Select [ 0, !GetAZs ]
-        CidrBlock: !Ref SubnetPublicCidrBlock
+        CidrBlock: !Ref PublicSubnetCidrBlock
         MapPublicIpOnLaunch: "true"
         SubnetName: !Sub "${SubnetName}-Public"
         VpcId: !GetAtt VpcStack.Outputs.VpcId
@@ -159,22 +159,22 @@ Outputs:
     Description: The IPv6 CIDR blocks for the VPC.
     Value: !GetAtt VpcStack.Outputs.VpcIpv6CidrBlock
 
-  SubnetPrivateId:
+  PrivateSubnetId:
     Description: "Private Subnet Id"
-    Value: !GetAtt SubnetPrivateStack.Outputs.SubnetId
+    Value: !GetAtt PrivateSubnetStack.Outputs.SubnetId
   SubnetCidrBlock:
     Description: The IPv4 CIDR blocks that are associated with the subnet.
-    Value: !GetAtt SubnetPrivateStack.Outputs.SubnetCidrBlock
+    Value: !GetAtt PrivateSubnetStack.Outputs.SubnetCidrBlock
   SubnetIpV6CidrBlock:
     Description: The IPv6 CIDR blocks that are associated with the subnet.
-    Value: !GetAtt SubnetPrivateStack.Outputs.SubnetIpV6CidrBlock
+    Value: !GetAtt PrivateSubnetStack.Outputs.SubnetIpV6CidrBlock
 
-  SubnetPublicId:
+  PublicSubnetId:
     Description: "Public Subnets Id"
-    Value: !GetAtt SubnetPublicStack.Outputs.SubnetId
-  SubnetPublicCidrBlock:
+    Value: !GetAtt PublicSubnetStack.Outputs.SubnetId
+  PublicSubnetCidrBlock:
     Description: The IPv4 CIDR blocks that are associated with the subnet.
-    Value: !GetAtt SubnetPublicStack.Outputs.SubnetCidrBlock
-  SubnetPublicIpV6CidrBlock:
+    Value: !GetAtt PublicSubnetStack.Outputs.SubnetCidrBlock
+  PublicSubnetIpV6CidrBlock:
     Description: The IPv6 CIDR blocks that are associated with the subnet.
-    Value: !GetAtt SubnetPublicStack.Outputs.SubnetIpV6CidrBlock
+    Value: !GetAtt PublicSubnetStack.Outputs.SubnetIpV6CidrBlock

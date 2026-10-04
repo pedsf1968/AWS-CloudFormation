@@ -46,27 +46,12 @@ Parameters:
     Description: "Save resources information in s3 file"
     Type: String
 
-  # Stack parameters
+  # EasyRSA install parameters
   CertificatesDirectory:
     Default: "/opt/certificates"
     Description: "Directory for certificates"
     Type: "String"
-  ClientName: 
-    AllowedPattern: "^[a-zA-Z0-9._-]+$"
-    ConstraintDescription: "Must contain only alphanumeric characters, periods, hyphens, and underscores"
-    Default: "client1.domain.kr"
-    Description: "Default client certificate base name"
-    MaxLength: 64
-    MinLength: 1
-    Type: String
-  InstanceId:
-    Description: "ID of the EC2 instance"
-    Type: String
-  InstallDirectory:
-    Default: "/opt/openvpn-setup"
-    Description: "Working directory for installation"
-    Type: String
-  Name:
+  DocumentName:
     AllowedPattern: "^[a-zA-Z0-9_.-]+$"
     ConstraintDescription: "Must contain only alphanumeric characters, hyphens, periods, and underscores"
     Description: "Name of the SSM Document"
@@ -74,12 +59,47 @@ Parameters:
     MaxLength: 64
     MinLength: 3
     Type: String
+  InstallDirectory:
+    Default: "/opt"
+    Description: "Working directory for installation"
+    Type: String
+  InstanceId:
+    Description: "ID of the EC2 instance"
+    Type: String
+  LogFile:
+    Default: "/var/log/openvpn-easyrsa-ca-certificate.log"
+    Description: "Log file path"
+    Type: String
   OutputS3BucketName:
     Description: "The Bucket name for logs"
     Type: String
   OutputS3KeyPrefix:
     Default: "logs/"
     Description: "Logs prefix"
+    Type: String
+
+  # Certificate parameters
+  ClientBaseName:
+    AllowedPattern: "^[a-zA-Z0-9._-]+$"
+    ConstraintDescription: "Must contain only alphanumeric characters, periods, hyphens, and underscores"
+    Default: "client1"
+    Description: "Default client certificate base name"
+    MaxLength: 64
+    MinLength: 1
+    Type: String
+  DomainName:
+    AllowedPattern: "^[a-zA-Z0-9.-]+$"
+    ConstraintDescription: "Must be a valid domain name"
+    Default: "domain.kr"
+    Description: "Base domain name for certificates"
+    MaxLength: 253
+    MinLength: 4
+    Type: String
+  RootCaBaseName:
+    Default: "root-ca"
+    Description: "Default CA certificate name"
+    MaxLength: 64
+    MinLength: 1
     Type: String
 
 Conditions:
@@ -103,14 +123,19 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
     Properties:
-      AssociationName: !Sub "${ProjectName}-${EnvironmentName}-${Name}"
-      Name: !Sub "${ProjectName}-${EnvironmentName}-${Name}"
+      AssociationName: !Sub "${ProjectName}-${EnvironmentName}-${DocumentName}"
+      Name: !Sub "${ProjectName}-${EnvironmentName}-${DocumentName}"
       OutputLocation:
         S3Location:
           OutputS3BucketName: !Ref OutputS3BucketName
           OutputS3KeyPrefix: !Ref OutputS3KeyPrefix
       Parameters:
-        EnvironmentName:
+        # Global parameters
+        Bucket:
+          - !Ref Bucket
+        BucketKey:
+          - !Ref BucketKey
+        EnvironmentName: 
           - !Ref EnvironmentName
         ProjectName:
           - !Ref ProjectName
@@ -122,12 +147,25 @@ Resources:
           - !Ref AWS::StackName
         WaitHandleUrl:
           - !Ref AssociationWaitConditionHandle
+
+        # EasyRSA install parameters
         CertificatesDirectory:
           - !Ref CertificatesDirectory
-        ClientName: 
-          - !Ref ClientName
         InstallDirectory:
           - !Ref InstallDirectory
+        LogDirectory:
+          - !Ref LogDirectory
+        LogFile:
+          - !Ref LogFile
+
+        # Certificate parameters
+        ClientBaseName:
+          - !Ref ClientBaseName
+        DomainName:
+          - !Ref DomainName
+        RootCaBaseName:
+          - !Ref RootCaBaseName
+
       Targets:
       - Key: InstanceIds
         Values:
@@ -146,12 +184,12 @@ Resources:
       BucketObject: !Ref BucketObject
       Region: !Ref AWS::Region
       ResourceType: "Association"
-      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:SSM:Association:${Name}"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:SSM:Association:${DocumentName}"
       Value: !Ref SsmAssociation
 
 Outputs:
   CertificateParameterStore:
     Description: "SSM Parameter Store Key for clientcertificate ARN"
-    Value: !Sub "/${ProjectName}/${EnvironmentName}/certificates/${ClientName}/arn"
+    Value: !Sub "/${ProjectName}/${EnvironmentName}/certificates/${ClientBaseName}.${DomainName}/arn"
     Export:
       Name: !Sub "${AWS::StackName}-CertificateParameterStore"

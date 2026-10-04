@@ -244,8 +244,8 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         VpcIds: !GetAtt VpcAndSubnets.Outputs.VpcIds
-        SubnetPrivateIds: !GetAtt VpcAndSubnets.Outputs.SubnetPrivateIds
-        SubnetPublicId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId
+        PrivateSubnetIds: !GetAtt VpcAndSubnets.Outputs.PrivateSubnetIds
+        PublicSubnetId: !GetAtt VpcAndSubnets.Outputs.PublicSubnetId
         RouteTableNames: "A,B"
         InternetGatewayId: !GetAtt Gateways.Outputs.InternetGatewayId
 
@@ -270,20 +270,20 @@ Resources:
         BastionInstanceName: !Ref BastionInstanceName
         BastionInstanceType: !Ref BastionInstanceType
         BastionInstanceSecurityGroup: !GetAtt SecurityGroups.Outputs.BastionInstanceSecurityGroupId
-        BastionInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId
+        BastionInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.PublicSubnetId
         ConsumerImageId: !Ref ConsumerImageId
         ConsumerInstanceName: !Ref ConsumerInstanceName
         ConsumerInstanceType: !Ref ConsumerInstanceType
         ConsumerSecurityGroup: !GetAtt SecurityGroups.Outputs.ConsumerSecurityGroupId
         ConsumerSubnetId: !Select
           - 0
-          - !Split [",", !GetAtt VpcAndSubnets.Outputs.SubnetPrivateIds]
+          - !Split [",", !GetAtt VpcAndSubnets.Outputs.PrivateSubnetIds]
         WebServerInstanceName: !Ref WebServerInstanceName
         WebServerInstanceType: !Ref WebServerInstanceType
         WebServerSecurityGroup: !GetAtt SecurityGroups.Outputs.WebServerSecurityGroupId
         WebServerSubnetId: !Select
           - 1
-          - !Split [",", !GetAtt VpcAndSubnets.Outputs.SubnetPrivateIds]
+          - !Split [",", !GetAtt VpcAndSubnets.Outputs.PrivateSubnetIds]
 
   LoadBalancers:
     Type: AWS::CloudFormation::Stack
@@ -303,7 +303,7 @@ Resources:
         SaveInS3File: !Ref SaveInS3File
         NLBName: "Provider"
         NLBSourceCidr: !Select [ 0, !Ref VpcCidrBlocks ]
-        NLBSubnetId: !Select [1, !Split [ ",", !GetAtt VpcAndSubnets.Outputs.SubnetPrivateIds ] ]
+        NLBSubnetId: !Select [1, !Split [ ",", !GetAtt VpcAndSubnets.Outputs.PrivateSubnetIds ] ]
         NLBTargetIds: !GetAtt Instances.Outputs.ApplicationInstanceIds
         VpcId: !Select [1, !Split [ ",", !GetAtt VpcAndSubnets.Outputs.VpcIds ] ]
 
@@ -326,7 +326,7 @@ Resources:
         NetworkLoadBalancerArn: !GetAtt LoadBalancers.Outputs.NetworkLoadBalancerArn
         VpcEpSubnetId: !Select
           - 0
-          - !Split [ ",", !GetAtt VpcAndSubnets.Outputs.SubnetPrivateIds ]
+          - !Split [ ",", !GetAtt VpcAndSubnets.Outputs.PrivateSubnetIds ]
         VpcEpVpcId: !Select
           - 0
           - !Split [ ",", !GetAtt VpcAndSubnets.Outputs.VpcIds ]

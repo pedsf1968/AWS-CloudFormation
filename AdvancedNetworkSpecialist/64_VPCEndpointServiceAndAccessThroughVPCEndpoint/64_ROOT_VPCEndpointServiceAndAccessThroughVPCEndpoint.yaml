@@ -288,9 +288,9 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         VpcIds: !GetAtt VpcAndSubnets.Outputs.VpcIds
-        VpcASubnetPrivateIds: !GetAtt VpcAndSubnets.Outputs.VpcASubnetPrivateIds
-        VpcBSubnetPrivateIds: !GetAtt VpcAndSubnets.Outputs.VpcBSubnetPrivateIds
-        SubnetPublicId: !GetAtt VpcAndSubnets.Outputs.VpcASubnetPublicId
+        VpcAPrivateSubnetIds: !GetAtt VpcAndSubnets.Outputs.VpcAPrivateSubnetIds
+        VpcBPrivateSubnetIds: !GetAtt VpcAndSubnets.Outputs.VpcBPrivateSubnetIds
+        PublicSubnetId: !GetAtt VpcAndSubnets.Outputs.VpcAPublicSubnetId
         RouteTableNames: "Consumer,Provider"
         InternetGatewayId: !GetAtt Gateways.Outputs.InternetGatewayId
 
@@ -313,22 +313,22 @@ Resources:
         KeyName: !Ref InstanceKeyName
         BaseInstanceProfile: !GetAtt Roles.Outputs.InstanceProfileId
         BaseInstanceSecurityGroup: !GetAtt SecurityGroups.Outputs.BastionInstanceSecurityGroupId
-        BaseInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.VpcASubnetPublicId
+        BaseInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.VpcAPublicSubnetId
         BastionInstanceImageId: !Ref BastionInstanceImageId
         BastionInstanceName: !Ref BastionInstanceName
         BastionInstanceType: !Ref BastionInstanceType
         BastionInstanceSecurityGroup: !GetAtt SecurityGroups.Outputs.BastionInstanceSecurityGroupId
-        BastionInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.VpcASubnetPublicId
+        BastionInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.VpcAPublicSubnetId
         ConsumerImageId: !Ref ConsumerImageId
         ConsumerInstanceName: !Ref ConsumerInstanceName
         ConsumerInstanceType: !Ref ConsumerInstanceType
         ConsumerSecurityGroup: !GetAtt SecurityGroups.Outputs.ConsumerSecurityGroupId
-        ConsumerSubnetIds: !GetAtt VpcAndSubnets.Outputs.VpcASubnetPrivateIds
+        ConsumerSubnetIds: !GetAtt VpcAndSubnets.Outputs.VpcAPrivateSubnetIds
         WebServerInstanceImageId: !Ref WebServerInstanceImageId
         WebServerInstanceName: !Ref WebServerInstanceName
         WebServerInstanceType: !Ref WebServerInstanceType
         WebServerInstanceSecurityGroup: !GetAtt SecurityGroups.Outputs.WebServerInstanceSecurityGroupId
-        WebServerInstanceSubnetIds: !GetAtt VpcAndSubnets.Outputs.VpcBSubnetPrivateIds
+        WebServerInstanceSubnetIds: !GetAtt VpcAndSubnets.Outputs.VpcBPrivateSubnetIds
 
   LoadBalancers:
     Type: AWS::CloudFormation::Stack
@@ -348,7 +348,7 @@ Resources:
         SaveInS3File: !Ref SaveInS3File
         NLBName: "Provider"
         NLBSourceCidr: !Select [ 0, !Ref VpcCidrBlocks ] # A CIDR
-        NLBSubnetIds: !GetAtt VpcAndSubnets.Outputs.VpcBSubnetPrivateIds
+        NLBSubnetIds: !GetAtt VpcAndSubnets.Outputs.VpcBPrivateSubnetIds
         NLBTargetIds: !GetAtt Instances.Outputs.ApplicationInstanceIds
         VpcId: !Select [1, !Split [ ",", !GetAtt VpcAndSubnets.Outputs.VpcIds ] ]
 
@@ -373,10 +373,10 @@ Resources:
           - ","
           - - !Select
               - 1
-              - !Split [ ",", !GetAtt VpcAndSubnets.Outputs.VpcASubnetPrivateIds ]
+              - !Split [ ",", !GetAtt VpcAndSubnets.Outputs.VpcAPrivateSubnetIds ]
             - !Select
               - 3
-              - !Split [ ",", !GetAtt VpcAndSubnets.Outputs.VpcASubnetPrivateIds ]
+              - !Split [ ",", !GetAtt VpcAndSubnets.Outputs.VpcAPrivateSubnetIds ]
         VpcEndpointVpcId: !Select
           - 0
           - !Split [ ",", !GetAtt VpcAndSubnets.Outputs.VpcIds ]

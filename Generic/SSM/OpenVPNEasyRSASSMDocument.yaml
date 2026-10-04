@@ -50,7 +50,7 @@ Parameters:
     Type: String
 
   # Stack parameters
-  CaName:
+  RootCaName:
     Default: "OpenVPN-CA"
     Description: "Default CA certificate name"
     MaxLength: 64
@@ -130,9 +130,9 @@ Resources:
             default: !Ref BucketKey
             description: "S3 bucket key prefix"
             type: "String"
-          CaName:
+          RootCaName:
             allowedPattern: "^[a-zA-Z0-9\\s._-]+$"
-            default: !Ref CaName
+            default: !Ref RootCaName
             description: "Certificate Authority name for OpenVPN"
             type: "String"
           CertificatesDirectory:
@@ -196,7 +196,7 @@ Resources:
                     readonly STACK_NAME="{{StackName}}"
                     readonly REGION="{{Region}}"
                     readonly RESOURCE_NAME="{{ResourceName}}"
-                    readonly CA_NAME="{{CaName}}"
+                    readonly CA_NAME="{{RootCaName}}"
                     readonly CLIENT_BASE_NAME="{{ClientBaseName}}"
                     readonly SERVER_BASE_NAME="{{ServerBaseName}}"
                     readonly WORKING_DIR="{{InstallDirectory}}"
@@ -486,6 +486,6 @@ Outputs:
       aws ssm send-command \
         --document-name "${SsmDocument}" \
         --instance-ids "i-1234567890abcdef0" \
-        --parameters "CaName=MyCA,ClientBaseName=client1,Region=${AWS::Region},ProjectName=${ProjectName},EnvironmentName=${EnvironmentName},Bucket=${Bucket},BucketKey=${BucketKey}"
+        --parameters "RootCaName=MyCA,ClientBaseName=client1,Region=${AWS::Region},ProjectName=${ProjectName},EnvironmentName=${EnvironmentName},Bucket=${Bucket},BucketKey=${BucketKey}"
     Export:
       Name: !Sub "${ProjectName}-${EnvironmentName}-${Name}-ExecutionCommand"

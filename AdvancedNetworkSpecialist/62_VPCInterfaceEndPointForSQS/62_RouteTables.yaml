@@ -49,10 +49,10 @@ Parameters:
     Default: "Public"
     Description: "Name of Public Route Table"
     Type: String
-  SubnetPrivateIds:
+  PrivateSubnetIds:
     Description: "ID of all Private Subnets"
     Type: CommaDelimitedList
-  SubnetPublicId:
+  PublicSubnetId:
     Description: "Public Subnets ID"
     Type: String
   VpcId:
@@ -60,7 +60,7 @@ Parameters:
     Type: String
 
 Resources:
-  SubnetPublicRouteTableStack:
+  PublicSubnetRouteTableStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -76,9 +76,9 @@ Resources:
         SaveInS3File: !Ref SaveInS3File
         VpcId: !Ref VpcId
         RouteTableName: !Ref RouteTablePublicName
-        SubnetId: !Ref SubnetPublicId
+        SubnetId: !Ref PublicSubnetId
 
-  SubnetPublicRouteStack:
+  PublicSubnetRouteStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -93,12 +93,12 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         DestinationCidrBlock: "0.0.0.0/0"
-        RouteTableId: !GetAtt SubnetPublicRouteTableStack.Outputs.RouteTableId
+        RouteTableId: !GetAtt PublicSubnetRouteTableStack.Outputs.RouteTableId
         RouteTableName: !Ref RouteTablePublicName
         TargetType: "InternetGateway"
         TargetId: !Ref InternetGatewayId
 
-  SubnetPrivateRouteTableStack:
+  PrivateSubnetRouteTableStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -113,38 +113,38 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         RouteTableName: !Ref RouteTablePrivateName
-        SubnetId: !Select [0, !Ref SubnetPrivateIds]
+        SubnetId: !Select [0, !Ref PrivateSubnetIds]
         VpcId: !Ref VpcId
 
   SubnetBRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !GetAtt SubnetPrivateRouteTableStack.Outputs.RouteTableId
-      SubnetId: !Select [1, !Ref SubnetPrivateIds]
+      RouteTableId: !GetAtt PrivateSubnetRouteTableStack.Outputs.RouteTableId
+      SubnetId: !Select [1, !Ref PrivateSubnetIds]
 
   SubnetCRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !GetAtt SubnetPrivateRouteTableStack.Outputs.RouteTableId
-      SubnetId: !Select [2, !Ref SubnetPrivateIds]
+      RouteTableId: !GetAtt PrivateSubnetRouteTableStack.Outputs.RouteTableId
+      SubnetId: !Select [2, !Ref PrivateSubnetIds]
 
 Outputs:
-  SubnetPrivateRouteTableId:
+  PrivateSubnetRouteTableId:
     Description: "Private Subnet Route Table ID"
-    Value: !GetAtt SubnetPrivateRouteTableStack.Outputs.RouteTableId
-  SubnetPrivateARouteTableAssociationId:
+    Value: !GetAtt PrivateSubnetRouteTableStack.Outputs.RouteTableId
+  PrivateSubnetARouteTableAssociationId:
     Description: "Private Subnet A Route Table Association ID"
-    Value: !GetAtt SubnetPrivateRouteTableStack.Outputs.SubnetRouteTableAssociationId
-  SubnetPrivateBRouteTableAssociationId:
+    Value: !GetAtt PrivateSubnetRouteTableStack.Outputs.SubnetRouteTableAssociationId
+  PrivateSubnetBRouteTableAssociationId:
     Description: "Private Subnet B Route Table Association ID"
     Value: !Ref SubnetBRouteTableAssociation
-  SubnetPrivateCRouteTableAssociationId:
+  PrivateSubnetCRouteTableAssociationId:
     Description: "Private Subnet C Route Table Association ID"
     Value: !Ref SubnetBRouteTableAssociation
 
-  SubnetPublicRouteTableAssociationId:
+  PublicSubnetRouteTableAssociationId:
     Description: "Public Route Table Association ID"
-    Value: !GetAtt SubnetPublicRouteTableStack.Outputs.SubnetRouteTableAssociationId
-  SubnetPublicRouteTableId:
+    Value: !GetAtt PublicSubnetRouteTableStack.Outputs.SubnetRouteTableAssociationId
+  PublicSubnetRouteTableId:
     Description: "Public Subnet Route Table ID"
-    Value: !GetAtt SubnetPublicRouteTableStack.Outputs.RouteTableId
+    Value: !GetAtt PublicSubnetRouteTableStack.Outputs.RouteTableId

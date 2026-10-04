@@ -37,6 +37,7 @@ Parameters:
     Description: "Description of the Security Group"
     Type: String
   GroupName:
+    Default: "Default-SG"
     Description: "Name of the Security Group"
     Type: String 
   VpcId:
@@ -76,7 +77,7 @@ Resources:
         - Key: EnvironmentName
           Value: !Ref EnvironmentName
         - Key: Name
-          Value:  !Sub "${ProjectName}-${EnvironmentName}-${GroupName}-SG"
+          Value:  !Sub "${ProjectName}-${EnvironmentName}-${GroupName}"
         - Key: ManagedBy
           Value: "CloudFormation"
         - Key: ProjectName

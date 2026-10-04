@@ -153,7 +153,7 @@ Resources:
         - Key: ProjectName
           Value: !Ref ProjectName
         - Key: Name
-          Value: !Sub "${ProjectName}-${EnvironmentName}-${FunctionName}"
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${FunctionName}Role"
         - Key: StackName
           Value: !Ref AWS::StackName
 

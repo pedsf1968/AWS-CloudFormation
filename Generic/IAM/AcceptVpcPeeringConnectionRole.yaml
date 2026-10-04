@@ -33,9 +33,6 @@ Parameters:
     Type: String
   
   # Stack parameters
-  FirstAccountId:
-    Description: First AWS Account ID for VPC peering
-    Type: String
   PeerRequesterAccountId:
     Description: Second AWS Account ID for VPC peering
     Type: String
@@ -109,7 +106,7 @@ Resources:
       Region: !Ref AWS::Region
       ResourceType: "Role"
       Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:IAM:Role:${RoleName}"
-      Value: !Ref AcceptVpcPeeringConnectionRole
+      Value: !Ref Role
 
 Outputs:
   RoleArn:

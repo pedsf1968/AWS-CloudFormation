@@ -38,9 +38,6 @@ Parameters:
     Type: String
 
   # Stack parameters
-  FirstAccountId:
-    Description: First AWS Account ID for VPC peering
-    Type: String
   PeerRequesterAccountId:
     Description: Second AWS Account ID for VPC peering
     Type: String
@@ -60,7 +57,6 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File 
-        FirstAccountId: !Ref FirstAccountId
         PeerRequesterAccountId: !Ref PeerRequesterAccountId
         RoleName: "VpcPeeringCrossAccount-Role"
 

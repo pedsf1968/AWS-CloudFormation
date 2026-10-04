@@ -42,7 +42,7 @@ Parameters:
     Default: "Subnet"
     Description: Subnet name
     Type: String
-  SubnetPublicCidrBlock:
+  PublicSubnetCidrBlock:
     Default: 10.100.0.0/24
     Description: "Public Subnet CIDR"
     Type: String
@@ -80,7 +80,7 @@ Resources:
         InstanceTenancy: default
         VpcName: !Ref VpcName
 
-  SubnetPublicStack:
+  PublicSubnetStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -94,7 +94,7 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         AvailabilityZone: !Select [ 0, !GetAZs ]
-        CidrBlock: !Ref SubnetPublicCidrBlock
+        CidrBlock: !Ref PublicSubnetCidrBlock
         MapPublicIpOnLaunch: "true"
         SaveInS3File: !Ref SaveInS3File
         SubnetName: !Sub "${SubnetName}-Public"
@@ -120,6 +120,6 @@ Outputs:
   VpcId:
     Description: "VPC Id"
     Value: !GetAtt VpcStack.Outputs.VpcId
-  SubnetPublicId:
+  PublicSubnetId:
     Description: "Public Subnets Id"
-    Value: !GetAtt SubnetPublicStack.Outputs.SubnetId
+    Value: !GetAtt PublicSubnetStack.Outputs.SubnetId

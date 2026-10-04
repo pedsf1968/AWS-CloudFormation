@@ -1,0 +1,605 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: This template deploys a Core Network
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation bucket URL
+    Type: String
+
+  BucketKey:
+    Default: "150_AWSCloudWANNetwork"
+    Description: Key to find object in the bucket
+    Type: String
+
+  BucketObject:
+    Default: "Data.json"
+    Description: File to store data in the bucket
+    Type: String
+
+  EnvironmentName:
+    AllowedValues:
+      - dev
+      - test
+      - staging
+      - prod
+    ConstraintDescription: Must specify dev, test, staging or prod
+    Default: dev
+    Description: Environment name that prefixes all resources
+    Type: String
+
+  ProjectName:
+    Default: "ANS"
+    Description: Project name that prefixes all resources
+    Type: String
+
+  SaveInS3File:
+    AllowedValues:
+      - "false"
+      - "true"
+    Default: "true"
+    Description: Save resources information in S3 file
+    Type: String
+
+  # Core Network parameters
+  AnsRange:
+    Default: "64512-65534"
+    Description: ASN range for the Core Network
+    Type: String
+
+  Description:
+    Default: "My Core Network"
+    Description: A brief description of the Core Network
+    MaxLength: 255
+    Type: String
+
+  EdgeLocations:
+    Default: "eu-west-3,eu-central-1,ap-northeast-2"
+    Description: Comma-separated list of edge locations
+    Type: CommaDelimitedList
+
+  EdgeLocationCount:
+    AllowedValues:
+      - 2
+      - 3
+      - 4
+      - 5
+    Default: 2
+    Description: Number of Edge Locations for the Core Network
+    Type: Number
+
+  GlobalNetworkId:
+    Description: Global Network ID
+    Type: String
+
+  Name:
+    Default: "Core-Network"
+    Description: Core Network name
+    Type: String
+  
+  SegmentCount:
+    AllowedValues:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+    Default: 1
+    Description: Number of segments for the Core Network
+    Type: Number
+
+  Segment0Name:
+    Default: "Shared"
+    Description: Segment 0 name for the Core Network
+    Type: String
+  Segment0Description:
+    Default: "Shared segment"
+    Description: Segment 0 description for the Core Network
+    Type: String
+  Segment0FilterType:
+    AllowedValues:
+      - none
+      - allow
+      - deny
+    Default: none
+    Description: Segment 0 filter type
+    Type: String
+  Segment0FilterSegments:
+    Default: ""
+    Description: Comma-separated list of segments for the Segment 0 filter
+    Type: CommaDelimitedList
+  Segment0ShareWith:
+    Default: "Shared"
+    Description: Segments that Segment 0 can share routes with
+    Type: CommaDelimitedList
+  Segment0IsolatedAttachment:
+    Default: "false"
+    Description: Isolate attachments for segment 0 in the Core Network
+    Type: String
+  Segment0RequireAttachmentAcceptance:
+    Default: "false"
+    Description: Require attachment acceptance in the Core Network
+    Type: String
+
+  Segment1Name:
+    Default: ""
+    Description: Segment 1 name for the Core Network
+    Type: String
+  Segment1Description:
+    Default: ""
+    Description: Segment 1 description for the Core Network
+    Type: String
+  Segment1FilterType:
+    AllowedValues:
+      - none
+      - allow
+      - deny
+    Default: none
+    Description: Segment 1 filter type
+    Type: String
+  Segment1FilterSegments:
+    Default: ""
+    Description: Comma-separated list of segments for the Segment 1 filter
+    Type: CommaDelimitedList
+  Segment1ShareWith:
+    Default: "Shared"
+    Description: Segments that Segment 1 can share routes with
+    Type: CommaDelimitedList
+  Segment1IsolatedAttachment:
+    Default: "false"
+    Description: Isolate attachments for segment 1 in the Core Network
+    Type: String
+  Segment1RequireAttachmentAcceptance:
+    Default: "false"
+    Description: Require attachment acceptance in the Core Network
+    Type: String
+
+  Segment2Name:
+    Default: ""
+    Description: Segment 2 name for the Core Network
+    Type: String
+  Segment2Description:
+    Default: ""
+    Description: Segment 2 description for the Core Network
+    Type: String
+  Segment2FilterType:
+    AllowedValues:
+      - none
+      - allow
+      - deny
+    Default: none
+    Description: Segment 2 filter type
+    Type: String
+  Segment2FilterSegments:
+    Default: ""
+    Description: Comma-separated list of segments for the Segment 2 filter
+    Type: CommaDelimitedList
+  Segment2ShareWith:
+    Default: "Shared"
+    Description: Segments that Segment 2 can share routes with
+    Type: CommaDelimitedList
+  Segment2IsolatedAttachment:
+    Default: "false"
+    Description: Isolate attachments for segment 2 in the Core Network
+    Type: String
+  Segment2RequireAttachmentAcceptance:
+    Default: "false"
+    Description: Require attachment acceptance in the Core Network
+    Type: String
+
+  Segment3Name:
+    Default: ""
+    Description: Segment 3 name for the Core Network
+    Type: String
+  Segment3Description:
+    Default: ""
+    Description: Segment 3 description for the Core Network
+    Type: String
+  Segment3FilterType:
+    AllowedValues:  
+      - none
+      - allow
+      - deny
+    Default: none
+    Description: Segment 3 filter type
+    Type: String
+  Segment3FilterSegments:
+    Default: ""
+    Description: Comma-separated list of segments for the Segment 3 filter
+    Type: CommaDelimitedList
+  Segment3ShareWith:
+    Default: "Shared"
+    Description: Segments that Segment 3 can share routes with
+    Type: CommaDelimitedList
+  Segment3IsolatedAttachment:
+    Default: "false"
+    Description: Isolate attachments for segment 3 in the Core Network
+    Type: String
+  Segment3RequireAttachmentAcceptance:
+    Default: "false"
+    Description: Require attachment acceptance in the Core Network
+    Type: String
+
+  Segment4Name:
+    Default: ""
+    Description: Segment 4 name for the Core Network
+    Type: String
+  Segment4Description:
+    Default: ""
+    Description: Segment 4 description for the Core Network
+    Type: String
+  Segment4FilterType:
+    AllowedValues:  
+      - none
+      - allow
+      - deny
+    Default: none
+    Description: Segment 4 filter type
+    Type: String
+  Segment4FilterSegments:
+    Default: ""
+    Description: Comma-separated list of segments for the Segment 4 filter
+    Type: CommaDelimitedList
+  Segment4ShareWith:
+    Default: "Shared"
+    Description: Segments that Segment 4 can share routes with
+    Type: CommaDelimitedList
+  Segment4IsolatedAttachment:
+    Default: "false"
+    Description: Isolate attachments for segment 4 in the Core Network
+    Type: String
+  Segment4RequireAttachmentAcceptance:
+    Default: "false"
+    Description: Require attachment acceptance in the Core Network
+    Type: String
+
+Conditions:
+  SaveInS3File: !Equals [!Ref SaveInS3File, "true"]
+
+  Has3EdgeLocations: !Or
+    - !Equals [!Ref EdgeLocationCount, 3]
+    - !Equals [!Ref EdgeLocationCount, 4]
+    - !Equals [!Ref EdgeLocationCount, 5]
+
+  Has4EdgeLocations: !Or
+    - !Equals [!Ref EdgeLocationCount, 4]
+    - !Equals [!Ref EdgeLocationCount, 5]
+
+  Has5EdgeLocations: !Equals [!Ref EdgeLocationCount, 5]
+
+  Has2Segments: !Or
+    - !Equals [!Ref SegmentCount, 2]
+    - !Equals [!Ref SegmentCount, 3]
+    - !Equals [!Ref SegmentCount, 4]
+    - !Equals [!Ref SegmentCount, 5]
+
+  Has3Segments: !Or
+    - !Equals [!Ref SegmentCount, 3]
+    - !Equals [!Ref SegmentCount, 4]
+    - !Equals [!Ref SegmentCount, 5]
+
+  Has4Segments: !Or
+    - !Equals [!Ref SegmentCount, 4]
+    - !Equals [!Ref SegmentCount, 5]
+
+  Has5Segments: !Equals [!Ref SegmentCount, 5]
+
+  Segment0AllowFilter: !Equals
+    - !Ref Segment0FilterType
+    - allow
+  Segment1AllowFilter: !Equals
+    - !Ref Segment1FilterType
+    - allow
+  Segment2AllowFilter: !Equals
+    - !Ref Segment2FilterType
+    - allow
+  Segment3AllowFilter: !Equals
+    - !Ref Segment3FilterType
+    - allow
+  Segment4AllowFilter: !Equals
+    - !Ref Segment4FilterType
+    - allow
+
+  Segment0DenyFilter: !Equals
+    - !Ref Segment0FilterType
+    - deny
+  Segment1DenyFilter: !Equals
+    - !Ref Segment1FilterType
+    - deny
+  Segment2DenyFilter: !Equals
+    - !Ref Segment2FilterType
+    - deny
+  Segment3DenyFilter: !Equals
+    - !Ref Segment3FilterType
+    - deny
+  Segment4DenyFilter: !Equals
+    - !Ref Segment4FilterType
+    - deny
+
+Resources:
+
+  CoreNetwork:
+    Type: AWS::NetworkManager::CoreNetwork
+
+    Properties:
+      Description: !Ref Description
+      GlobalNetworkId: !Ref GlobalNetworkId
+
+      PolicyDocument:
+        version: "2021.12"
+
+        core-network-configuration:
+          vpn-ecmp-support: true
+
+          asn-ranges:
+            - !Ref AnsRange
+
+          edge-locations:
+            - location: !Select [0, !Ref EdgeLocations]
+            - location: !Select [1, !Ref EdgeLocations]
+            - !If
+              - Has3EdgeLocations
+              - location: !Select [2, !Ref EdgeLocations]
+              - !Ref AWS::NoValue
+            - !If
+              - Has4EdgeLocations
+              - location: !Select [3, !Ref EdgeLocations]
+              - !Ref AWS::NoValue
+            - !If
+              - Has5EdgeLocations
+              - location: !Select [4, !Ref EdgeLocations]
+              - !Ref AWS::NoValue
+
+
+        segments:
+          # Segment 0 - always present
+          - name: !Ref Segment0Name
+            description: !Ref Segment0Description
+            isolate-attachments: !Ref Segment0IsolatedAttachment
+            require-attachment-acceptance: !Ref Segment0RequireAttachmentAcceptance
+
+            allow-filter: !If
+              - Segment0AllowFilter
+              - !Ref Segment0FilterSegments
+              - !Ref AWS::NoValue
+
+            deny-filter: !If
+              - Segment0DenyFilter
+              - !Ref Segment0FilterSegments
+              - !Ref AWS::NoValue
+
+          # Segment 1
+          - !If
+            - Has2Segments
+            - 
+              name: !Ref Segment1Name
+              description: !Ref Segment1Description
+              isolate-attachments: !Ref Segment1IsolatedAttachment
+              require-attachment-acceptance: !Ref Segment1RequireAttachmentAcceptance
+              allow-filter: !If
+                - Segment1AllowFilter
+                - !Ref Segment1FilterSegments
+                - !Ref AWS::NoValue
+
+              deny-filter: !If
+                - Segment1DenyFilter
+                - !Ref Segment1FilterSegments 
+                - !Ref AWS::NoValue
+            - !Ref AWS::NoValue
+
+          # Segment 2
+          - !If
+            - Has3Segments
+            - 
+              name: !Ref Segment2Name
+              description: !Ref Segment2Description
+              isolate-attachments: !Ref Segment2IsolatedAttachment
+              require-attachment-acceptance: !Ref Segment2RequireAttachmentAcceptance
+              allow-filter: !If
+                - Segment2AllowFilter
+                - !Ref Segment2FilterSegments
+                - !Ref AWS::NoValue
+
+              deny-filter: !If
+                - Segment2DenyFilter
+                - !Ref Segment2FilterSegments
+                - !Ref AWS::NoValue
+            - !Ref AWS::NoValue
+
+          # Segment 3
+          - !If
+            - Has4Segments
+            - 
+              name: !Ref Segment3Name
+              description: !Ref Segment3Description
+              isolate-attachments: !Ref Segment3IsolatedAttachment
+              require-attachment-acceptance: !Ref Segment3RequireAttachmentAcceptance
+              allow-filter: !If
+                - Segment3AllowFilter
+                - !Ref Segment3FilterSegments
+                - !Ref AWS::NoValue
+
+              deny-filter: !If
+                - Segment3DenyFilter
+                - !Ref Segment3FilterSegments
+                - !Ref AWS::NoValue
+            - !Ref AWS::NoValue
+
+
+          # Segment 4
+          - !If
+            - Has5Segments
+            - 
+              name: !Ref Segment4Name
+              description: !Ref Segment4Description
+              isolate-attachments: !Ref Segment4IsolatedAttachment
+              require-attachment-acceptance: !Ref Segment4RequireAttachmentAcceptance
+              allow-filter: !If
+                - Segment4AllowFilter
+                - !Ref Segment4FilterSegments
+                - !Ref AWS::NoValue
+
+              deny-filter: !If
+                - Segment4DenyFilter
+                - !Ref Segment4FilterSegments
+                - !Ref AWS::NoValue
+            - !Ref AWS::NoValue
+
+        segment-actions:
+
+          - action: share
+            mode: attachment-route
+            segment: !Ref Segment0Name
+            share-with: !Ref Segment0ShareWith
+
+          - !If
+            - Has2Segments
+            - 
+              action: share
+              mode: attachment-route
+              segment: !Ref Segment1Name
+              share-with: !Ref Segment1ShareWith
+            - !Ref AWS::NoValue
+
+          - !If
+            - Has3Segments
+            - 
+              action: share
+              mode: attachment-route
+              segment: !Ref Segment2Name
+              share-with: !Ref Segment2ShareWith
+            - !Ref AWS::NoValue
+
+          - !If
+            - Has4Segments
+            - 
+              action: share
+              mode: attachment-route
+              segment: !Ref Segment3Name
+              share-with: !Ref Segment3ShareWith
+            - !Ref AWS::NoValue
+
+          - !If
+            - Has5Segments
+            - 
+              action: share
+              mode: attachment-route
+              segment: !Ref Segment4Name
+              share-with: !Ref Segment4ShareWith
+            - !Ref AWS::NoValue
+
+        attachment-policies:
+
+          - !If
+            - Has2Segments
+            - rule-number: 1
+              description: "VPCs tagged as Development go to Development segment"
+              conditions:
+                - type: tag-value
+                  key: Environment
+                  operator: equals
+                  value: !Ref Segment1Name
+              action:
+                association-method: constant
+                segment: !Ref Segment1Name
+            - !Ref AWS::NoValue
+
+          - !If
+            - Has3Segments
+            - 
+              rule-number: 2
+              description: "VPCs tagged as Production go to Production segment"
+              conditions:
+                - type: tag-value
+                  key: Environment
+                  operator: equals
+                  value: !Ref Segment2Name
+              action:
+                association-method: constant
+                segment: !Ref Segment2Name
+            - !Ref AWS::NoValue
+
+          - !If
+            - Has4Segments
+            - 
+              rule-number: 3
+              description: "VPCs tagged as Staging go to Staging segment"
+              conditions:
+                - type: tag-value
+                  key: Environment
+                  operator: equals
+                  value: !Ref Segment3Name
+              action:
+                association-method: constant
+                segment: !Ref Segment3Name
+            - !Ref AWS::NoValue
+
+          - !If
+            - Has5Segments
+            - 
+              rule-number: 4
+              description: "VPCs tagged as Production go to Production segment"
+              conditions:
+                - type: tag-value
+                  key: Environment
+                  operator: equals
+                  value: !Ref Segment4Name
+              action:
+                association-method: constant
+                segment: !Ref Segment4Name
+            - !Ref AWS::NoValue
+
+          - rule-number: 100
+            description: "VPCs tagged as Shared go to Shared segment"
+            conditions:
+              - type: any
+            action:
+              association-method: constant
+              segment: !Ref Segment0Name
+
+      Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value: !Sub "${ProjectName}-${EnvironmentName}-${Name}"
+        - Key: ManagedBy
+          Value: "CloudFormation"
+        - Key: ProjectName
+          Value: !Ref ProjectName
+        - Key: StackName
+          Value: !Ref AWS::StackName
+
+
+  CoreNetworkToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: SaveInS3File
+
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:NetworkManagerResourceToS3"]]
+      ServiceTimeout: 600
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Region: !Ref AWS::Region
+      ResourceType: "CoreNetwork"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:NetworkManager:CoreNetwork:${Name}"
+      Value: !Ref CoreNetwork
+
+
+Outputs:
+  CoreNetworkArn:
+    Description: Core Network ARN
+    Value: !GetAtt CoreNetwork.CoreNetworkArn
+  CoreNetworkId:
+    Description: Core Network ID
+    Value: !Ref CoreNetwork
+  CreatedAt:
+    Description: Creation date of the Core Network
+    Value: !GetAtt CoreNetwork.CreatedAt
+  State:
+    Description: State of the Core Network
+    Value: !GetAtt CoreNetwork.State

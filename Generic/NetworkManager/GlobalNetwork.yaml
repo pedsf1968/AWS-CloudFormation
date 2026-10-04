@@ -1,0 +1,89 @@
+---
+
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template deploys a Global Network
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "150_AWSCloudWANNetwork"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: ["dev", "test", "staging", "prod"]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String    
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "true"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+  # Stack parameters
+  Description:
+    Default: "My Global Network"
+    Description: "A brief description of the Global Network"
+    MaxLength: 255
+    Type: String
+  Name:
+    Default: "Global-Network"
+    Description: "Global Network name"
+    Type: String
+
+Conditions:
+  SaveInS3File: !Equals [ !Ref SaveInS3File, "true"]
+
+Resources:
+  GlobalNetwork:
+    Type: AWS::NetworkManager::GlobalNetwork
+    Properties:
+      Description: !Ref Description
+      Tags:
+        - Key: EnvironmentName
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value: !Ref Name
+        - Key: ManagedBy
+          Value: "CloudFormation"
+        - Key: ProjectName
+          Value: !Ref ProjectName
+        - Key: StackName
+          Value: !Ref AWS::StackName
+
+  GlobalNetworkToS3:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: SaveInS3File
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ServiceToken: !Join [ ":", [ "arn:aws:lambda", !Sub "${AWS::Region}", !Sub "${AWS::AccountId}", "function:NetworkManagerResourceToS3"]]
+      ServiceTimeout: 300
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Region: !Ref AWS::Region
+      ResourceType: "GlobalNetwork"
+      Key: !Sub "${AWS::Region}:${ProjectName}:${EnvironmentName}:NetworkManager:GlobalNetwork:${Name}"
+      Value: !Ref GlobalNetwork
+
+Outputs:
+  GlobalNetworkId:
+    Description: "Global Network ID"
+    Value: !Ref GlobalNetwork
+  GlobalNetworkArn:
+    Description: "Global Network ARN"
+    Value: !GetAtt GlobalNetwork.Arn

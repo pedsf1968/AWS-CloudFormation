@@ -48,10 +48,10 @@ Parameters:
     Default: "A,B"
     Description: "Names of all Route Tables"
     Type: CommaDelimitedList
-  SubnetPrivateId:
+  PrivateSubnetId:
     Description: "Private Subnets ID"
     Type: String
-  SubnetPublicId:
+  PublicSubnetId:
     Description: "Public Subnets ID"
     Type: String
   VpcId:
@@ -60,7 +60,7 @@ Parameters:
 
 Resources:  
   # Route, Route Table and Associations
-  SubnetPublicRouteTableStack:
+  PublicSubnetRouteTableStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -76,9 +76,9 @@ Resources:
         SaveInS3File: !Ref SaveInS3File
         VpcId: !Ref VpcId
         RouteTableName: !Join [ "-", [ !Select [ 0, !Ref RouteTableNames ], "Application" ] ]
-        SubnetId: !Ref SubnetPublicId
+        SubnetId: !Ref PublicSubnetId
 
-  SubnetPublicRouteStack:
+  PublicSubnetRouteStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -93,12 +93,12 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         DestinationCidrBlock: "0.0.0.0/0"
-        RouteTableId: !GetAtt SubnetPublicRouteTableStack.Outputs.RouteTableId
+        RouteTableId: !GetAtt PublicSubnetRouteTableStack.Outputs.RouteTableId
         RouteTableName: !Join [ "-", [ !Select [ 0, !Ref RouteTableNames ], "Application" ] ]
         TargetType: "InternetGateway"
         TargetId: !Ref InternetGatewayId
 
-  SubnetPrivateRouteTableStack:
+  PrivateSubnetRouteTableStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -113,10 +113,10 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         RouteTableName: !Join [ "-", [ !Select [ 0, !Ref RouteTableNames ], "Database" ] ]
-        SubnetId: !Ref SubnetPrivateId
+        SubnetId: !Ref PrivateSubnetId
         VpcId: !Ref VpcId
 
-  SubnetPrivateRouteStack:
+  PrivateSubnetRouteStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -131,28 +131,28 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         DestinationCidrBlock: "0.0.0.0/0"
-        RouteTableId: !GetAtt SubnetPrivateRouteTableStack.Outputs.RouteTableId
+        RouteTableId: !GetAtt PrivateSubnetRouteTableStack.Outputs.RouteTableId
         RouteTableName: !Join [ "-", [ !Select [ 0, !Ref RouteTableNames ], "Database" ] ]
         TargetType: "NatGateway"
         TargetId: !Ref NatGatewayId
 
 Outputs:
-  SubnetPrivateRouteId:
+  PrivateSubnetRouteId:
     Description: "Private Subnet Route ID"
-    Value: !GetAtt SubnetPrivateRouteStack.Outputs.RouteId
-  SubnetPrivateRouteTableAssociationId:
+    Value: !GetAtt PrivateSubnetRouteStack.Outputs.RouteId
+  PrivateSubnetRouteTableAssociationId:
     Description: "Private Route Table Association ID"
-    Value: SubnetPrivateRouteTableStack.Outputs.SubnetRouteTableAssociationId
-  SubnetPrivateRouteTableId:
+    Value: PrivateSubnetRouteTableStack.Outputs.SubnetRouteTableAssociationId
+  PrivateSubnetRouteTableId:
     Description: "Private Subnet Route Table ID"
-    Value: !GetAtt SubnetPrivateRouteTableStack.Outputs.RouteTableId
+    Value: !GetAtt PrivateSubnetRouteTableStack.Outputs.RouteTableId
 
-  SubnetPublicRouteId:
+  PublicSubnetRouteId:
     Description: "Public Subnet Route IDs"
-    Value: !GetAtt SubnetPublicRouteStack.Outputs.RouteId
-  SubnetPublicRouteTableAssociationId:
+    Value: !GetAtt PublicSubnetRouteStack.Outputs.RouteId
+  PublicSubnetRouteTableAssociationId:
     Description: "Public Route Table Association ID"
-    Value: !GetAtt SubnetPublicRouteTableStack.Outputs.SubnetRouteTableAssociationId
-  SubnetPublicRouteTableId:
+    Value: !GetAtt PublicSubnetRouteTableStack.Outputs.SubnetRouteTableAssociationId
+  PublicSubnetRouteTableId:
     Description: "Public Subnet Route Table ID"
-    Value: !GetAtt SubnetPublicRouteTableStack.Outputs.RouteTableId
+    Value: !GetAtt PublicSubnetRouteTableStack.Outputs.RouteTableId

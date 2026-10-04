@@ -44,13 +44,13 @@ Parameters:
   RouteTableNames:
     Description: "Names of all Route Tables"
     Type: CommaDelimitedList
-  VpcASubnetPrivateIds:
+  VpcAPrivateSubnetIds:
     Description: "VPC A Private Subnets IDs"
     Type: CommaDelimitedList
-  VpcBSubnetPrivateIds:
+  VpcBPrivateSubnetIds:
     Description: "VPC B Private Subnets IDs"
     Type: CommaDelimitedList
-  SubnetPublicId:
+  PublicSubnetId:
     Description: "Public Subnets ID"
     Type: String
   VpcIds:
@@ -75,31 +75,31 @@ Resources:
         SaveInS3File: !Ref SaveInS3File
         VpcId: !Select [ 0, !Ref VpcIds ]
         RouteTableName: !Select [ 0, !Ref RouteTableNames]
-        SubnetId: !Ref SubnetPublicId
+        SubnetId: !Ref PublicSubnetId
 
-  VpcASubnetPrivateARouteTableAssociation:
+  VpcAPrivateSubnetARouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId: !GetAtt VpcARouteTableStack.Outputs.RouteTableId
-      SubnetId: !Select [0, !Ref VpcASubnetPrivateIds]
+      SubnetId: !Select [0, !Ref VpcAPrivateSubnetIds]
 
-  VpcASubnetPrivateBRouteTableAssociation:
+  VpcAPrivateSubnetBRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId: !GetAtt VpcARouteTableStack.Outputs.RouteTableId
-      SubnetId: !Select [1, !Ref VpcASubnetPrivateIds]
+      SubnetId: !Select [1, !Ref VpcAPrivateSubnetIds]
 
-  VpcASubnetPrivateCRouteTableAssociation:
+  VpcAPrivateSubnetCRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId: !GetAtt VpcARouteTableStack.Outputs.RouteTableId
-      SubnetId: !Select [2, !Ref VpcASubnetPrivateIds]
+      SubnetId: !Select [2, !Ref VpcAPrivateSubnetIds]
 
-  VpcASubnetPrivateDRouteTableAssociation:
+  VpcAPrivateSubnetDRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId: !GetAtt VpcARouteTableStack.Outputs.RouteTableId
-      SubnetId: !Select [3, !Ref VpcASubnetPrivateIds]
+      SubnetId: !Select [3, !Ref VpcAPrivateSubnetIds]
 
   VpcARouteStack:
     Type: AWS::CloudFormation::Stack
@@ -137,26 +137,26 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         RouteTableName: !Select [ 1, !Ref RouteTableNames ]
-        SubnetId: !Select [ 0, !Ref VpcBSubnetPrivateIds ]
+        SubnetId: !Select [ 0, !Ref VpcBPrivateSubnetIds ]
         VpcId: !Select [ 1, !Ref VpcIds ]
        
-  VpcBSubnetPrivateBRouteTableAssociation:
+  VpcBPrivateSubnetBRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId: !GetAtt VpcBRouteTableStack.Outputs.RouteTableId
-      SubnetId: !Select [1, !Ref VpcBSubnetPrivateIds]
+      SubnetId: !Select [1, !Ref VpcBPrivateSubnetIds]
     
-  VpcBSubnetPrivateCRouteTableAssociation:
+  VpcBPrivateSubnetCRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId: !GetAtt VpcBRouteTableStack.Outputs.RouteTableId
-      SubnetId: !Select [2, !Ref VpcBSubnetPrivateIds]
+      SubnetId: !Select [2, !Ref VpcBPrivateSubnetIds]
     
-  VpcBSubnetPrivateDRouteTableAssociation:
+  VpcBPrivateSubnetDRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId: !GetAtt VpcBRouteTableStack.Outputs.RouteTableId
-      SubnetId: !Select [3, !Ref VpcBSubnetPrivateIds]
+      SubnetId: !Select [3, !Ref VpcBPrivateSubnetIds]
 
 Outputs:
   VpcARouteTableAssociationIds:
@@ -164,10 +164,10 @@ Outputs:
     Value: !Join
       - ","
       - - !GetAtt VpcARouteTableStack.Outputs.SubnetRouteTableAssociationId
-        - !Ref VpcASubnetPrivateARouteTableAssociation
-        - !Ref VpcASubnetPrivateBRouteTableAssociation
-        - !Ref VpcASubnetPrivateCRouteTableAssociation
-        - !Ref VpcASubnetPrivateDRouteTableAssociation
+        - !Ref VpcAPrivateSubnetARouteTableAssociation
+        - !Ref VpcAPrivateSubnetBRouteTableAssociation
+        - !Ref VpcAPrivateSubnetCRouteTableAssociation
+        - !Ref VpcAPrivateSubnetDRouteTableAssociation
 
   VpcARouteTableId:
     Description: "VPC A Route Table ID"
@@ -177,11 +177,11 @@ Outputs:
     Description: "Public Subnet Route IDs"
     Value: !Ref VpcARouteStack
 
-  VpcASubnetPublicRouteTableAssociationIds:
+  VpcAPublicSubnetRouteTableAssociationIds:
     Description: "Public Route Table Association IDs"
     Value: !GetAtt VpcARouteTableStack.Outputs.SubnetRouteTableAssociationId
 
-  VpcASubnetPublicRouteTableIds:
+  VpcAPublicSubnetRouteTableIds:
     Description: "Public Subnet Route Table IDs"
     Value: !GetAtt VpcARouteTableStack.Outputs.RouteTableId
 
@@ -189,9 +189,9 @@ Outputs:
     Description: "VPC B Private Subnet Route Table Association IDs"
     Value: !Join
       - ","
-      - - !Ref VpcBSubnetPrivateBRouteTableAssociation
-        - !Ref VpcBSubnetPrivateCRouteTableAssociation
-        - !Ref VpcBSubnetPrivateDRouteTableAssociation
+      - - !Ref VpcBPrivateSubnetBRouteTableAssociation
+        - !Ref VpcBPrivateSubnetCRouteTableAssociation
+        - !Ref VpcBPrivateSubnetDRouteTableAssociation
 
   VpcBRouteTableId:
     Description: "VPC B Route Table ID"

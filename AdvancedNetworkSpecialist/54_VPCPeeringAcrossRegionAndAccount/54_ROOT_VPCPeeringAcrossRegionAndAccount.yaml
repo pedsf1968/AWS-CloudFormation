@@ -185,7 +185,6 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
-        FirstAccountId: !Ref FirstAccountId
         PeerRequesterAccountId: !Ref SecondAccountId
 
   VpcAndSubnets:
@@ -210,7 +209,7 @@ Resources:
         VpcCidrBlock: !FindInMap [RegionMap, !Ref "AWS::Region", VpcCidrBlock]
         VpcName: !FindInMap [RegionMap, !Ref "AWS::Region", VpcName]
 
-  # Make VPC peering with the first account
+  # Make VPC peering with the first account from the second account
   VPCPeering:
     Type: AWS::CloudFormation::Stack
     Condition: IsSecondAccount

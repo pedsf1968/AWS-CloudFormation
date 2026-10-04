@@ -30,8 +30,8 @@ Metadata:
           default: "Subnets configuration"
         Parameters:
           - SubnetName
-          - SubnetPrivateCidrBlock
-          - SubnetPublicCidrBlock
+          - PrivateSubnetCidrBlock
+          - PublicSubnetCidrBlock
       - Label:
           default: "IGW, Route Tables and Routes"
         Parameters:
@@ -115,11 +115,11 @@ Parameters:
     Default: "Subnet"
     Description: Subnet name
     Type: String
-  SubnetPrivateCidrBlock:
+  PrivateSubnetCidrBlock:
     Default: 10.10.1.0/24
     Description: "Private Subnet CIDR"
     Type: String
-  SubnetPublicCidrBlock:
+  PublicSubnetCidrBlock:
     Default: 10.10.0.0/24
     Description: "Public Subnet CIDR"
     Type: String
@@ -259,8 +259,8 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
-        SubnetPublicCidrBlock: !Ref SubnetPublicCidrBlock
-        SubnetPrivateCidrBlock: !Ref SubnetPrivateCidrBlock
+        PublicSubnetCidrBlock: !Ref PublicSubnetCidrBlock
+        PrivateSubnetCidrBlock: !Ref PrivateSubnetCidrBlock
         SubnetName: !Ref SubnetName
         VpcCidrBlock: !Ref VpcCidrBlock
         VpcName: !Ref VpcName
@@ -285,7 +285,7 @@ Resources:
         SaveInS3File: !Ref SaveInS3File
         IgwName: !Ref InternetGatewayName
         NgwName: !Ref NatGatewayName
-        SubnetPublicId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId
+        PublicSubnetId: !GetAtt VpcAndSubnets.Outputs.PublicSubnetId
         VpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
 
   RouteTables:
@@ -308,8 +308,8 @@ Resources:
         InternetGatewayId: !GetAtt Gateways.Outputs.InternetGatewayId
         NatGatewayId: !GetAtt Gateways.Outputs.NatGatewayId
         RouteTableNames: "A,B"
-        SubnetPrivateId: !GetAtt VpcAndSubnets.Outputs.SubnetPrivateId
-        SubnetPublicId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId
+        PrivateSubnetId: !GetAtt VpcAndSubnets.Outputs.PrivateSubnetId
+        PublicSubnetId: !GetAtt VpcAndSubnets.Outputs.PublicSubnetId
         VpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
 
   SecurityGroups:
@@ -361,23 +361,23 @@ Resources:
         ApplicationInstanceProfile: !GetAtt Roles.Outputs.InstanceProfileId
         ApplicationInstanceType: !Ref ApplicationInstanceType
         ApplicationInstanceSecurityGroup: !GetAtt SecurityGroups.Outputs.ApplicationInstanceSecurityGroupId
-        ApplicationInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId
+        ApplicationInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.PublicSubnetId
         BastionInstanceImageId: !Ref BastionInstanceImageId
         BastionInstanceName: !Ref BastionInstanceName
         BastionInstanceType: !Ref BastionInstanceType
         BastionInstanceSecurityGroup: !GetAtt SecurityGroups.Outputs.BastionInstanceSecurityGroupId
-        BastionInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId
+        BastionInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.PublicSubnetId
         DatabaseInstanceImageId: !Ref DatabaseInstanceImageId
         DatabaseInstanceName: !Ref DatabaseInstanceName
         DatabaseInstanceType: !Ref DatabaseInstanceType
         DatabaseInstanceSecurityGroup: !GetAtt SecurityGroups.Outputs.DatabaseInstanceSecurityGroupId
-        DatabaseInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.SubnetPrivateId
+        DatabaseInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.PrivateSubnetId
         DnsInstanceImageId: !Ref DnsInstanceImageId
         DnsInstanceName: !Ref DnsInstanceName
         DnsInstanceProfile: !GetAtt Roles.Outputs.InstanceProfileId
         DnsInstanceType: !Ref DnsInstanceType
         DnsInstanceSecurityGroup: !GetAtt SecurityGroups.Outputs.DnsInstanceSecurityGroupId
-        DnsInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId
+        DnsInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.PublicSubnetId
         KeyName: !Ref KeyName
 
   SSMDocuments:

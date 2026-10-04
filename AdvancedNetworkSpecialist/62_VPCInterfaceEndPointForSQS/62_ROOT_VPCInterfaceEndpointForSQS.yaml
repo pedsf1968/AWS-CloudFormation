@@ -33,8 +33,8 @@ Metadata:
           default: "Subnets configuration"
         Parameters:
           - SubnetName
-          - SubnetPrivateCidrBlock
-          - SubnetPublicCidrBlock
+          - PrivateSubnetCidrBlock
+          - PublicSubnetCidrBlock
       - Label:
           default: "IGW, Route Tables and Routes"
         Parameters:
@@ -95,19 +95,19 @@ Parameters:
     Default: "VPC-IGW"
     Type: String
 
-  SubnetPrivateNames:
+  PrivateSubnetNames:
     Default: "ec2-connect-endpoint-private-subnet,ec2-private-subnet,vpc-endpoint-private-subnet"
     Description: "Subnet names"
     Type: String
-  SubnetPrivateCidrBlocks:
+  PrivateSubnetCidrBlocks:
     Default: "10.10.1.0/24,10.10.2.0/24,10.10.3.0/24"
     Description: "Private Subnet CIDR"
     Type: String
-  SubnetPublicName:
+  PublicSubnetName:
     Default: "public-subnet"
     Description: "Subnet names"
     Type: String
-  SubnetPublicCidrBlock:
+  PublicSubnetCidrBlock:
     Default: "10.10.0.0/24"
     Description: "Public Subnet CIDR"
     Type: String
@@ -212,10 +212,10 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
-        SubnetPrivateCidrBlocks: !Ref SubnetPrivateCidrBlocks
-        SubnetPrivateNames: !Ref SubnetPrivateNames
-        SubnetPublicCidrBlock: !Ref SubnetPublicCidrBlock
-        SubnetPublicName: !Ref SubnetPublicName
+        PrivateSubnetCidrBlocks: !Ref PrivateSubnetCidrBlocks
+        PrivateSubnetNames: !Ref PrivateSubnetNames
+        PublicSubnetCidrBlock: !Ref PublicSubnetCidrBlock
+        PublicSubnetName: !Ref PublicSubnetName
         VpcCidrBlock: !Ref VpcCidrBlock
         VpcName: !Ref VpcName
 
@@ -275,12 +275,12 @@ Resources:
         ProjectName: !Ref ProjectName
         SaveInS3File: !Ref SaveInS3File
         InternetGatewayId: !GetAtt Gateways.Outputs.InternetGatewayId
-        SubnetPrivateIds: !Join
+        PrivateSubnetIds: !Join
           - ","
-          - - !GetAtt VpcAndSubnets.Outputs.SubnetPrivateAId
-            - !GetAtt VpcAndSubnets.Outputs.SubnetPrivateBId
-            - !GetAtt VpcAndSubnets.Outputs.SubnetPrivateCId
-        SubnetPublicId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId
+          - - !GetAtt VpcAndSubnets.Outputs.PrivateSubnetAId
+            - !GetAtt VpcAndSubnets.Outputs.PrivateSubnetBId
+            - !GetAtt VpcAndSubnets.Outputs.PrivateSubnetCId
+        PublicSubnetId: !GetAtt VpcAndSubnets.Outputs.PublicSubnetId
         VpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
 
   SecurityGroups:
@@ -299,7 +299,7 @@ Resources:
         BucketObject: !Ref BucketObject
         EnvironmentName: !Ref EnvironmentName
         ProjectName: !Ref ProjectName
-        ApplicationInstanceIngressCidrIp: !Ref SubnetPublicCidrBlock
+        ApplicationInstanceIngressCidrIp: !Ref PublicSubnetCidrBlock
         ApplicationInstanceVpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
         BastionInstanceIngressCidrIp: "0.0.0.0/0"
         BastionInstanceVpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
@@ -324,7 +324,7 @@ Resources:
         SaveInS3File: !Ref SaveInS3File
         QueueArn: !GetAtt SQS.Outputs.QueueArn
         SecurityGroupId: !GetAtt SecurityGroups.Outputs.InterfaceSecurityGroupId
-        SubnetId: !GetAtt VpcAndSubnets.Outputs.SubnetPrivateCId
+        SubnetId: !GetAtt VpcAndSubnets.Outputs.PrivateSubnetCId
         VpcId: !GetAtt VpcAndSubnets.Outputs.VpcId
 
   Instances:
@@ -349,10 +349,10 @@ Resources:
         ApplicationInstanceProfile: !GetAtt Roles.Outputs.InstanceProfileId
         ApplicationInstanceType: !Ref ApplicationInstanceType
         ApplicationInstanceSecurityGroup: !GetAtt SecurityGroups.Outputs.ApplicationInstanceSecurityGroupId
-        ApplicationInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.SubnetPrivateBId
+        ApplicationInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.PrivateSubnetBId
         BastionInstanceImageId: !Ref BastionInstanceImageId
         BastionInstanceName: !Ref BastionInstanceName
         BastionInstanceType: !Ref BastionInstanceType
         BastionInstanceSecurityGroup: !GetAtt SecurityGroups.Outputs.BastionInstanceSecurityGroupId
-        BastionInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.SubnetPublicId
+        BastionInstanceSubnetId: !GetAtt VpcAndSubnets.Outputs.PublicSubnetId
         KeyName: !Ref KeyName

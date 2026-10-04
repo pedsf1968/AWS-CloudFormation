@@ -82,7 +82,7 @@ Resources:
         CidrBlock: !Select [ 1, !Ref VpcCidrBlocks ]        
         VpcName: !Select [ 1, !Ref VpcNames ]
 
-  SubnetPrivateAStack:
+  PrivateSubnetAStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -107,7 +107,7 @@ Resources:
         SubnetName: "A-Private"
         VpcId: !GetAtt VpcAStack.Outputs.VpcId
 
-  SubnetPublicAStack:
+  PublicSubnetAStack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -132,7 +132,7 @@ Resources:
         SubnetName: "A-Public"
         VpcId: !GetAtt VpcAStack.Outputs.VpcId
 
-  SubnetPrivateB1Stack:
+  PrivateSubnetB1Stack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -157,7 +157,7 @@ Resources:
         SubnetName: "B-NLB"
         VpcId: !GetAtt VpcBStack.Outputs.VpcId
 
-  SubnetPrivateB2Stack:
+  PrivateSubnetB2Stack:
     Type: AWS::CloudFormation::Stack
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete
@@ -189,13 +189,13 @@ Outputs:
       - ","
       - - !GetAtt VpcAStack.Outputs.VpcId
         - !GetAtt VpcBStack.Outputs.VpcId
-  SubnetPrivateIds:
+  PrivateSubnetIds:
     Description: "Private Subnet Ids"
     Value: !Join
       - ","
-      - - !GetAtt SubnetPrivateAStack.Outputs.SubnetId
-        - !GetAtt SubnetPrivateB1Stack.Outputs.SubnetId
-        - !GetAtt SubnetPrivateB2Stack.Outputs.SubnetId
-  SubnetPublicId:
+      - - !GetAtt PrivateSubnetAStack.Outputs.SubnetId
+        - !GetAtt PrivateSubnetB1Stack.Outputs.SubnetId
+        - !GetAtt PrivateSubnetB2Stack.Outputs.SubnetId
+  PublicSubnetId:
     Description: "Public Subnets Ids"
-    Value: !GetAtt SubnetPublicAStack.Outputs.SubnetId
+    Value: !GetAtt PublicSubnetAStack.Outputs.SubnetId

@@ -1,0 +1,312 @@
+---
+
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  This template deploys a Global Network
+
+Parameters:
+  # Global parameters
+  Bucket:
+    Default: "hawkfund-cloudformation"
+    Description: CloudFormation buket URL
+    Type: String
+  BucketKey:
+    Default: "150_AWSCloudWANNetwork"
+    Description: Key to find object in the bucket
+    Type: String
+  BucketObject:
+    Default: "Data.json"
+    Description: "File to store data in the bucket"
+    Type: String
+  BucketRegion:
+    AllowedValues: ["eu-west-3", "eu-central-1"]
+    Default: "eu-west-3"
+    Description: "Region where is the Bucket"
+    Type: String
+  EnvironmentName:
+    AllowedValues: ["dev", "test", "staging", "prod"]
+    ConstraintDescription: "Must specify dev, test or prod"
+    Default: "dev"
+    Description: "Environment name that prefix all resources"
+    Type: String    
+  ProjectName:
+    Default: "ANS"
+    Description: "Project name that prefix all resources"
+    Type: String
+  SaveInS3File:
+    AllowedValues: [ "false", "true" ]
+    Default: "true"
+    Description: "Save resources information in s3 file"
+    Type: String
+
+  # Stack parameters
+  CoreNetworkName:
+    Default: "Core-Network"
+    Description: "Core Network name"
+    Type: String
+  EdgeLocations:
+    Default: "eu-west-3,eu-central-1,ap-northeast-2"
+    Description: "Comma-separated list of edge locations for the core network"
+    Type: String
+  FirstRegion:
+    Description: Region of the first AWS Account
+    Type: String
+    Default: eu-west-3
+  GlobalNetworkName:
+    Default: "Global-Network"
+    Description: "Global Network name"
+    Type: String
+  Phase:
+    AllowedValues: [ "Phase1", "Phase2", "Phase3" ]
+    Default: Phase1
+    Description: "Deploy successively Phase1, Phase2, and Phase3"
+    Type: String
+  SegmentCount:
+    Default: 3
+    Description: "Number of segments for the core network"
+    Type: Number
+  SegmentDescriptions:
+    Default: "Shared segment,Development segment,Production segment"
+    Description: "Comma-separated list of segment descriptions for the Core Network"
+    Type: CommaDelimitedList
+  SegmentNames:
+    Default: "Shared,Development,Production"
+    Description: "Comma-separated list of segments for the Core Network"
+    Type: CommaDelimitedList
+  SubnetNames:
+    Description: Subnet names
+    Type: CommaDelimitedList
+  VpcCount:
+    Default: 1
+    Description: "Number of VPCs to attach to the Core Network"
+    Type: Number
+  VpcNames:
+    Default: "VPC-1"
+    Description: "Comma-separated list of VPC names to attach to the Core Network"
+    Type: CommaDelimitedList
+
+Conditions:
+  IsFirstRegion: !Equals [ !Ref AWS::Region, !Ref FirstRegion ]
+  IsFirstRegionAndPhase2: !And 
+    - !Equals [ !Ref AWS::Region, !Ref FirstRegion ]
+    - !Equals [ "Phase2", !Ref Phase]
+  IsThirdPhase: !Equals [ "Phase3", !Ref Phase]
+  IsThirdPhaseAndTwoVpcs: !And 
+    - !Equals [ "Phase3", !Ref Phase]
+    - !Equals [ !Ref VpcCount, 2 ]
+
+
+Resources:
+  GlobalNetwork:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsFirstRegion
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/NetworkManager/GlobalNetwork.yaml"
+      TimeoutInMinutes: 5
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        Name: !Ref GlobalNetworkName
+
+  CoreNetwork:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsFirstRegionAndPhase2
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/NetworkManager/CoreNetwork.yaml"
+      TimeoutInMinutes: 30
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        EdgeLocations: !Ref EdgeLocations
+        EdgeLocationCount: 3
+        GlobalNetworkId: !GetAtt GlobalNetwork.Outputs.GlobalNetworkId
+        Name: !Ref CoreNetworkName
+        #Shared segment
+        Segment0Name: !Select [0, !Ref SegmentNames]
+        Segment0Description: !Select [0, !Ref SegmentDescriptions]
+        Segment0FilterType: "allow"
+        Segment0FilterSegments: "Development,Production"
+        Segment0ShareWith: "Development,Production"
+        # Development segment
+        Segment1Name: !Select [1, !Ref SegmentNames]
+        Segment1Description: !Select [1, !Ref SegmentDescriptions]
+        Segment1FilterType: "allow"
+        Segment1FilterSegments: "Shared"
+        # Production segment
+        Segment2Name: !Select [2, !Ref SegmentNames]
+        Segment2Description: !Select [2, !Ref SegmentDescriptions]
+        Segment2FilterType: "allow"
+        Segment2FilterSegments: "Shared"
+        SegmentCount: !Ref SegmentCount
+
+  GetCoreNetworkId:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: IsThirdPhase
+    Properties:
+      ServiceToken: !Join [":", ["arn:aws:lambda", !Ref AWS::Region, !Ref AWS::AccountId, "function:GetParametersFromS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Key: !Sub "${FirstRegion}:${ProjectName}:${EnvironmentName}:NetworkManager:CoreNetwork:${CoreNetworkName}:CoreNetworkId"
+      Delay: 30
+      DelayCount: 3
+
+  GetVpc0Id:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: IsThirdPhase
+    Properties:
+      ServiceToken: !Join [":", ["arn:aws:lambda", !Ref AWS::Region, !Ref AWS::AccountId, "function:GetParametersFromS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Key: !Sub 
+        - "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:VPC:${VpcName}:VpcId"
+        - VpcName: !Select [0, !Ref VpcNames]
+      Delay: 30
+      DelayCount: 3
+
+  GetVpc0Subnet0Arn:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: IsThirdPhase
+    Properties:
+      ServiceToken: !Join [":", ["arn:aws:lambda", !Ref AWS::Region, !Ref AWS::AccountId, "function:GetParametersFromS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Key: !Sub 
+        - "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:Subnet:${SubnetName}:SubnetArn"
+        - SubnetName: !Select [0, !Ref SubnetNames]
+      Delay: 30
+      DelayCount: 3
+
+  VpcAttachment0:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsThirdPhase
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/NetworkManager/VpcAttachment.yaml"
+      TimeoutInMinutes: 10
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        Name: !Sub 
+          - ${AWS::Region}-${SegmentName}-VpcAttachment
+          - SegmentName: !Select [0, !Ref SegmentNames]
+        TagValueAttachment: !Select [0, !Ref SegmentNames]
+        VpcId: !GetAtt GetVpc0Id.Value
+        SubnetArns: !GetAtt GetVpc0Subnet0Arn.Value
+        CoreNetworkId: !GetAtt GetCoreNetworkId.Value
+
+  GetVpc1Id:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: IsThirdPhaseAndTwoVpcs
+    Properties:
+      ServiceToken: !Join [":", ["arn:aws:lambda", !Ref AWS::Region, !Ref AWS::AccountId, "function:GetParametersFromS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Key: !Sub 
+        - "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:VPC:${VpcName}:VpcId"
+        - VpcName: !Select [1, !Ref VpcNames]
+      Delay: 30
+      DelayCount: 3
+
+
+  GetVpc1Subnet0Arn:
+    Type: AWS::CloudFormation::CustomResource
+    Condition: IsThirdPhaseAndTwoVpcs
+    Properties:
+      ServiceToken: !Join [":", ["arn:aws:lambda", !Ref AWS::Region, !Ref AWS::AccountId, "function:GetParametersFromS3"]]
+      ServiceTimeout: 60
+      Bucket: !Ref Bucket
+      BucketKey: !Ref BucketKey
+      BucketObject: !Ref BucketObject
+      Key: !Sub 
+        - "${AWS::Region}:${ProjectName}:${EnvironmentName}:EC2:Subnet:${SubnetName}:SubnetArn"
+        - SubnetName: !Select [1, !Ref SubnetNames]
+      Delay: 30
+      DelayCount: 3
+
+  VpcAttachment1:
+    Type: AWS::CloudFormation::Stack
+    Condition: IsThirdPhaseAndTwoVpcs
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TemplateURL: !Sub "https://${Bucket}.s3.${BucketRegion}.amazonaws.com/Generic/NetworkManager/VpcAttachment.yaml"
+      TimeoutInMinutes: 10
+      Parameters:
+        Bucket: !Ref Bucket
+        BucketKey: !Ref BucketKey
+        BucketObject: !Ref BucketObject
+        EnvironmentName: !Ref EnvironmentName
+        ProjectName: !Ref ProjectName
+        SaveInS3File: !Ref SaveInS3File
+        Name: !Sub 
+          - ${AWS::Region}-${SegmentName}-VpcAttachment
+          - SegmentName: !Select [1, !Ref SegmentNames]
+        TagValueAttachment: !Select [1, !Ref SegmentNames]
+        VpcId: !GetAtt GetVpc1Id.Value
+        SubnetArns: !GetAtt GetVpc1Subnet0Arn.Value
+        CoreNetworkId: !GetAtt GetCoreNetworkId.Value
+
+Outputs:
+  GlobalNetworkId:
+    Description: ID of the Global Network
+    Value: !If
+      - IsFirstRegion
+      - !GetAtt GlobalNetwork.Outputs.GlobalNetworkId
+      - ""
+
+  CoreNetworkId:
+    Description: ID of the Core Network
+    Value: !If
+      - IsThirdPhase
+      - !GetAtt GetCoreNetworkId.Value
+      - ""
+
+  Vpc0Id:
+    Description: ID of the VPC 0
+    Value: !If
+      - IsThirdPhase
+      - !GetAtt GetVpc0Id.Value
+      - ""
+  Vpc0Subnet0Arn:
+    Description: ARN of the Subnet 0
+    Value: !If
+      - IsThirdPhase
+      - !GetAtt GetVpc0Subnet0Arn.Value
+      - ""
+  
+  Vpc1Id:
+    Description: ID of the VPC 1
+    Value: !If
+      - IsThirdPhaseAndTwoVpcs
+      - !GetAtt GetVpc1Id.Value
+      - ""
+  Vpc1Subnet0Arn:
+    Description: ARN of the Subnet 1
+    Value: !If
+      - IsThirdPhaseAndTwoVpcs
+      - !GetAtt GetVpc1Subnet0Arn.Value
+      - ""
